@@ -1,5 +1,7 @@
 # Brassbox Lexicon Prototype
 
+**Live App: [Play Letter Punk](https://letter-punk.jmajerus.workers.dev)**
+
 Open `public/index.html` directly in a browser, or serve the `public/` folder with any static file server if you prefer.
 
 For Cloudflare Workers, the project is intentionally static-only, so the Worker can serve the built-in files without any server logic. The included `wrangler.toml` points Workers at the `public/` asset directory.

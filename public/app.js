@@ -640,6 +640,54 @@ function createSvgPath(className, d, animate = false) {
   return path;
 }
 
+function createSvgCircle(className, cx, cy, r) {
+  const circle = document.createElementNS(SVG_NS, 'circle');
+  circle.setAttribute('class', className);
+  circle.setAttribute('cx', String(cx));
+  circle.setAttribute('cy', String(cy));
+  circle.setAttribute('r', String(r));
+  return circle;
+}
+
+function buildPipeRoute(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const points = [{ x: from.x, y: from.y }];
+
+  // Use elbow routes for most links so connectors look like rigid pipes.
+  if (Math.abs(dx) > 20 && Math.abs(dy) > 20) {
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      points.push({ x: to.x, y: from.y });
+    } else {
+      points.push({ x: from.x, y: to.y });
+    }
+  }
+
+  points.push({ x: to.x, y: to.y });
+
+  const d = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+
+  return { d, points };
+}
+
+function appendPipePath(d, animate = false) {
+  const shell = createSvgPath('board-pipe-shell', d, false);
+  const core = createSvgPath('board-pipe-core', d, animate);
+  const highlight = createSvgPath('board-pipe-highlight', d, false);
+  boardLinksElement.append(shell, core, highlight);
+}
+
+function appendPipeJoints(points) {
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const point = points[index];
+    const jointOuter = createSvgCircle('board-pipe-joint-shell', point.x, point.y, 8.5);
+    const jointInner = createSvgCircle('board-pipe-joint-core', point.x, point.y, 5.25);
+    boardLinksElement.append(jointOuter, jointInner);
+  }
+}
+
 function renderBoardLinks() {
   if (!boardLinksElement) {
     return;
@@ -667,8 +715,9 @@ function renderBoardLinks() {
       const previousPoint = getTokenPoint(state.tokens[index - 1]);
       if (previousPoint) {
         const shouldAnimateLink = index === state.tokens.length - 1;
-        const link = createSvgPath('board-link', `M ${previousPoint.x} ${previousPoint.y} L ${point.x} ${point.y}`, shouldAnimateLink);
-        boardLinksElement.append(link);
+        const route = buildPipeRoute(previousPoint, point);
+        appendPipePath(route.d, shouldAnimateLink);
+        appendPipeJoints(route.points);
       }
     }
 
@@ -694,8 +743,7 @@ function renderBoardLinks() {
 
       const loopPath = `M ${point.x} ${point.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${mx} ${my} C ${c3x} ${c3y}, ${c4x} ${c4y}, ${point.x} ${point.y}`;
       const shouldAnimateLoop = index === state.tokens.length - 1;
-      const loop = createSvgPath('board-loop', loopPath, shouldAnimateLoop);
-      boardLinksElement.append(loop);
+      appendPipePath(loopPath, shouldAnimateLoop);
     }
   }
 }

@@ -210,24 +210,43 @@ h2 {
   pointer-events: none;
 }
 
-.board-link,
-.board-loop {
+.board-pipe-shell,
+.board-pipe-core,
+.board-pipe-highlight {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
-.board-link {
-  stroke: rgba(156, 200, 213, 0.82);
-  stroke-width: 3;
-  filter: drop-shadow(0 0 6px rgba(156, 200, 213, 0.4));
+.board-pipe-shell {
+  stroke: rgba(64, 42, 29, 0.95);
+  stroke-width: 10;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
-.board-loop {
-  stroke: rgba(240, 197, 109, 0.9);
-  stroke-width: 3.4;
-  filter: drop-shadow(0 0 7px rgba(240, 197, 109, 0.38));
+.board-pipe-core {
+  stroke: rgba(195, 134, 78, 0.96);
+  stroke-width: 7;
+  filter: drop-shadow(0 0 5px rgba(231, 166, 98, 0.25));
+}
+
+.board-pipe-highlight {
+  stroke: rgba(244, 211, 155, 0.7);
+  stroke-width: 2;
+  stroke-dasharray: 18 26;
+  filter: drop-shadow(0 0 2px rgba(250, 230, 196, 0.25));
+}
+
+.board-pipe-joint-shell {
+  fill: rgba(74, 49, 34, 0.96);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.board-pipe-joint-core {
+  fill: rgba(198, 141, 87, 0.98);
+  stroke: rgba(245, 210, 154, 0.65);
+  stroke-width: 1.1;
 }
 
 .side {
