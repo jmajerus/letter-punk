@@ -78,14 +78,14 @@ body {
 .app-shell {
   width: min(1280px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 28px 0 40px;
+  padding: 20px 0 30px;
   position: relative;
 }
 
 .hero {
   display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .eyebrow,
@@ -143,22 +143,22 @@ h2 {
 }
 
 .board-card {
-  padding: 22px;
+  padding: 18px;
 }
 
 .board-header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: end;
-  margin-bottom: 18px;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .board-tools {
   display: flex;
   flex-direction: column;
   align-items: end;
-  gap: 10px;
+  gap: 6px;
 }
 
 .board-tool-buttons {
@@ -198,7 +198,7 @@ h2 {
 .board-wrap {
   display: flex;
   justify-content: center;
-  padding: 16px 0 22px;
+  padding: 8px 0 14px;
   position: relative;
 }
 
@@ -882,7 +882,24 @@ button {
 @media (max-width: 820px) {
   .app-shell {
     width: min(100vw - 20px, 1280px);
-    padding-top: 16px;
+    padding-top: 10px;
+    padding-bottom: 20px;
+  }
+
+  .hero {
+    margin-bottom: 6px;
+  }
+
+  .board-card {
+    padding: 14px;
+  }
+
+  .board-header {
+    margin-bottom: 8px;
+  }
+
+  .board-wrap {
+    padding: 6px 0 10px;
   }
 
   .board-card,
