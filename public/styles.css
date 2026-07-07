@@ -218,21 +218,6 @@ h2 {
     0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
-.board-frame::after {
-  content: "";
-  position: absolute;
-  inset: 20px;
-  border-radius: 24px;
-  pointer-events: none;
-  z-index: 1;
-  background:
-    linear-gradient(90deg, transparent 0 10%, rgba(170, 121, 76, 0.1) 10% 11.2%, transparent 11.2% 88.8%, rgba(170, 121, 76, 0.1) 88.8% 90%, transparent 90% 100%),
-    radial-gradient(circle at 6% 50%, rgba(198, 149, 97, 0.46) 0 4px, transparent 4px),
-    radial-gradient(circle at 94% 50%, rgba(198, 149, 97, 0.46) 0 4px, transparent 4px),
-    radial-gradient(circle at 50% 8%, rgba(198, 149, 97, 0.3) 0 3px, transparent 3px),
-    radial-gradient(circle at 50% 92%, rgba(198, 149, 97, 0.3) 0 3px, transparent 3px);
-}
-
 .board {
   position: absolute;
   inset: 0;
