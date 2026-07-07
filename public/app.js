@@ -1,14 +1,12 @@
-const BOARD = [
-  { side: 0, name: 'top', letters: ['C', 'R', 'T'] },
-  { side: 1, name: 'right', letters: ['O', 'A', 'E'] },
-  { side: 2, name: 'bottom', letters: ['L', 'N', 'S'] },
-  { side: 3, name: 'left', letters: ['D', 'I', 'M'] },
-];
+const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
+const VOWELS = ['A', 'E', 'I', 'O', 'U'];
+const CONSONANTS = ['R', 'S', 'T', 'L', 'N', 'D', 'M', 'C', 'P', 'H', 'G', 'B', 'F', 'K', 'W', 'Y', 'V', 'J', 'X', 'Q', 'Z'];
 
 const DICTIONARY_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 const VALIDATION_TIMEOUT_MS = 3500;
 const validationCache = new Map();
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -26,17 +24,65 @@ const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const letterButtons = new Map();
 
+function pickRandom(source, count) {
+  const pool = [...source];
+  const picked = [];
+
+  while (picked.length < count && pool.length > 0) {
+    const index = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(index, 1)[0]);
+  }
+
+  return picked;
+}
+
+function buildBoard() {
+  const sideCounts = SIDE_NAMES.map(() => 3);
+  const totalLetters = sideCounts.reduce((sum, value) => sum + value, 0);
+  const vowelCount = Math.min(5, Math.max(4, Math.round(totalLetters * 0.3)));
+  const consonantCount = totalLetters - vowelCount;
+
+  const selectedLetters = [...pickRandom(VOWELS, vowelCount), ...pickRandom(CONSONANTS, consonantCount)];
+
+  for (let index = selectedLetters.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const temp = selectedLetters[index];
+    selectedLetters[index] = selectedLetters[swapIndex];
+    selectedLetters[swapIndex] = temp;
+  }
+
+  const board = [];
+  let cursor = 0;
+  for (let side = 0; side < SIDE_NAMES.length; side += 1) {
+    const count = sideCounts[side];
+    board.push({
+      side,
+      name: SIDE_NAMES[side],
+      letters: selectedLetters.slice(cursor, cursor + count),
+    });
+    cursor += count;
+  }
+
+  return board;
+}
+
+let BOARD = buildBoard();
 const lettersToSide = new Map();
-for (const side of BOARD) {
-  for (const letter of side.letters) {
-    lettersToSide.set(letter.toLowerCase(), side.side);
+function refreshLettersToSide() {
+  lettersToSide.clear();
+  for (const side of BOARD) {
+    for (const letter of side.letters) {
+      lettersToSide.set(letter.toLowerCase(), side.side);
+    }
   }
 }
+refreshLettersToSide();
 
 const state = {
   tokens: [],
   foundWords: [],
   score: 0,
+  usedLetters: new Set(),
   messageTimer: null,
 };
 
@@ -87,6 +133,10 @@ function setMessage(text, kind = '') {
 }
 
 function renderBoard() {
+  BOARD = buildBoard();
+  refreshLettersToSide();
+  state.usedLetters.clear();
+
   boardElement.innerHTML = '';
   letterButtons.clear();
 
@@ -140,10 +190,34 @@ function getTokenPoint(token) {
   };
 }
 
+function animatePathDraw(path) {
+  if (prefersReducedMotion) {
+    return;
+  }
+
+  const length = path.getTotalLength();
+  path.style.strokeDasharray = `${length}`;
+  path.style.strokeDashoffset = `${length}`;
+
+  requestAnimationFrame(() => {
+    path.style.transition = 'stroke-dashoffset 170ms ease-out';
+    path.style.strokeDashoffset = '0';
+  });
+
+  path.addEventListener('transitionend', () => {
+    path.style.transition = '';
+    path.style.strokeDasharray = '';
+    path.style.strokeDashoffset = '';
+  }, { once: true });
+}
+
 function createSvgPath(className, d, animate = false) {
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('class', animate ? `${className} is-new` : className);
+  path.setAttribute('class', className);
   path.setAttribute('d', d);
+  if (animate) {
+    animatePathDraw(path);
+  }
   return path;
 }
 
@@ -188,16 +262,16 @@ function renderBoardLinks() {
       const px = -uy;
       const py = ux;
 
-      const c1x = point.x + (px * 20) + (ux * 10);
-      const c1y = point.y + (py * 20) + (uy * 10);
-      const c2x = point.x + (px * 24) + (ux * 34);
-      const c2y = point.y + (py * 24) + (uy * 34);
-      const mx = point.x + (ux * 42);
-      const my = point.y + (uy * 42);
-      const c3x = point.x - (px * 24) + (ux * 34);
-      const c3y = point.y - (py * 24) + (uy * 34);
-      const c4x = point.x - (px * 20) + (ux * 10);
-      const c4y = point.y - (py * 20) + (uy * 10);
+      const c1x = point.x + (px * 28) + (ux * 14);
+      const c1y = point.y + (py * 28) + (uy * 14);
+      const c2x = point.x + (px * 34) + (ux * 48);
+      const c2y = point.y + (py * 34) + (uy * 48);
+      const mx = point.x + (ux * 62);
+      const my = point.y + (uy * 62);
+      const c3x = point.x - (px * 34) + (ux * 48);
+      const c3y = point.y - (py * 34) + (uy * 48);
+      const c4x = point.x - (px * 28) + (ux * 14);
+      const c4y = point.y - (py * 28) + (uy * 14);
 
       const loopPath = `M ${point.x} ${point.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${mx} ${my} C ${c3x} ${c3y}, ${c4x} ${c4y}, ${point.x} ${point.y}`;
       const shouldAnimateLoop = index === state.tokens.length - 1;
@@ -253,10 +327,17 @@ function renderStats() {
   foundCountElement.textContent = String(state.foundWords.length);
 }
 
+function renderLetterUsage() {
+  for (const [letter, button] of letterButtons.entries()) {
+    button.classList.toggle('used', state.usedLetters.has(letter));
+  }
+}
+
 function updateUI() {
   renderCurrentWord();
   renderFoundWords();
   renderStats();
+  renderLetterUsage();
   renderBoardLinks();
 }
 
@@ -388,6 +469,11 @@ async function submitWord() {
 
   state.score += length;
   state.foundWords.unshift({ word, length });
+
+  for (const token of state.tokens) {
+    state.usedLetters.add(token.letter);
+  }
+
   updateUI();
   setMessage(`Accepted ${word.toUpperCase()}.`, 'success');
   clearTokens(true);
