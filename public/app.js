@@ -6,7 +6,8 @@ const DICTIONARY_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 const VALIDATION_TIMEOUT_MS = 3500;
 const validationCache = new Map();
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
+const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -15,11 +16,18 @@ const messageElement = document.getElementById('message');
 const foundWordsElement = document.getElementById('foundWords');
 const scoreValueElement = document.getElementById('scoreValue');
 const foundCountElement = document.getElementById('foundCount');
+const scoreStatElement = document.getElementById('scoreStat');
+const foundStatElement = document.getElementById('foundStat');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
 const setBoardButton = document.getElementById('setBoardBtn');
+const settingsButton = document.getElementById('settingsBtn');
 const helpButton = document.getElementById('helpBtn');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsButton = document.getElementById('closeSettingsBtn');
+const saveSettingsButton = document.getElementById('saveSettingsBtn');
+const reducedMotionToggle = document.getElementById('reducedMotionToggle');
 const helpModal = document.getElementById('helpModal');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
@@ -44,6 +52,57 @@ const BOARD_INPUTS = {
   bottom: boardBottomInput,
   left: boardLeftInput,
 };
+
+function readReducedMotionPreference() {
+  try {
+    const value = window.localStorage.getItem(REDUCED_MOTION_STORAGE_KEY);
+    if (value === 'on' || value === 'off') {
+      return value;
+    }
+  } catch {
+    // Ignore storage reads when unavailable.
+  }
+
+  return null;
+}
+
+let reducedMotionPreference = readReducedMotionPreference();
+
+function isReducedMotionEnabled() {
+  if (reducedMotionPreference === 'on') {
+    return true;
+  }
+
+  if (reducedMotionPreference === 'off') {
+    return false;
+  }
+
+  return SYSTEM_REDUCED_MOTION_QUERY.matches;
+}
+
+function setReducedMotionPreference(enabled) {
+  reducedMotionPreference = enabled ? 'on' : 'off';
+
+  try {
+    window.localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, reducedMotionPreference);
+  } catch {
+    // Ignore storage writes when unavailable.
+  }
+
+  const reducedMotionEnabled = isReducedMotionEnabled();
+  document.body.classList.toggle('reduce-motion', reducedMotionEnabled);
+  if (reducedMotionToggle) {
+    reducedMotionToggle.checked = reducedMotionEnabled;
+  }
+}
+
+function syncMotionPreferenceToUi() {
+  const reducedMotionEnabled = isReducedMotionEnabled();
+  document.body.classList.toggle('reduce-motion', reducedMotionEnabled);
+  if (reducedMotionToggle) {
+    reducedMotionToggle.checked = reducedMotionEnabled;
+  }
+}
 
 function pickRandom(source, count) {
   const pool = [...source];
@@ -630,7 +689,7 @@ function getTokenAnchor(token) {
 }
 
 function animatePathDraw(path) {
-  if (prefersReducedMotion) {
+  if (isReducedMotionEnabled()) {
     return;
   }
 
@@ -1132,6 +1191,8 @@ function renderFoundWords() {
 function renderStats() {
   scoreValueElement.textContent = String(state.score);
   foundCountElement.textContent = String(state.foundWords.length);
+  scoreStatElement?.setAttribute('aria-label', `Score: ${state.score}`);
+  foundStatElement?.setAttribute('aria-label', `Words found: ${state.foundWords.length}`);
 }
 
 function renderLetterUsage() {
@@ -1344,6 +1405,25 @@ function openHelpModal() {
   closeHelpButton?.focus();
 }
 
+function openSettingsModal() {
+  if (!settingsModal) {
+    return;
+  }
+
+  syncMotionPreferenceToUi();
+  settingsModal.hidden = false;
+  reducedMotionToggle?.focus();
+}
+
+function closeSettingsModal() {
+  if (!settingsModal) {
+    return;
+  }
+
+  settingsModal.hidden = true;
+  settingsButton?.focus();
+}
+
 function closeHelpModal() {
   if (!helpModal) {
     return;
@@ -1376,6 +1456,10 @@ function closeBoardModal() {
 function getActiveModal() {
   if (boardModal && !boardModal.hidden) {
     return boardModal;
+  }
+
+  if (settingsModal && !settingsModal.hidden) {
+    return settingsModal;
   }
 
   if (helpModal && !helpModal.hidden) {
@@ -1419,7 +1503,10 @@ submitButton.addEventListener('click', submitWord);
 undoButton.addEventListener('click', removeLastToken);
 clearButton.addEventListener('click', () => clearTokens());
 setBoardButton?.addEventListener('click', openBoardModal);
+settingsButton?.addEventListener('click', openSettingsModal);
 helpButton?.addEventListener('click', openHelpModal);
+closeSettingsButton?.addEventListener('click', closeSettingsModal);
+saveSettingsButton?.addEventListener('click', closeSettingsModal);
 closeHelpButton?.addEventListener('click', closeHelpModal);
 gotItButton?.addEventListener('click', closeHelpModal);
 closeBoardButton?.addEventListener('click', closeBoardModal);
@@ -1437,6 +1524,26 @@ boardModal?.addEventListener('click', (event) => {
     closeBoardModal();
   }
 });
+settingsModal?.addEventListener('click', (event) => {
+  if (event.target === settingsModal) {
+    closeSettingsModal();
+  }
+});
+
+reducedMotionToggle?.addEventListener('change', () => {
+  setReducedMotionPreference(Boolean(reducedMotionToggle.checked));
+  renderBoardLinks();
+  setMessage(`Reduced motion ${reducedMotionToggle.checked ? 'enabled' : 'disabled'}.`, 'success');
+});
+
+if (typeof SYSTEM_REDUCED_MOTION_QUERY.addEventListener === 'function') {
+  SYSTEM_REDUCED_MOTION_QUERY.addEventListener('change', () => {
+    if (reducedMotionPreference === null) {
+      syncMotionPreferenceToUi();
+      renderBoardLinks();
+    }
+  });
+}
 
 for (const input of Object.values(BOARD_INPUTS)) {
   input?.addEventListener('input', () => {
@@ -1451,14 +1558,18 @@ window.addEventListener('keydown', (event) => {
     trapFocusInModal(activeModal, event);
   }
 
-  if (!boardModal?.hidden && event.key === 'Escape') {
+  if (event.key === 'Escape' && activeModal) {
     event.preventDefault();
-    closeBoardModal();
-    return;
-  }
+    if (activeModal === boardModal) {
+      closeBoardModal();
+      return;
+    }
 
-  if (!helpModal?.hidden && event.key === 'Escape') {
-    event.preventDefault();
+    if (activeModal === settingsModal) {
+      closeSettingsModal();
+      return;
+    }
+
     closeHelpModal();
     return;
   }
@@ -1469,7 +1580,7 @@ window.addEventListener('keydown', (event) => {
     return;
   }
 
-  if (!helpModal?.hidden) {
+  if (activeModal) {
     return;
   }
 
@@ -1487,6 +1598,8 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('resize', renderBoardLinks);
+
+syncMotionPreferenceToUi();
 
 BOARD = buildBoard();
 refreshLettersToSide();
