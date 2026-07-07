@@ -208,6 +208,7 @@ h2 {
   aspect-ratio: 1;
   position: relative;
   border-radius: 38px;
+  container-type: inline-size;
   background:
     radial-gradient(circle at center, rgba(232, 239, 245, 0.08), transparent 42%),
     linear-gradient(145deg, rgba(72, 81, 90, 0.94), rgba(19, 24, 29, 0.99));
@@ -812,5 +813,63 @@ button {
 
   .panel {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .app-shell {
+    width: calc(100vw - 16px);
+  }
+
+  .board-card {
+    padding: 12px;
+  }
+
+  .board-wrap::before,
+  .board-wrap::after {
+    display: none;
+  }
+}
+
+/* Scale tiles relative to the board frame width so corners never collide.
+   17cqw × 3 tiles + 2cqw × 2 gaps = 55cqw row width, centred starts at 22.5cqw.
+   Left column ends at 2.5cqw + 17cqw = 19.5cqw — no overlap. */
+@container (max-width: 500px) {
+  .tile {
+    width: 17cqw;
+    height: 14cqw;
+  }
+
+  .tile-letter {
+    font-size: 6cqw;
+    border-radius: 3.5cqw;
+  }
+
+  .tile-x2 {
+    width: 6cqw;
+    height: 6cqw;
+    font-size: 2cqw;
+    right: -2cqw;
+    bottom: -2cqw;
+  }
+
+  .side-top {
+    top: 2.5cqw;
+    gap: 2cqw;
+  }
+
+  .side-bottom {
+    bottom: 2.5cqw;
+    gap: 2cqw;
+  }
+
+  .side-left {
+    left: 2.5cqw;
+    gap: 1.5cqw;
+  }
+
+  .side-right {
+    right: 2.5cqw;
+    gap: 1.5cqw;
   }
 }
