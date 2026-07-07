@@ -801,6 +801,22 @@ function getSideVectors(side) {
   return { inward: { x: 1, y: 0 }, perpendicular: { x: 0, y: 1 } };
 }
 
+function getLoopProfile(side) {
+  if (side === 0) {
+    return { depth: 36, width: 30 };
+  }
+
+  if (side === 1) {
+    return { depth: 32, width: 24 };
+  }
+
+  if (side === 2) {
+    return { depth: 34, width: 28 };
+  }
+
+  return { depth: 38, width: 22 };
+}
+
 function buildDoubledLoopRoute(token, width, height) {
   const anchor = getTokenAnchor(token);
   if (!anchor) {
@@ -810,8 +826,9 @@ function buildDoubledLoopRoute(token, width, height) {
   const corridor = getCenterCorridor(width, height);
   const entry = buildEntryFromAnchor(anchor, token.side, corridor);
   const vectors = getSideVectors(token.side);
-  const loopDepth = 34;
-  const loopWidth = 26;
+  const loopProfile = getLoopProfile(token.side);
+  const loopDepth = loopProfile.depth;
+  const loopWidth = loopProfile.width;
   const points = [];
 
   appendUniquePoint(points, anchor);
