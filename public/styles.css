@@ -267,6 +267,49 @@ h2 {
   filter: drop-shadow(0 0 2px rgba(245, 212, 149, 0.35));
 }
 
+.board-pipe-live {
+  animation: pipe-live-pulse 1s ease-in-out infinite;
+}
+
+.board-pipe-arrow-live {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pipe-arrow-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes pipe-live-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 5px rgba(231, 166, 98, 0.25));
+    opacity: 1;
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px rgba(249, 207, 132, 0.5));
+    opacity: 0.92;
+  }
+}
+
+@keyframes pipe-arrow-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.82;
+  }
+
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-pipe-live,
+  .board-pipe-arrow-live {
+    animation: none;
+  }
+}
+
 .side {
   position: absolute;
   display: flex;

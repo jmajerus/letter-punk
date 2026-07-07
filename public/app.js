@@ -785,11 +785,65 @@ function buildPipeRoute(fromToken, toToken, width, height) {
   return { points, corridor };
 }
 
-function appendPipePath(d, animate = false) {
-  const shell = createSvgPath('board-pipe-shell', d, false);
-  const core = createSvgPath('board-pipe-core', d, animate);
-  const highlight = createSvgPath('board-pipe-highlight', d, false);
-  boardLinksElement.append(shell, core, highlight);
+function getSideVectors(side) {
+  if (side === 0) {
+    return { inward: { x: 0, y: 1 }, perpendicular: { x: 1, y: 0 } };
+  }
+
+  if (side === 1) {
+    return { inward: { x: -1, y: 0 }, perpendicular: { x: 0, y: 1 } };
+  }
+
+  if (side === 2) {
+    return { inward: { x: 0, y: -1 }, perpendicular: { x: 1, y: 0 } };
+  }
+
+  return { inward: { x: 1, y: 0 }, perpendicular: { x: 0, y: 1 } };
+}
+
+function buildDoubledLoopRoute(token, width, height) {
+  const anchor = getTokenAnchor(token);
+  if (!anchor) {
+    return null;
+  }
+
+  const corridor = getCenterCorridor(width, height);
+  const entry = buildEntryFromAnchor(anchor, token.side, corridor);
+  const vectors = getSideVectors(token.side);
+  const loopDepth = 34;
+  const loopWidth = 26;
+  const points = [];
+
+  appendUniquePoint(points, anchor);
+  for (const point of entry.points) {
+    appendUniquePoint(points, point);
+  }
+  appendUniquePoint(points, entry.hub);
+
+  const loopA = {
+    x: entry.hub.x + (vectors.inward.x * loopDepth),
+    y: entry.hub.y + (vectors.inward.y * loopDepth),
+  };
+  const loopB = {
+    x: loopA.x + (vectors.perpendicular.x * loopWidth),
+    y: loopA.y + (vectors.perpendicular.y * loopWidth),
+  };
+  const loopC = {
+    x: entry.hub.x + (vectors.perpendicular.x * loopWidth),
+    y: entry.hub.y + (vectors.perpendicular.y * loopWidth),
+  };
+
+  appendUniquePoint(points, loopA);
+  appendUniquePoint(points, loopB);
+  appendUniquePoint(points, loopC);
+  appendUniquePoint(points, entry.hub);
+
+  for (let index = entry.points.length - 1; index >= 0; index -= 1) {
+    appendUniquePoint(points, entry.points[index]);
+  }
+  appendUniquePoint(points, anchor);
+
+  return { points, corridor };
 }
 
 function createSvgPolygon(className, points) {
@@ -856,7 +910,7 @@ function setPipeThickness(path, count, role) {
   path.style.strokeWidth = String(2 + (overlap * 0.55));
 }
 
-function appendFlowArrow(segment, count) {
+function appendFlowArrow(segment, count, isNewest = false) {
   if (segment.length < 28) {
     return;
   }
@@ -886,14 +940,18 @@ function appendFlowArrow(segment, count) {
     y: back.y - (py * arrowHalfWidth),
   };
 
-  boardLinksElement.append(createSvgPolygon('board-pipe-arrow', [tip, left, right]));
+  const arrowClass = `board-pipe-arrow${isNewest ? ' board-pipe-arrow-live' : ''}`;
+  boardLinksElement.append(createSvgPolygon(arrowClass, [tip, left, right]));
 }
 
-function appendPipeSegment(segment, count, animate = false) {
+function appendPipeSegment(segment, count, animate = false, isNewest = false) {
   const d = `M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`;
   const shell = createSvgPath('board-pipe-shell', d, false);
   const core = createSvgPath('board-pipe-core', d, animate);
   const highlight = createSvgPath('board-pipe-highlight', d, false);
+  if (isNewest) {
+    core.classList.add('board-pipe-live');
+  }
   setPipeThickness(shell, count, 'shell');
   setPipeThickness(core, count, 'core');
   setPipeThickness(highlight, count, 'highlight');
@@ -922,21 +980,23 @@ function findArrowSegment(segments, corridor) {
   }, null);
 }
 
-function appendRoutedPipe(route, usage, animate = false) {
+function appendRoutedPipe(route, usage, options = {}) {
+  const { animate = false, withArrow = true, isNewestRoute = false } = options;
   const segments = buildSegmentsFromPoints(route.points);
   if (segments.length === 0) {
     return;
   }
 
-  const arrowSegment = findArrowSegment(segments, route.corridor);
+  const arrowSegment = withArrow ? findArrowSegment(segments, route.corridor) : null;
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
     const segmentCount = usage.get(segment.key) || 1;
     const shouldAnimate = animate && index === segments.length - 1;
-    appendPipeSegment(segment, segmentCount, shouldAnimate);
+    const isNewestSegment = isNewestRoute && index === segments.length - 1;
+    appendPipeSegment(segment, segmentCount, shouldAnimate, isNewestSegment);
 
     if (arrowSegment && segment.key === arrowSegment.key) {
-      appendFlowArrow(segment, segmentCount);
+      appendFlowArrow(segment, segmentCount, isNewestRoute);
     }
   }
 }
@@ -977,49 +1037,37 @@ function renderBoardLinks() {
       routes.push({
         route,
         animate: index === state.tokens.length - 1,
+        withArrow: true,
+        isNewestRoute: index === state.tokens.length - 1,
+      });
+    }
+  }
+
+  for (let index = 0; index < state.tokens.length; index += 1) {
+    const token = state.tokens[index];
+    if (!token.doubled) {
+      continue;
+    }
+
+    const route = buildDoubledLoopRoute(token, width, height);
+    if (route) {
+      routes.push({
+        route,
+        animate: index === state.tokens.length - 1,
+        withArrow: false,
+        isNewestRoute: false,
       });
     }
   }
 
   const segmentUsage = collectSegmentUsage(routes.map((entry) => entry.route));
   for (const entry of routes) {
-    appendRoutedPipe(entry.route, segmentUsage, entry.animate);
+    appendRoutedPipe(entry.route, segmentUsage, {
+      animate: entry.animate,
+      withArrow: entry.withArrow,
+      isNewestRoute: entry.isNewestRoute,
+    });
     appendPipeJoints(entry.route.points);
-  }
-
-  const center = { x: width / 2, y: height / 2 };
-
-  for (let index = 0; index < state.tokens.length; index += 1) {
-    const token = state.tokens[index];
-    const point = getTokenAnchor(token);
-    if (!point) {
-      continue;
-    }
-
-    if (token.doubled) {
-      const towardCenterX = center.x - point.x;
-      const towardCenterY = center.y - point.y;
-      const vectorLength = Math.hypot(towardCenterX, towardCenterY) || 1;
-      const ux = towardCenterX / vectorLength;
-      const uy = towardCenterY / vectorLength;
-      const px = -uy;
-      const py = ux;
-
-      const c1x = point.x + (px * 28) + (ux * 14);
-      const c1y = point.y + (py * 28) + (uy * 14);
-      const c2x = point.x + (px * 34) + (ux * 48);
-      const c2y = point.y + (py * 34) + (uy * 48);
-      const mx = point.x + (ux * 62);
-      const my = point.y + (uy * 62);
-      const c3x = point.x - (px * 34) + (ux * 48);
-      const c3y = point.y - (py * 34) + (uy * 48);
-      const c4x = point.x - (px * 28) + (ux * 14);
-      const c4y = point.y - (py * 28) + (uy * 14);
-
-      const loopPath = `M ${point.x} ${point.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${mx} ${my} C ${c3x} ${c3y}, ${c4x} ${c4y}, ${point.x} ${point.y}`;
-      const shouldAnimateLoop = index === state.tokens.length - 1;
-      appendPipePath(loopPath, shouldAnimateLoop);
-    }
   }
 }
 
