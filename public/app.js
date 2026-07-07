@@ -1152,7 +1152,15 @@ function renderCurrentWord() {
   for (const token of state.tokens) {
     const tokenElement = document.createElement('span');
     tokenElement.className = `token${token.doubled ? ' x2' : ''}`;
-    tokenElement.textContent = token.doubled ? `${token.letter}${token.letter}` : token.letter;
+    tokenElement.textContent = token.letter;
+
+    if (token.doubled) {
+      const multiplier = document.createElement('span');
+      multiplier.className = 'token-multiplier';
+      multiplier.textContent = 'x2';
+      tokenElement.append(multiplier);
+    }
+
     currentWordElement.append(tokenElement);
   }
 }
