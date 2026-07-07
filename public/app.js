@@ -782,8 +782,7 @@ function buildPipeRoute(fromToken, toToken, width, height) {
   }
   appendUniquePoint(points, to);
 
-  const d = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-  return { d, points };
+  return { points, corridor };
 }
 
 function appendPipePath(d, animate = false) {
@@ -793,12 +792,167 @@ function appendPipePath(d, animate = false) {
   boardLinksElement.append(shell, core, highlight);
 }
 
+function createSvgPolygon(className, points) {
+  const polygon = document.createElementNS(SVG_NS, 'polygon');
+  polygon.setAttribute('class', className);
+  polygon.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
+  return polygon;
+}
+
+function quantize(value) {
+  return Math.round(value * 2) / 2;
+}
+
+function buildSegmentKey(start, end) {
+  const a = `${quantize(start.x)},${quantize(start.y)}`;
+  const b = `${quantize(end.x)},${quantize(end.y)}`;
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function buildSegmentsFromPoints(points) {
+  const segments = [];
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    if (start.x === end.x && start.y === end.y) {
+      continue;
+    }
+
+    segments.push({
+      start,
+      end,
+      key: buildSegmentKey(start, end),
+      length: Math.hypot(end.x - start.x, end.y - start.y),
+    });
+  }
+
+  return segments;
+}
+
+function collectSegmentUsage(routes) {
+  const usage = new Map();
+  for (const route of routes) {
+    const segments = buildSegmentsFromPoints(route.points);
+    for (const segment of segments) {
+      usage.set(segment.key, (usage.get(segment.key) || 0) + 1);
+    }
+  }
+
+  return usage;
+}
+
+function setPipeThickness(path, count, role) {
+  const overlap = Math.max(0, count - 1);
+  if (role === 'shell') {
+    path.style.strokeWidth = String(10 + (overlap * 2));
+    return;
+  }
+
+  if (role === 'core') {
+    path.style.strokeWidth = String(7 + (overlap * 1.5));
+    return;
+  }
+
+  path.style.strokeWidth = String(2 + (overlap * 0.55));
+}
+
+function appendFlowArrow(segment, count) {
+  if (segment.length < 28) {
+    return;
+  }
+
+  const ux = (segment.end.x - segment.start.x) / segment.length;
+  const uy = (segment.end.y - segment.start.y) / segment.length;
+  const px = -uy;
+  const py = ux;
+  const overlap = Math.max(0, count - 1);
+  const arrowLength = 10 + (overlap * 1.5);
+  const arrowHalfWidth = 4 + (overlap * 0.8);
+
+  const tip = {
+    x: segment.start.x + ((segment.end.x - segment.start.x) * 0.6),
+    y: segment.start.y + ((segment.end.y - segment.start.y) * 0.6),
+  };
+  const back = {
+    x: tip.x - (ux * arrowLength),
+    y: tip.y - (uy * arrowLength),
+  };
+  const left = {
+    x: back.x + (px * arrowHalfWidth),
+    y: back.y + (py * arrowHalfWidth),
+  };
+  const right = {
+    x: back.x - (px * arrowHalfWidth),
+    y: back.y - (py * arrowHalfWidth),
+  };
+
+  boardLinksElement.append(createSvgPolygon('board-pipe-arrow', [tip, left, right]));
+}
+
+function appendPipeSegment(segment, count, animate = false) {
+  const d = `M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`;
+  const shell = createSvgPath('board-pipe-shell', d, false);
+  const core = createSvgPath('board-pipe-core', d, animate);
+  const highlight = createSvgPath('board-pipe-highlight', d, false);
+  setPipeThickness(shell, count, 'shell');
+  setPipeThickness(core, count, 'core');
+  setPipeThickness(highlight, count, 'highlight');
+  boardLinksElement.append(shell, core, highlight);
+}
+
+function findArrowSegment(segments, corridor) {
+  const corridorSegment = segments.find((segment) => {
+    const insideStart = segment.start.x >= corridor.left && segment.start.x <= corridor.right
+      && segment.start.y >= corridor.top && segment.start.y <= corridor.bottom;
+    const insideEnd = segment.end.x >= corridor.left && segment.end.x <= corridor.right
+      && segment.end.y >= corridor.top && segment.end.y <= corridor.bottom;
+    return insideStart && insideEnd;
+  });
+
+  if (corridorSegment) {
+    return corridorSegment;
+  }
+
+  return segments.reduce((longest, segment) => {
+    if (!longest || segment.length > longest.length) {
+      return segment;
+    }
+
+    return longest;
+  }, null);
+}
+
+function appendRoutedPipe(route, usage, animate = false) {
+  const segments = buildSegmentsFromPoints(route.points);
+  if (segments.length === 0) {
+    return;
+  }
+
+  const arrowSegment = findArrowSegment(segments, route.corridor);
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const segmentCount = usage.get(segment.key) || 1;
+    const shouldAnimate = animate && index === segments.length - 1;
+    appendPipeSegment(segment, segmentCount, shouldAnimate);
+
+    if (arrowSegment && segment.key === arrowSegment.key) {
+      appendFlowArrow(segment, segmentCount);
+    }
+  }
+}
+
 function appendPipeJoints(points) {
   for (let index = 1; index < points.length - 1; index += 1) {
     const point = points[index];
     const jointOuter = createSvgCircle('board-pipe-joint-shell', point.x, point.y, 8.5);
     const jointInner = createSvgCircle('board-pipe-joint-core', point.x, point.y, 5.25);
-    boardLinksElement.append(jointOuter, jointInner);
+    const valveCross = createSvgPath(
+      'board-pipe-valve-lines',
+      `M ${point.x - 2.6} ${point.y} L ${point.x + 2.6} ${point.y} M ${point.x} ${point.y - 2.6} L ${point.x} ${point.y + 2.6}`,
+      false,
+    );
+    const valveCore = createSvgCircle('board-pipe-valve-core', point.x, point.y, 1.2);
+    boardLinksElement.append(jointOuter, jointInner, valveCross, valveCore);
   }
 }
 
@@ -816,6 +970,23 @@ function renderBoardLinks() {
     return;
   }
 
+  const routes = [];
+  for (let index = 1; index < state.tokens.length; index += 1) {
+    const route = buildPipeRoute(state.tokens[index - 1], state.tokens[index], width, height);
+    if (route) {
+      routes.push({
+        route,
+        animate: index === state.tokens.length - 1,
+      });
+    }
+  }
+
+  const segmentUsage = collectSegmentUsage(routes.map((entry) => entry.route));
+  for (const entry of routes) {
+    appendRoutedPipe(entry.route, segmentUsage, entry.animate);
+    appendPipeJoints(entry.route.points);
+  }
+
   const center = { x: width / 2, y: height / 2 };
 
   for (let index = 0; index < state.tokens.length; index += 1) {
@@ -823,15 +994,6 @@ function renderBoardLinks() {
     const point = getTokenAnchor(token);
     if (!point) {
       continue;
-    }
-
-    if (index > 0) {
-      const shouldAnimateLink = index === state.tokens.length - 1;
-      const route = buildPipeRoute(state.tokens[index - 1], token, width, height);
-      if (route) {
-        appendPipePath(route.d, shouldAnimateLink);
-        appendPipeJoints(route.points);
-      }
     }
 
     if (token.doubled) {

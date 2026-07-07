@@ -249,6 +249,24 @@ h2 {
   stroke-width: 1.1;
 }
 
+.board-pipe-valve-lines {
+  fill: none;
+  stroke: rgba(66, 41, 26, 0.85);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.board-pipe-valve-core {
+  fill: rgba(245, 223, 180, 0.92);
+  stroke: rgba(97, 62, 38, 0.6);
+  stroke-width: 0.8;
+}
+
+.board-pipe-arrow {
+  fill: rgba(243, 223, 186, 0.82);
+  filter: drop-shadow(0 0 2px rgba(245, 212, 149, 0.35));
+}
+
 .side {
   position: absolute;
   display: flex;
@@ -382,43 +400,6 @@ button:active {
   box-shadow:
     0 8px 12px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
-.board-core {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-  width: 210px;
-  height: 210px;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  z-index: 5;
-}
-
-.core-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 225, 172, 0.2);
-  background:
-    radial-gradient(circle at center, rgba(156, 200, 213, 0.12), transparent 48%),
-    radial-gradient(circle at center, rgba(0, 0, 0, 0) 0 36%, rgba(0, 0, 0, 0.3) 72%, rgba(0, 0, 0, 0.48) 100%);
-  box-shadow:
-    inset 0 0 32px rgba(0, 0, 0, 0.45),
-    0 0 0 10px rgba(0, 0, 0, 0.14);
-}
-
-.core-label {
-  position: relative;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: rgba(13, 11, 9, 0.74);
-  border: 1px solid rgba(255, 226, 167, 0.14);
-  color: var(--steam);
-  font-size: 0.82rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
 }
 
 .controls {
@@ -739,11 +720,6 @@ button {
     bottom: -8px;
     width: 32px;
     height: 32px;
-  }
-
-  .board-core {
-    width: 180px;
-    height: 180px;
   }
 
   .side-top,
