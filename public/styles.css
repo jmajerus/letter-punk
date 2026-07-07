@@ -414,7 +414,6 @@ h2 {
   border: 1px solid rgba(255, 232, 192, 0.38);
   border-radius: 24px;
   background:
-    linear-gradient(180deg, transparent 0 12%, rgba(255, 225, 172, 0.22) 12% 15%, transparent 15% 85%, rgba(65, 39, 24, 0.34) 85% 88%, transparent 88% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.18), transparent 26%),
     linear-gradient(180deg, #cb9053 0%, #8a4f2e 100%);
   color: #fff1d1;
@@ -433,7 +432,6 @@ h2 {
 
 .tile-letter.used {
   background:
-    linear-gradient(180deg, transparent 0 12%, rgba(206, 239, 223, 0.2) 12% 15%, transparent 15% 85%, rgba(36, 56, 49, 0.32) 85% 88%, transparent 88% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.14), transparent 26%),
     linear-gradient(180deg, #7ea694 0%, #4e6e62 100%);
   color: #eef7f1;
