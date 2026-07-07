@@ -4,7 +4,9 @@ Open `public/index.html` directly in a browser, or serve the `public/` folder wi
 
 For Cloudflare Workers, the project is intentionally static-only, so the Worker can serve the built-in files without any server logic. The included `wrangler.toml` points Workers at the `public/` asset directory.
 
-For Cloudflare Pages, you can deploy the same static files directly from the `public/` directory. The included `public/_redirects` file keeps client-side routing working if you add routes later.
+For Cloudflare Pages, you can deploy the same static files directly from the `public/` directory.
+
+Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
 
 Run locally with:
 
