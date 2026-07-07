@@ -280,12 +280,12 @@ function getRequiredStartingLetter() {
   return state.foundWords[0].word.slice(-1);
 }
 
-function createToken(letter, doubled = false) {
+function createToken(letter, repeatOfPrevious = false) {
   const lower = letter.toLowerCase();
   return {
     letter: lower,
     side: lettersToSide.get(lower),
-    doubled,
+    repeatOfPrevious,
   };
 }
 
@@ -302,9 +302,7 @@ function seedNextWord() {
 }
 
 function wordFromTokens(tokens) {
-  return tokens
-    .map((token) => (token.doubled ? token.letter + token.letter : token.letter))
-    .join('');
+  return tokens.map((token) => token.letter).join('');
 }
 
 function tokensFromWord(word) {
@@ -313,14 +311,8 @@ function tokensFromWord(word) {
 
   for (let index = 0; index < lower.length; index += 1) {
     const letter = lower[index];
-    const next = lower[index + 1];
-    if (next === letter) {
-      tokens.push(createToken(letter, true));
-      index += 1;
-      continue;
-    }
-
-    tokens.push(createToken(letter, false));
+    const previous = lower[index - 1];
+    tokens.push(createToken(letter, previous === letter));
   }
 
   return tokens;
@@ -356,6 +348,10 @@ function tokensAreValid(tokens) {
   }
 
   for (let index = 1; index < tokens.length; index += 1) {
+    if (tokens[index].repeatOfPrevious && tokens[index - 1].letter === tokens[index].letter) {
+      continue;
+    }
+
     if (tokens[index].side === tokens[index - 1].side) {
       return false;
     }
@@ -1101,30 +1097,29 @@ function renderBoardLinks() {
 
   const routes = [];
   for (let index = 1; index < state.tokens.length; index += 1) {
-    const route = buildPipeRoute(state.tokens[index - 1], state.tokens[index], width, height);
+    const previousToken = state.tokens[index - 1];
+    const token = state.tokens[index];
+
+    if (token.repeatOfPrevious && token.letter === previousToken.letter) {
+      const route = buildDoubledLoopRoute(token, width, height);
+      if (route) {
+        routes.push({
+          route,
+          animate: index === state.tokens.length - 1,
+          withArrow: false,
+          isNewestRoute: false,
+        });
+      }
+      continue;
+    }
+
+    const route = buildPipeRoute(previousToken, token, width, height);
     if (route) {
       routes.push({
         route,
         animate: index === state.tokens.length - 1,
         withArrow: true,
         isNewestRoute: index === state.tokens.length - 1,
-      });
-    }
-  }
-
-  for (let index = 0; index < state.tokens.length; index += 1) {
-    const token = state.tokens[index];
-    if (!token.doubled) {
-      continue;
-    }
-
-    const route = buildDoubledLoopRoute(token, width, height);
-    if (route) {
-      routes.push({
-        route,
-        animate: index === state.tokens.length - 1,
-        withArrow: false,
-        isNewestRoute: false,
       });
     }
   }
@@ -1150,25 +1145,18 @@ function renderCurrentWord() {
   }
 
   for (const token of state.tokens) {
-    const firstTokenElement = document.createElement('span');
-    firstTokenElement.className = 'token';
-    firstTokenElement.textContent = token.letter;
-    currentWordElement.append(firstTokenElement);
+    const tokenElement = document.createElement('span');
+    tokenElement.className = `token${token.repeatOfPrevious ? ' token-repeat-second' : ''}`;
+    tokenElement.textContent = token.letter;
 
-    if (!token.doubled) {
-      continue;
+    if (token.repeatOfPrevious) {
+      const multiplier = document.createElement('span');
+      multiplier.className = 'token-multiplier';
+      multiplier.textContent = 'x2';
+      tokenElement.append(multiplier);
     }
 
-    const secondTokenElement = document.createElement('span');
-    secondTokenElement.className = 'token token-repeat-second';
-    secondTokenElement.textContent = token.letter;
-
-    const multiplier = document.createElement('span');
-    multiplier.className = 'token-multiplier';
-    multiplier.textContent = 'x2';
-    secondTokenElement.append(multiplier);
-
-    currentWordElement.append(secondTokenElement);
+    currentWordElement.append(tokenElement);
   }
 }
 
@@ -1215,21 +1203,24 @@ function appendToken(letter, doubled) {
     return;
   }
 
-  // Treat a repeated click on the same letter as intent to use x2.
   if (lastToken && lastToken.letter === lower) {
-    if (!lastToken.doubled) {
-      lastToken.doubled = true;
-      const word = wordFromTokens(state.tokens);
-      setMessage(`Doubled ${lower}${lower}. Current build: ${word.toUpperCase()}.`);
-      updateUI();
+    if (lastToken.repeatOfPrevious) {
+      setMessage(`${lower}${lower} is already doubled. Pick a letter from another side.`, 'error');
       return;
     }
 
-    setMessage(`${lower}${lower} is already doubled. Pick a letter from another side.`, 'error');
+    state.tokens.push(createToken(letter, true));
+    const word = wordFromTokens(state.tokens);
+    setMessage(`Doubled ${lower}${lower}. Current build: ${word.toUpperCase()}.`);
+    updateUI();
     return;
   }
 
-  state.tokens.push(createToken(letter, doubled));
+  state.tokens.push(createToken(letter, false));
+  if (doubled) {
+    state.tokens.push(createToken(letter, true));
+  }
+
   const word = wordFromTokens(state.tokens);
   setMessage(`Added ${doubled ? `${letter}${letter}` : letter.toLowerCase()}. Current build: ${word.toUpperCase()}.`);
   updateUI();
@@ -1243,14 +1234,6 @@ function removeLastToken() {
 
   if (state.tokens.length === 0) {
     backUpIntoPreviousWord();
-    return;
-  }
-
-  const lastToken = state.tokens[state.tokens.length - 1];
-  if (lastToken?.doubled) {
-    lastToken.doubled = false;
-    updateUI();
-    setMessage('Removed one letter.');
     return;
   }
 
