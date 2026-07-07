@@ -218,15 +218,6 @@ h2 {
     0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
-.board-frame::before {
-  content: "";
-  position: absolute;
-  inset: 14px;
-  border-radius: 28px;
-  border: 1px dashed rgba(246, 214, 160, 0.12);
-  z-index: 1;
-}
-
 .board-frame::after {
   content: "";
   position: absolute;
