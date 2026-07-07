@@ -14,10 +14,6 @@ const boardLinksElement = document.getElementById('boardLinks');
 const currentWordElement = document.getElementById('currentWord');
 const messageElement = document.getElementById('message');
 const foundWordsElement = document.getElementById('foundWords');
-const scoreValueElement = document.getElementById('scoreValue');
-const foundCountElement = document.getElementById('foundCount');
-const scoreStatElement = document.getElementById('scoreStat');
-const foundStatElement = document.getElementById('foundStat');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
@@ -271,7 +267,6 @@ refreshLettersToSide();
 const state = {
   tokens: [],
   foundWords: [],
-  score: 0,
   usedLetters: new Set(),
   starterLocked: false,
   messageTimer: null,
@@ -347,7 +342,6 @@ function backUpIntoPreviousWord() {
 
   const [lastWord] = state.foundWords;
   state.foundWords.shift();
-  state.score -= lastWord.length;
   rebuildUsedLettersFromFoundWords();
   state.tokens = tokensFromWord(lastWord.word);
   state.starterLocked = false;
@@ -430,7 +424,6 @@ function renderBoard() {
 function resetGameForBoard() {
   state.tokens = [];
   state.foundWords = [];
-  state.score = 0;
   state.usedLetters.clear();
   state.starterLocked = false;
 }
@@ -1180,19 +1173,8 @@ function renderFoundWords() {
     pill.className = 'word-pill';
     pill.textContent = word.word;
 
-    const meta = document.createElement('small');
-    meta.textContent = `${word.length} pts`;
-    pill.append(meta);
-
     foundWordsElement.append(pill);
   }
-}
-
-function renderStats() {
-  scoreValueElement.textContent = String(state.score);
-  foundCountElement.textContent = String(state.foundWords.length);
-  scoreStatElement?.setAttribute('aria-label', `Score: ${state.score}`);
-  foundStatElement?.setAttribute('aria-label', `Words found: ${state.foundWords.length}`);
 }
 
 function renderLetterUsage() {
@@ -1204,7 +1186,6 @@ function renderLetterUsage() {
 function updateUI() {
   renderCurrentWord();
   renderFoundWords();
-  renderStats();
   renderLetterUsage();
   renderBoardLinks();
 }
@@ -1372,7 +1353,6 @@ async function submitWord() {
     return;
   }
 
-  state.score += length;
   state.foundWords.unshift({ word, length });
 
   for (const token of state.tokens) {
