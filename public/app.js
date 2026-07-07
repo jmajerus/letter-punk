@@ -1150,18 +1150,25 @@ function renderCurrentWord() {
   }
 
   for (const token of state.tokens) {
-    const tokenElement = document.createElement('span');
-    tokenElement.className = `token${token.doubled ? ' x2' : ''}`;
-    tokenElement.textContent = token.letter;
+    const firstTokenElement = document.createElement('span');
+    firstTokenElement.className = 'token';
+    firstTokenElement.textContent = token.letter;
+    currentWordElement.append(firstTokenElement);
 
-    if (token.doubled) {
-      const multiplier = document.createElement('span');
-      multiplier.className = 'token-multiplier';
-      multiplier.textContent = 'x2';
-      tokenElement.append(multiplier);
+    if (!token.doubled) {
+      continue;
     }
 
-    currentWordElement.append(tokenElement);
+    const secondTokenElement = document.createElement('span');
+    secondTokenElement.className = 'token token-repeat-second';
+    secondTokenElement.textContent = token.letter;
+
+    const multiplier = document.createElement('span');
+    multiplier.className = 'token-multiplier';
+    multiplier.textContent = 'x2';
+    secondTokenElement.append(multiplier);
+
+    currentWordElement.append(secondTokenElement);
   }
 }
 

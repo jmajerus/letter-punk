@@ -633,13 +633,15 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
-.token.x2 {
+.token-repeat-second {
   border: 1px solid rgba(118, 134, 146, 0.45);
 }
 
 .token-multiplier {
-  margin-left: 6px;
-  font-size: 0.7rem;
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 0.56rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: rgba(36, 48, 58, 0.7);
