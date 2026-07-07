@@ -170,6 +170,33 @@ h2 {
   display: flex;
   justify-content: center;
   padding: 16px 0 22px;
+  position: relative;
+}
+
+.board-wrap::before,
+.board-wrap::after {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  pointer-events: none;
+  opacity: 0.42;
+  background:
+    radial-gradient(circle at center, transparent 0 26px, rgba(78, 52, 33, 0.8) 26px 29px, transparent 29px 100%),
+    repeating-conic-gradient(from 5deg, rgba(219, 175, 109, 0.3) 0deg 9deg, transparent 9deg 18deg),
+    radial-gradient(circle at center, rgba(224, 190, 130, 0.22) 0 7px, transparent 7px);
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35));
+}
+
+.board-wrap::before {
+  left: 8px;
+  top: -8px;
+}
+
+.board-wrap::after {
+  right: 8px;
+  bottom: -4px;
+  transform: rotate(17deg);
 }
 
 .board-frame {
@@ -193,6 +220,22 @@ h2 {
   inset: 14px;
   border-radius: 28px;
   border: 1px dashed rgba(246, 214, 160, 0.12);
+  z-index: 1;
+}
+
+.board-frame::after {
+  content: "";
+  position: absolute;
+  inset: 20px;
+  border-radius: 24px;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, transparent 0 10%, rgba(170, 121, 76, 0.1) 10% 11.2%, transparent 11.2% 88.8%, rgba(170, 121, 76, 0.1) 88.8% 90%, transparent 90% 100%),
+    radial-gradient(circle at 6% 50%, rgba(198, 149, 97, 0.46) 0 4px, transparent 4px),
+    radial-gradient(circle at 94% 50%, rgba(198, 149, 97, 0.46) 0 4px, transparent 4px),
+    radial-gradient(circle at 50% 8%, rgba(198, 149, 97, 0.3) 0 3px, transparent 3px),
+    radial-gradient(circle at 50% 92%, rgba(198, 149, 97, 0.3) 0 3px, transparent 3px);
 }
 
 .board {
@@ -361,19 +404,19 @@ h2 {
 
 .tile {
   position: relative;
-  width: 104px;
-  height: 82px;
+  width: 92px;
+  height: 92px;
 }
 
 .tile-letter {
   width: 100%;
   height: 100%;
   border: 1px solid rgba(255, 232, 192, 0.38);
-  border-radius: 999px;
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, transparent 0 15%, rgba(255, 225, 172, 0.22) 15% 19%, transparent 19% 81%, rgba(65, 39, 24, 0.36) 81% 85%, transparent 85% 100%),
+    linear-gradient(180deg, transparent 0 12%, rgba(255, 225, 172, 0.22) 12% 15%, transparent 15% 85%, rgba(65, 39, 24, 0.34) 85% 88%, transparent 88% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.18), transparent 26%),
-    linear-gradient(180deg, #c78c52 0%, #8a4f2e 100%);
+    linear-gradient(180deg, #cb9053 0%, #8a4f2e 100%);
   color: #fff1d1;
   font-family: inherit;
   font-size: 2rem;
@@ -383,15 +426,14 @@ h2 {
     0 12px 20px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -1px 0 rgba(41, 24, 15, 0.45),
-    inset 10px 0 0 rgba(98, 64, 39, 0.28),
-    inset -10px 0 0 rgba(98, 64, 39, 0.28);
+    inset -14px 0 0 rgba(86, 54, 32, 0.34);
   cursor: pointer;
   transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
 }
 
 .tile-letter.used {
   background:
-    linear-gradient(180deg, transparent 0 15%, rgba(206, 239, 223, 0.2) 15% 19%, transparent 19% 81%, rgba(36, 56, 49, 0.32) 81% 85%, transparent 85% 100%),
+    linear-gradient(180deg, transparent 0 12%, rgba(206, 239, 223, 0.2) 12% 15%, transparent 15% 85%, rgba(36, 56, 49, 0.32) 85% 88%, transparent 88% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.14), transparent 26%),
     linear-gradient(180deg, #7ea694 0%, #4e6e62 100%);
   color: #eef7f1;
@@ -399,6 +441,7 @@ h2 {
   box-shadow:
     0 10px 18px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset -14px 0 0 rgba(43, 66, 58, 0.32),
     0 0 0 2px rgba(156, 200, 181, 0.2);
 }
 
@@ -426,8 +469,8 @@ button:active {
 
 .tile-x2 {
   position: absolute;
-  right: -10px;
-  bottom: -10px;
+  right: -9px;
+  bottom: -9px;
   width: 32px;
   height: 32px;
   border-radius: 999px;
@@ -750,8 +793,8 @@ button {
   }
 
   .tile {
-    width: 86px;
-    height: 68px;
+    width: 80px;
+    height: 80px;
   }
 
   .tile-letter {

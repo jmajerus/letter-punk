@@ -1,4 +1,4 @@
-# Brassbox Lexicon Prototype
+# Letter Punk
 
 **Live App: [Play Letter Punk](https://letter-punk.jmajerus.workers.dev)**
 
