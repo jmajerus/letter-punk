@@ -1,33 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 102 84" role="img" aria-label="Patina pressure tank">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" role="img" aria-label="Patina pressure tank">
   <defs>
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#9ac1ae"/>
-      <stop offset="0.5" stop-color="#678b7d"/>
-      <stop offset="1" stop-color="#3f5d53"/>
+
+    <!-- Smooth cylindrical patina shading -->
+    <linearGradient id="trueCylinderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#29463d"/>
+      <stop offset="7%" stop-color="#4f7667"/>
+      <stop offset="25%" stop-color="#b5d0c3"/>
+      <stop offset="40%" stop-color="#edf7f2"/>
+      <stop offset="70%" stop-color="#8fb1a0"/>
+      <stop offset="93%" stop-color="#456055"/>
+      <stop offset="100%" stop-color="#22362f"/>
     </linearGradient>
-    <linearGradient id="capLeft" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#c4e0d2"/>
-      <stop offset="1" stop-color="#547a6d"/>
-    </linearGradient>
-    <linearGradient id="capRight" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b1d4c4"/>
-      <stop offset="1" stop-color="#436a5d"/>
+
+    <!-- Shading for the top ellipse cap to match the light source -->
+    <linearGradient id="topCapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2fbf6"/>
+      <stop offset="40%" stop-color="#d6ebe2"/>
+      <stop offset="80%" stop-color="#7da394"/>
+      <stop offset="100%" stop-color="#3f5d52"/>
     </linearGradient>
   </defs>
 
-  <rect x="1" y="1" width="100" height="82" rx="20" ry="20" fill="url(#body)" stroke="#d5efe3" stroke-opacity="0.52"/>
-  <rect x="9" y="12" width="12" height="60" rx="6" fill="url(#capLeft)" stroke="#bfdfcf" stroke-opacity="0.45"/>
-  <rect x="81" y="12" width="12" height="60" rx="6" fill="url(#capRight)" stroke="#a7d0bd" stroke-opacity="0.38"/>
+  <path d="M 70,120 
+           A 130,32 0 0,0 330,120 
+           L 330,320 
+           A 130,32 0 0,1 70,320 
+           Z" 
+        fill="url(#trueCylinderGrad)" />
 
-  <rect x="1" y="1" width="100" height="82" rx="20" ry="20" fill="none" stroke="#11231d" stroke-opacity="0.33"/>
-  <path d="M6 6h90" stroke="#f1fbf5" stroke-opacity="0.2"/>
-  <path d="M6 78h90" stroke="#10211b" stroke-opacity="0.33"/>
-  <path d="M86 2v80" stroke="#1e3c33" stroke-opacity="0.22" stroke-width="10"/>
-
-  <g fill="#d8efe4" fill-opacity="0.72">
-    <circle cx="15" cy="18" r="1.3"/>
-    <circle cx="15" cy="66" r="1.3"/>
-    <circle cx="87" cy="18" r="1.3"/>
-    <circle cx="87" cy="66" r="1.3"/>
+  <ellipse cx="200" cy="120" rx="130" ry="32" fill="url(#topCapGrad)" stroke="#f3fbf6" stroke-width="0.5" opacity="0.84"/>
+  <ellipse cx="200" cy="320" rx="130" ry="32" fill="#0f211c" opacity="0.28"/>
+  <g fill="#e7f5ef" fill-opacity="0.34">
+    <circle cx="118" cy="132" r="4"/>
+    <circle cx="118" cy="300" r="4"/>
+    <circle cx="282" cy="132" r="4"/>
+    <circle cx="282" cy="300" r="4"/>
   </g>
 </svg>
