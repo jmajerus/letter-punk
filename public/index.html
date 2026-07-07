@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brassbox Lexicon</title>
+    <meta
+      name="description"
+      content="A steampunk letter puzzle prototype with friendly double-letter x2 controls."
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">Prototype build</p>
+        <h1>Brassbox Lexicon</h1>
+        <p class="subtitle">
+          A welcoming word puzzle inspired by Letter Boxed, with an always-available x2 valve on every letter.
+        </p>
+      </header>
+
+      <section class="layout">
+        <div class="board-card">
+          <div class="board-header">
+            <div>
+              <p class="section-label">Steam board</p>
+              <h2>Forge a word</h2>
+            </div>
+            <div class="stats">
+              <div>
+                <span id="scoreValue">0</span>
+                <small>Score</small>
+              </div>
+              <div>
+                <span id="foundCount">0</span>
+                <small>Found</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="board-wrap">
+            <div class="board-frame">
+              <div id="board" class="board" aria-label="Letter board"></div>
+              <div class="board-core">
+                <div class="core-ring"></div>
+                <div class="core-label">x2 is always on</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <button id="submitBtn" class="primary">Submit word</button>
+            <button id="undoBtn" class="secondary">Undo</button>
+            <button id="clearBtn" class="secondary">Clear</button>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <section class="panel-card word-card">
+            <p class="section-label">Word builder</p>
+            <div id="currentWord" class="current-word" aria-live="polite"></div>
+            <div id="message" class="message" aria-live="polite"></div>
+            <p class="helper-text">
+              Click a letter to add it once. Click x2 to add a doubled letter token. Consecutive tokens still need to come from different sides.
+            </p>
+          </section>
+
+          <section class="panel-card">
+            <p class="section-label">Accepted words</p>
+            <div id="foundWords" class="found-words"></div>
+          </section>
+
+          <section class="panel-card">
+            <p class="section-label">Practice moves</p>
+            <div id="samples" class="sample-words"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
