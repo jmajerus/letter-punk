@@ -17,9 +17,6 @@
       <header class="hero">
         <p class="eyebrow">Double letters welcome</p>
         <h1>Letter Punk</h1>
-        <p class="subtitle">
-          A welcoming word puzzle inspired by Letter Boxed, now with the freedom to use double letters naturally.
-        </p>
       </header>
 
       <section class="layout">
@@ -28,12 +25,12 @@
             <p class="section-label">Word builder</p>
             <div id="currentWord" class="current-word" aria-live="polite"></div>
             <div id="message" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
-            <p id="builderHelp" class="helper-text">
+            <p id="builderHelp" class="helper-text sr-only">
               Tap a letter once for a single token. Tap the same letter twice to double it. After the first word, each new word must begin with the last letter of the previous word.
             </p>
             <div class="legend" aria-label="Board legend">
               <span class="legend-item"><span class="legend-swatch brass"></span>Unused letter</span>
-              <span class="legend-item"><span class="legend-swatch patina"></span>Used at least once</span>
+              <span class="legend-item"><span class="legend-swatch patina"></span>Used at least once (checkmark + dashed edge)</span>
             </div>
           </section>
 
@@ -96,6 +93,7 @@
           <li>Consecutive tokens still need to come from different sides.</li>
           <li>After the first word, the next word must begin with the previous word's final letter.</li>
           <li>Submit words with 3+ letters.</li>
+          <li>Delete backs up through the current word and can continue into previous accepted words.</li>
           <li>Use Set Board to copy daily Letter Boxed letters and compare solve paths.</li>
           <li>Using every letter solves the board. If you can do better, Undo can retract your last accepted word.</li>
           <li>Words are validated live with dictionaryapi.dev.</li>
