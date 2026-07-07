@@ -421,19 +421,26 @@ h2 {
 }
 
 .tile-letter:hover,
-.tile-letter:focus-visible,
-button:hover,
-button:focus-visible {
+button:hover {
   outline: none;
   transform: translateY(-2px);
   filter: brightness(1.08);
 }
 
-.tile-x2:hover,
-.tile-x2:focus-visible {
+.tile-x2:hover {
   outline: none;
   transform: translateY(-1px);
   filter: brightness(1.04);
+}
+
+.tile-letter:focus-visible,
+.tile-x2:focus-visible,
+button:focus-visible,
+.board-input:focus-visible,
+.help-close:focus-visible {
+  outline: 2px solid rgba(210, 233, 248, 0.95);
+  outline-offset: 2px;
+  filter: brightness(1.08);
 }
 
 .tile-letter:active,

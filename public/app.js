@@ -1373,6 +1373,48 @@ function closeBoardModal() {
   setBoardButton?.focus();
 }
 
+function getActiveModal() {
+  if (boardModal && !boardModal.hidden) {
+    return boardModal;
+  }
+
+  if (helpModal && !helpModal.hidden) {
+    return helpModal;
+  }
+
+  return null;
+}
+
+function trapFocusInModal(modal, event) {
+  if (!modal || event.key !== 'Tab') {
+    return;
+  }
+
+  const focusable = modal.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  );
+
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+    return;
+  }
+
+  if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 submitButton.addEventListener('click', submitWord);
 undoButton.addEventListener('click', removeLastToken);
 clearButton.addEventListener('click', () => clearTokens());
@@ -1404,6 +1446,11 @@ for (const input of Object.values(BOARD_INPUTS)) {
 }
 
 window.addEventListener('keydown', (event) => {
+  const activeModal = getActiveModal();
+  if (activeModal) {
+    trapFocusInModal(activeModal, event);
+  }
+
   if (!boardModal?.hidden && event.key === 'Escape') {
     event.preventDefault();
     closeBoardModal();

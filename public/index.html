@@ -27,8 +27,8 @@
           <section class="panel-card word-card">
             <p class="section-label">Word builder</p>
             <div id="currentWord" class="current-word" aria-live="polite"></div>
-            <div id="message" class="message" aria-live="polite"></div>
-            <p class="helper-text">
+            <div id="message" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
+            <p id="builderHelp" class="helper-text">
               Tap a letter once for a single token. Tap the same letter twice to double it. After the first word, each new word must begin with the last letter of the previous word.
             </p>
             <div class="legend" aria-label="Board legend">
@@ -39,7 +39,7 @@
 
           <section class="panel-card">
             <p class="section-label">Accepted words</p>
-            <div id="foundWords" class="found-words"></div>
+            <div id="foundWords" class="found-words" aria-live="polite" aria-relevant="additions text"></div>
           </section>
         </aside>
 
@@ -70,7 +70,7 @@
           <div class="board-wrap">
             <div class="board-frame">
               <svg id="boardLinks" class="board-links" aria-hidden="true"></svg>
-              <div id="board" class="board" aria-label="Letter board"></div>
+              <div id="board" class="board" aria-label="Letter board" aria-describedby="builderHelp"></div>
             </div>
           </div>
 
@@ -137,7 +137,7 @@
           <label class="board-input-label" for="boardLeftInput">Left</label>
           <input id="boardLeftInput" class="board-input" type="text" maxlength="8" placeholder="DIM" />
         </div>
-        <div id="boardInputMessage" class="message" aria-live="polite"></div>
+        <div id="boardInputMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="help-actions">
           <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>
         </div>
