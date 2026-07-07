@@ -767,6 +767,13 @@ function removeLastToken() {
   }
 
   if (state.tokens.length === 1 && state.foundWords.length > 0) {
+    if (state.tokens[0].doubled) {
+      state.tokens[0].doubled = false;
+      updateUI();
+      setMessage(`Removed the extra ${state.tokens[0].letter.toUpperCase()}.`);
+      return;
+    }
+
     setMessage(`This word starts with ${state.tokens[0].letter.toUpperCase()}. Add the next letter or undo the previous word.`, 'error');
     return;
   }
