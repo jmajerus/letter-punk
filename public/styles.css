@@ -522,25 +522,31 @@ button:active {
   transform: translateY(1px) scale(0.98);
 }
 
-.tile-x2 {
+.tile-x2,
+.token-multiplier {
   position: absolute;
-  right: -9px;
-  bottom: -9px;
-  width: 32px;
-  height: 32px;
   border-radius: 999px;
   border: 1px solid rgba(255, 237, 204, 0.28);
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), transparent 24%),
     linear-gradient(180deg, #d9b067 0%, #9a5b32 100%);
   color: #2d160d;
-  font-size: 0.7rem;
   font-weight: 700;
-  opacity: 0.82;
-  cursor: pointer;
+  display: grid;
+  place-items: center;
   box-shadow:
     0 8px 12px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.tile-x2 {
+  right: -9px;
+  bottom: -9px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.7rem;
+  opacity: 0.82;
+  cursor: pointer;
 }
 
 .controls {
@@ -638,13 +644,14 @@ button {
 }
 
 .token-multiplier {
-  position: absolute;
-  right: 4px;
-  bottom: 2px;
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: rgba(36, 48, 58, 0.7);
+  right: -5px;
+  bottom: -5px;
+  width: 16px;
+  height: 16px;
+  font-size: 0.5rem;
+  letter-spacing: 0;
+  opacity: 0.9;
+  pointer-events: none;
 }
 
 .message {
