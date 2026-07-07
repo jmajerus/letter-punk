@@ -181,10 +181,7 @@ h2 {
   height: 160px;
   pointer-events: none;
   opacity: 0.42;
-  background:
-    radial-gradient(circle at center, transparent 0 26px, rgba(78, 52, 33, 0.8) 26px 29px, transparent 29px 100%),
-    repeating-conic-gradient(from 5deg, rgba(219, 175, 109, 0.3) 0deg 9deg, transparent 9deg 18deg),
-    radial-gradient(circle at center, rgba(224, 190, 130, 0.22) 0 7px, transparent 7px);
+  background: url("assets/gear-ornament.svg") center / contain no-repeat;
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35));
 }
 
@@ -410,77 +407,33 @@ h2 {
 
 .tile-letter {
   position: relative;
-  overflow: hidden;
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(255, 232, 192, 0.42);
+  border: 1px solid rgba(255, 232, 192, 0.32);
   border-radius: 20px;
-  background:
-    linear-gradient(90deg, rgba(94, 60, 36, 0.36) 0 12%, transparent 12% 88%, rgba(68, 42, 26, 0.38) 88% 100%),
-    linear-gradient(180deg, rgba(255, 236, 201, 0.24) 0 9%, transparent 9% 91%, rgba(52, 30, 18, 0.32) 91% 100%),
-    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.22), transparent 26%),
-    linear-gradient(180deg, #cb9053 0%, #8a4f2e 100%);
+  background: url("assets/tank-copper.svg") center / cover no-repeat;
   color: #fff1d1;
   font-family: inherit;
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(26, 13, 8, 0.62);
   box-shadow:
     0 12px 20px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(45, 26, 16, 0.5),
-    inset -10px 0 0 rgba(82, 50, 30, 0.28),
-    inset 0 -8px 0 rgba(72, 44, 27, 0.24);
+    inset 0 -1px 0 rgba(45, 26, 16, 0.5);
   cursor: pointer;
   transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
 }
 
-.tile-letter::before,
-.tile-letter::after {
-  content: "";
-  position: absolute;
-  top: 14px;
-  bottom: 14px;
-  width: 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 226, 167, 0.3);
-  pointer-events: none;
-}
-
-.tile-letter::before {
-  left: 8px;
-  background: linear-gradient(180deg, rgba(229, 188, 126, 0.38), rgba(116, 74, 42, 0.5));
-}
-
-.tile-letter::after {
-  right: 8px;
-  background: linear-gradient(180deg, rgba(207, 162, 103, 0.32), rgba(90, 57, 33, 0.56));
-}
-
 .tile-letter.used {
-  background:
-    linear-gradient(90deg, rgba(49, 71, 63, 0.34) 0 12%, transparent 12% 88%, rgba(34, 52, 45, 0.38) 88% 100%),
-    linear-gradient(180deg, rgba(226, 245, 238, 0.2) 0 9%, transparent 9% 91%, rgba(30, 47, 41, 0.28) 91% 100%),
-    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.18), transparent 26%),
-    linear-gradient(180deg, #7ea694 0%, #4e6e62 100%);
+  background: url("assets/tank-patina.svg") center / cover no-repeat;
   color: #eef7f1;
-  border-color: rgba(186, 235, 212, 0.45);
+  border-color: rgba(186, 235, 212, 0.32);
   box-shadow:
     0 10px 18px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -8px 0 rgba(34, 52, 45, 0.24),
-    inset -10px 0 0 rgba(43, 66, 58, 0.3),
     0 0 0 2px rgba(156, 200, 181, 0.2);
-}
-
-.tile-letter.used::before {
-  background: linear-gradient(180deg, rgba(181, 219, 203, 0.34), rgba(72, 108, 95, 0.46));
-  border-color: rgba(196, 233, 217, 0.34);
-}
-
-.tile-letter.used::after {
-  background: linear-gradient(180deg, rgba(161, 205, 186, 0.3), rgba(58, 92, 80, 0.52));
-  border-color: rgba(168, 218, 196, 0.3);
 }
 
 .tile-letter:hover,

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 102 84" role="img" aria-label="Copper pressure tank">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d79d61"/>
+      <stop offset="0.5" stop-color="#b87444"/>
+      <stop offset="1" stop-color="#7c4628"/>
+    </linearGradient>
+    <linearGradient id="capLeft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#efcb97"/>
+      <stop offset="1" stop-color="#84542f"/>
+    </linearGradient>
+    <linearGradient id="capRight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dfb17a"/>
+      <stop offset="1" stop-color="#734524"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="1" y="1" width="100" height="82" rx="20" ry="20" fill="url(#body)" stroke="#f0cb98" stroke-opacity="0.55"/>
+  <rect x="9" y="12" width="12" height="60" rx="6" fill="url(#capLeft)" stroke="#e5bb83" stroke-opacity="0.55"/>
+  <rect x="81" y="12" width="12" height="60" rx="6" fill="url(#capRight)" stroke="#d8a66f" stroke-opacity="0.42"/>
+
+  <rect x="1" y="1" width="100" height="82" rx="20" ry="20" fill="none" stroke="#2f190f" stroke-opacity="0.35"/>
+  <path d="M6 6h90" stroke="#fff4dc" stroke-opacity="0.25"/>
+  <path d="M6 78h90" stroke="#2f190f" stroke-opacity="0.35"/>
+  <path d="M86 2v80" stroke="#3e2416" stroke-opacity="0.24" stroke-width="10"/>
+
+  <g fill="#f4d6ad" fill-opacity="0.74">
+    <circle cx="15" cy="18" r="1.3"/>
+    <circle cx="15" cy="66" r="1.3"/>
+    <circle cx="87" cy="18" r="1.3"/>
+    <circle cx="87" cy="66" r="1.3"/>
+  </g>
+</svg>

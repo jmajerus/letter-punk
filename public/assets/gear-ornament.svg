@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Steampunk gear ornament">
+  <defs>
+    <radialGradient id="center" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f0ce99" stop-opacity="0.46"/>
+      <stop offset="1" stop-color="#8a5c35" stop-opacity="0.08"/>
+    </radialGradient>
+  </defs>
+
+  <g transform="translate(80 80)">
+    <circle r="45" fill="none" stroke="#5c3b24" stroke-opacity="0.9" stroke-width="5"/>
+    <circle r="47" fill="none" stroke="#d3a76a" stroke-opacity="0.34" stroke-width="2"/>
+
+    <g fill="#c99656" fill-opacity="0.4" stroke="#5a3a23" stroke-opacity="0.74" stroke-width="1">
+      <rect x="-4" y="-70" width="8" height="16" rx="2"/>
+      <rect x="-4" y="54" width="8" height="16" rx="2"/>
+      <rect x="-70" y="-4" width="16" height="8" rx="2"/>
+      <rect x="54" y="-4" width="16" height="8" rx="2"/>
+    </g>
+
+    <g fill="#c99656" fill-opacity="0.33" stroke="#5a3a23" stroke-opacity="0.62" stroke-width="1" transform="rotate(45)">
+      <rect x="-4" y="-70" width="8" height="16" rx="2"/>
+      <rect x="-4" y="54" width="8" height="16" rx="2"/>
+      <rect x="-70" y="-4" width="16" height="8" rx="2"/>
+      <rect x="54" y="-4" width="16" height="8" rx="2"/>
+    </g>
+
+    <circle r="20" fill="url(#center)" stroke="#e0b980" stroke-opacity="0.34"/>
+    <circle r="5" fill="#f2deb8" fill-opacity="0.6"/>
+  </g>
+</svg>
