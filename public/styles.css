@@ -243,51 +243,51 @@ h2 {
 }
 
 .board-pipe-shell {
-  stroke: rgba(64, 42, 29, 0.95);
+  stroke: rgba(48, 56, 63, 0.96);
   stroke-width: 10;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.38));
 }
 
 .board-pipe-core {
-  stroke: rgba(195, 134, 78, 0.96);
+  stroke: rgba(141, 153, 164, 0.96);
   stroke-width: 7;
-  filter: drop-shadow(0 0 5px rgba(231, 166, 98, 0.25));
+  filter: drop-shadow(0 0 5px rgba(198, 211, 221, 0.2));
 }
 
 .board-pipe-highlight {
-  stroke: rgba(244, 211, 155, 0.7);
+  stroke: rgba(228, 235, 241, 0.74);
   stroke-width: 2;
   stroke-dasharray: 18 26;
-  filter: drop-shadow(0 0 2px rgba(250, 230, 196, 0.25));
+  filter: drop-shadow(0 0 2px rgba(245, 248, 250, 0.24));
 }
 
 .board-pipe-joint-shell {
-  fill: rgba(74, 49, 34, 0.96);
+  fill: rgba(41, 48, 54, 0.96);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 .board-pipe-joint-core {
-  fill: rgba(198, 141, 87, 0.98);
-  stroke: rgba(245, 210, 154, 0.65);
+  fill: rgba(160, 170, 179, 0.98);
+  stroke: rgba(221, 229, 235, 0.62);
   stroke-width: 1.1;
 }
 
 .board-pipe-valve-lines {
   fill: none;
-  stroke: rgba(66, 41, 26, 0.85);
+  stroke: rgba(37, 44, 50, 0.9);
   stroke-width: 1.8;
   stroke-linecap: round;
 }
 
 .board-pipe-valve-core {
-  fill: rgba(245, 223, 180, 0.92);
-  stroke: rgba(97, 62, 38, 0.6);
+  fill: rgba(205, 214, 221, 0.92);
+  stroke: rgba(80, 88, 96, 0.56);
   stroke-width: 0.8;
 }
 
 .board-pipe-arrow {
-  fill: rgba(243, 223, 186, 0.82);
-  filter: drop-shadow(0 0 2px rgba(245, 212, 149, 0.35));
+  fill: rgba(220, 228, 234, 0.84);
+  filter: drop-shadow(0 0 2px rgba(244, 247, 250, 0.28));
 }
 
 .board-pipe-live {
@@ -303,12 +303,12 @@ h2 {
 @keyframes pipe-live-pulse {
   0%,
   100% {
-    filter: drop-shadow(0 0 5px rgba(231, 166, 98, 0.25));
+    filter: drop-shadow(0 0 5px rgba(198, 211, 221, 0.22));
     opacity: 1;
   }
 
   50% {
-    filter: drop-shadow(0 0 8px rgba(249, 207, 132, 0.5));
+    filter: drop-shadow(0 0 8px rgba(233, 240, 245, 0.45));
     opacity: 0.92;
   }
 }
