@@ -540,11 +540,11 @@ button:active {
 }
 
 .tile-x2 {
-  right: -9px;
-  bottom: -9px;
-  width: 32px;
-  height: 32px;
-  font-size: 0.7rem;
+  right: -7px;
+  bottom: -7px;
+  width: 26px;
+  height: 26px;
+  font-size: 0.62rem;
   opacity: 0.82;
   cursor: pointer;
 }
@@ -891,10 +891,10 @@ button {
   }
 
   .tile-x2 {
-    right: -8px;
-    bottom: -8px;
-    width: 32px;
-    height: 32px;
+    right: -6px;
+    bottom: -6px;
+    width: 26px;
+    height: 26px;
   }
 
   .side-top,
@@ -958,11 +958,11 @@ button {
   }
 
   .tile-x2 {
-    width: 6cqw;
-    height: 6cqw;
-    font-size: 2cqw;
-    right: -2cqw;
-    bottom: -2cqw;
+    width: 5cqw;
+    height: 5cqw;
+    font-size: 1.7cqw;
+    right: -1.7cqw;
+    bottom: -1.7cqw;
   }
 
   .side-top {
