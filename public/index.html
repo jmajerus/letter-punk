@@ -23,6 +23,26 @@
       </header>
 
       <section class="layout">
+        <aside class="panel">
+          <section class="panel-card word-card">
+            <p class="section-label">Word builder</p>
+            <div id="currentWord" class="current-word" aria-live="polite"></div>
+            <div id="message" class="message" aria-live="polite"></div>
+            <p class="helper-text">
+              Tap a letter once for a single token. Tap the same letter twice to double it. After the first word, each new word must begin with the last letter of the previous word.
+            </p>
+            <div class="legend" aria-label="Board legend">
+              <span class="legend-item"><span class="legend-swatch brass"></span>Unused letter</span>
+              <span class="legend-item"><span class="legend-swatch patina"></span>Used at least once</span>
+            </div>
+          </section>
+
+          <section class="panel-card">
+            <p class="section-label">Accepted words</p>
+            <div id="foundWords" class="found-words"></div>
+          </section>
+        </aside>
+
         <div class="board-card">
           <div class="board-header">
             <div>
@@ -40,7 +60,10 @@
                   <small>Found</small>
                 </div>
               </div>
-              <button id="helpBtn" class="help-btn" type="button" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
+              <div class="board-tool-buttons">
+                <button id="setBoardBtn" class="help-btn" type="button" aria-haspopup="dialog" aria-controls="boardModal">Set Board</button>
+                <button id="helpBtn" class="help-btn" type="button" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
+              </div>
             </div>
           </div>
 
@@ -56,31 +79,11 @@
           </div>
 
           <div class="controls">
-            <button id="submitBtn" class="primary">Submit word</button>
-            <button id="undoBtn" class="secondary">Undo</button>
-            <button id="clearBtn" class="secondary">Clear</button>
+            <button id="clearBtn" class="secondary">Restart</button>
+            <button id="undoBtn" class="secondary">Delete</button>
+            <button id="submitBtn" class="primary">Enter</button>
           </div>
         </div>
-
-        <aside class="panel">
-          <section class="panel-card word-card">
-            <p class="section-label">Word builder</p>
-            <div id="currentWord" class="current-word" aria-live="polite"></div>
-            <div id="message" class="message" aria-live="polite"></div>
-            <p class="helper-text">
-              Tap a letter once for a single token. Tap the same letter twice to double it. The x2 button is there as a friendly shortcut.
-            </p>
-            <div class="legend" aria-label="Board legend">
-              <span class="legend-item"><span class="legend-swatch brass"></span>Unused letter</span>
-              <span class="legend-item"><span class="legend-swatch patina"></span>Used at least once</span>
-            </div>
-          </section>
-
-          <section class="panel-card">
-            <p class="section-label">Accepted words</p>
-            <div id="foundWords" class="found-words"></div>
-          </section>
-        </aside>
       </section>
     </main>
 
@@ -95,11 +98,52 @@
           <li>Tap a letter once for one token.</li>
           <li>Tap the same letter twice for a doubled token, or use x2.</li>
           <li>Consecutive tokens still need to come from different sides.</li>
+          <li>After the first word, the next word must begin with the previous word's final letter.</li>
           <li>Submit words with 3+ letters.</li>
+          <li>Use Set Board to copy daily Letter Boxed letters and compare solve paths.</li>
+          <li>Using every letter solves the board. If you can do better, Undo can retract your last accepted word.</li>
           <li>Words are validated live with dictionaryapi.dev.</li>
         </ul>
         <div class="help-actions">
           <button id="gotItBtn" class="primary" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="boardModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="boardTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="boardTitle">Set Daily Board</h2>
+          <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close board setup">Close</button>
+        </div>
+        <p class="help-copy">Paste the current puzzle letters. Use 3 letters per side (for example: CRT), or 12 letters clockwise from upper-left with no spaces.</p>
+        <label class="board-input-label" for="boardPasteInput">Pasted board text (optional)</label>
+        <textarea id="boardPasteInput" class="board-input board-paste" rows="3" placeholder='Examples:\n{"top":"ABC","right":"DEF","bottom":"GHI","left":"JKL"}\nTOP: ABC RIGHT: DEF BOTTOM: GHI LEFT: JKL\nABCDEFGHIJKL (clockwise from upper-left)'></textarea>
+        <div class="board-paste-actions">
+          <button id="pasteClipboardBtn" class="secondary" type="button">Paste Clipboard</button>
+          <button id="parseBoardPasteBtn" class="secondary" type="button">Parse Pasted Text</button>
+        </div>
+        <label class="board-input-label" for="solutionWordsInput">Generate from solution words (optional)</label>
+        <input id="solutionWordsInput" class="board-input" type="text" placeholder="WORDONE WORDTWO" />
+        <div class="board-paste-actions">
+          <button id="generateBoardBtn" class="secondary" type="button">Generate From Words</button>
+        </div>
+        <div class="board-input-grid">
+          <label class="board-input-label" for="boardTopInput">Top</label>
+          <input id="boardTopInput" class="board-input" type="text" maxlength="8" placeholder="CRT" />
+
+          <label class="board-input-label" for="boardRightInput">Right</label>
+          <input id="boardRightInput" class="board-input" type="text" maxlength="8" placeholder="OAE" />
+
+          <label class="board-input-label" for="boardBottomInput">Bottom</label>
+          <input id="boardBottomInput" class="board-input" type="text" maxlength="8" placeholder="LNS" />
+
+          <label class="board-input-label" for="boardLeftInput">Left</label>
+          <input id="boardLeftInput" class="board-input" type="text" maxlength="8" placeholder="DIM" />
+        </div>
+        <div id="boardInputMessage" class="message" aria-live="polite"></div>
+        <div class="help-actions">
+          <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>
         </div>
       </div>
     </div>

@@ -18,11 +18,32 @@ const foundCountElement = document.getElementById('foundCount');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
+const setBoardButton = document.getElementById('setBoardBtn');
 const helpButton = document.getElementById('helpBtn');
 const helpModal = document.getElementById('helpModal');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
+const boardModal = document.getElementById('boardModal');
+const closeBoardButton = document.getElementById('closeBoardBtn');
+const applyBoardButton = document.getElementById('applyBoardBtn');
+const boardTopInput = document.getElementById('boardTopInput');
+const boardRightInput = document.getElementById('boardRightInput');
+const boardBottomInput = document.getElementById('boardBottomInput');
+const boardLeftInput = document.getElementById('boardLeftInput');
+const boardPasteInput = document.getElementById('boardPasteInput');
+const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
+const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
+const solutionWordsInput = document.getElementById('solutionWordsInput');
+const generateBoardButton = document.getElementById('generateBoardBtn');
+const boardInputMessageElement = document.getElementById('boardInputMessage');
 const letterButtons = new Map();
+
+const BOARD_INPUTS = {
+  top: boardTopInput,
+  right: boardRightInput,
+  bottom: boardBottomInput,
+  left: boardLeftInput,
+};
 
 function pickRandom(source, count) {
   const pool = [...source];
@@ -66,6 +87,116 @@ function buildBoard() {
   return board;
 }
 
+function normalizeSideInput(rawValue) {
+  return (rawValue || '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+function boardFromInputValues(values) {
+  const lettersBySide = SIDE_NAMES.map((name) => normalizeSideInput(values[name]));
+  const hasWrongLength = lettersBySide.some((letters) => letters.length !== 3);
+  if (hasWrongLength) {
+    return { error: 'Each side needs exactly 3 letters.' };
+  }
+
+  const allLetters = lettersBySide.join('').split('');
+  const uniqueCount = new Set(allLetters).size;
+  if (uniqueCount !== allLetters.length) {
+    return { error: 'All 12 letters must be unique across the board.' };
+  }
+
+  return {
+    board: SIDE_NAMES.map((name, index) => ({
+      side: index,
+      name,
+      letters: lettersBySide[index].split(''),
+    })),
+  };
+}
+
+function parseBoardText(text) {
+  const raw = (text || '').trim();
+  if (!raw) {
+    return { error: 'Paste board text first.' };
+  }
+
+  try {
+    const parsedJson = JSON.parse(raw);
+    if (parsedJson && typeof parsedJson === 'object') {
+      const top = normalizeSideInput(parsedJson.top);
+      const right = normalizeSideInput(parsedJson.right);
+      const bottom = normalizeSideInput(parsedJson.bottom);
+      const left = normalizeSideInput(parsedJson.left);
+      if (top || right || bottom || left) {
+        return { values: { top, right, bottom, left } };
+      }
+    }
+  } catch {
+    // Ignore and continue with text-based parsing.
+  }
+
+  const labeled = {};
+  const labelRegex = /(top|right|bottom|left)\s*[:=\-]\s*([A-Za-z]+)/gi;
+  let match = labelRegex.exec(raw);
+  while (match) {
+    labeled[match[1].toLowerCase()] = normalizeSideInput(match[2]);
+    match = labelRegex.exec(raw);
+  }
+
+  if (labeled.top || labeled.right || labeled.bottom || labeled.left) {
+    return {
+      values: {
+        top: labeled.top || '',
+        right: labeled.right || '',
+        bottom: labeled.bottom || '',
+        left: labeled.left || '',
+      },
+    };
+  }
+
+  const grouped = raw
+    .split(/\n|,|;/)
+    .map((part) => normalizeSideInput(part))
+    .filter(Boolean);
+
+  if (grouped.length >= 4 && grouped.slice(0, 4).every((group) => group.length >= 3)) {
+    return {
+      values: {
+        top: grouped[0].slice(0, 3),
+        right: grouped[1].slice(0, 3),
+        bottom: grouped[2].slice(0, 3),
+        left: grouped[3].slice(0, 3),
+      },
+    };
+  }
+
+  const compact = normalizeSideInput(raw);
+  if (compact.length >= 12) {
+    const top = compact.slice(0, 3);
+    const right = compact.slice(3, 6);
+    const bottomClockwise = compact.slice(6, 9);
+    const leftClockwise = compact.slice(9, 12);
+
+    return {
+      values: {
+        top,
+        right,
+        // Clockwise entry from upper-left traverses bottom right->left and left bottom->top.
+        bottom: bottomClockwise.split('').reverse().join(''),
+        left: leftClockwise.split('').reverse().join(''),
+      },
+    };
+  }
+
+  return { error: 'Could not parse board text. Use JSON, labeled sides, or 4 groups of letters.' };
+}
+
+function fillBoardInputs(values) {
+  boardTopInput.value = values.top || '';
+  boardRightInput.value = values.right || '';
+  boardBottomInput.value = values.bottom || '';
+  boardLeftInput.value = values.left || '';
+}
+
 let BOARD = buildBoard();
 const lettersToSide = new Map();
 function refreshLettersToSide() {
@@ -86,6 +217,14 @@ const state = {
   messageTimer: null,
 };
 
+function getRequiredStartingLetter() {
+  if (state.foundWords.length === 0) {
+    return null;
+  }
+
+  return state.foundWords[0].word.slice(-1);
+}
+
 function createToken(letter, doubled = false) {
   const lower = letter.toLowerCase();
   return {
@@ -93,6 +232,16 @@ function createToken(letter, doubled = false) {
     side: lettersToSide.get(lower),
     doubled,
   };
+}
+
+function seedNextWord() {
+  const requiredStartingLetter = getRequiredStartingLetter();
+  if (!requiredStartingLetter) {
+    state.tokens = [];
+    return;
+  }
+
+  state.tokens = [createToken(requiredStartingLetter, false)];
 }
 
 function wordFromTokens(tokens) {
@@ -133,10 +282,6 @@ function setMessage(text, kind = '') {
 }
 
 function renderBoard() {
-  BOARD = buildBoard();
-  refreshLettersToSide();
-  state.usedLetters.clear();
-
   boardElement.innerHTML = '';
   letterButtons.clear();
 
@@ -174,6 +319,232 @@ function renderBoard() {
   }
 
   renderBoardLinks();
+}
+
+function resetGameForBoard() {
+  state.tokens = [];
+  state.foundWords = [];
+  state.score = 0;
+  state.usedLetters.clear();
+}
+
+function fillBoardInputsFromCurrentBoard() {
+  fillBoardInputs({
+    top: BOARD[0]?.letters.join('') || '',
+    right: BOARD[1]?.letters.join('') || '',
+    bottom: BOARD[2]?.letters.join('') || '',
+    left: BOARD[3]?.letters.join('') || '',
+  });
+
+  if (boardPasteInput) {
+    boardPasteInput.value = '';
+  }
+
+  if (solutionWordsInput) {
+    solutionWordsInput.value = '';
+  }
+}
+
+function setBoardInputMessage(text, kind = '') {
+  if (!boardInputMessageElement) {
+    return;
+  }
+
+  boardInputMessageElement.textContent = text;
+  boardInputMessageElement.classList.remove('success', 'error');
+  if (kind) {
+    boardInputMessageElement.classList.add(kind);
+  }
+}
+
+function wordsFromSolutionInput(raw) {
+  return (raw || '')
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 3);
+}
+
+function generateBoardFromSolutionWords(words) {
+  if (!Array.isArray(words) || words.length < 2) {
+    return { error: 'Provide at least two solution words.' };
+  }
+
+  const uniqueLetters = [];
+  const seen = new Set();
+  for (const word of words) {
+    for (const letter of word) {
+      if (!seen.has(letter)) {
+        seen.add(letter);
+        uniqueLetters.push(letter);
+      }
+    }
+  }
+
+  if (uniqueLetters.length !== 12) {
+    return { error: `Expected exactly 12 unique letters from solution words, found ${uniqueLetters.length}.` };
+  }
+
+  const adjacency = new Map(uniqueLetters.map((letter) => [letter, new Set()]));
+  for (const word of words) {
+    for (let index = 1; index < word.length; index += 1) {
+      const a = word[index - 1];
+      const b = word[index];
+      if (a === b) {
+        continue;
+      }
+
+      adjacency.get(a).add(b);
+      adjacency.get(b).add(a);
+    }
+  }
+
+  const orderedLetters = [...uniqueLetters].sort((left, right) => {
+    const degreeDiff = adjacency.get(right).size - adjacency.get(left).size;
+    if (degreeDiff !== 0) {
+      return degreeDiff;
+    }
+
+    return uniqueLetters.indexOf(left) - uniqueLetters.indexOf(right);
+  });
+
+  const assignment = new Map();
+  const sideCounts = [0, 0, 0, 0];
+
+  function canAssign(letter, side) {
+    if (sideCounts[side] >= 3) {
+      return false;
+    }
+
+    for (const neighbor of adjacency.get(letter)) {
+      if (assignment.get(neighbor) === side) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function solve(index) {
+    if (index >= orderedLetters.length) {
+      return sideCounts.every((count) => count === 3);
+    }
+
+    const letter = orderedLetters[index];
+    const sideOrder = index === 0 ? [0] : [0, 1, 2, 3];
+
+    for (const side of sideOrder) {
+      if (!canAssign(letter, side)) {
+        continue;
+      }
+
+      assignment.set(letter, side);
+      sideCounts[side] += 1;
+
+      if (solve(index + 1)) {
+        return true;
+      }
+
+      sideCounts[side] -= 1;
+      assignment.delete(letter);
+    }
+
+    return false;
+  }
+
+  if (!solve(0)) {
+    return { error: 'Could not generate a valid 4-side layout from these words.' };
+  }
+
+  const bySide = [[], [], [], []];
+  for (const letter of uniqueLetters) {
+    const side = assignment.get(letter);
+    bySide[side].push(letter);
+  }
+
+  if (!bySide.every((letters) => letters.length === 3)) {
+    return { error: 'Generated layout was invalid. Try different solution words.' };
+  }
+
+  return {
+    board: SIDE_NAMES.map((name, side) => ({
+      side,
+      name,
+      letters: bySide[side],
+    })),
+  };
+}
+
+function applyBoardDefinition(board) {
+  BOARD = board;
+  refreshLettersToSide();
+  resetGameForBoard();
+  renderBoard();
+  updateUI();
+}
+
+function applyBoardFromInputs() {
+  const values = {
+    top: boardTopInput?.value,
+    right: boardRightInput?.value,
+    bottom: boardBottomInput?.value,
+    left: boardLeftInput?.value,
+  };
+
+  const parsed = boardFromInputValues(values);
+  if (parsed.error) {
+    setBoardInputMessage(parsed.error, 'error');
+    return;
+  }
+
+  applyBoardDefinition(parsed.board);
+  closeBoardModal();
+  setMessage('Applied custom board. Forge away.');
+}
+
+function generateBoardFromWordsInput() {
+  const words = wordsFromSolutionInput(solutionWordsInput?.value || '');
+  const generated = generateBoardFromSolutionWords(words);
+  if (generated.error) {
+    setBoardInputMessage(generated.error, 'error');
+    return;
+  }
+
+  fillBoardInputs({
+    top: generated.board[0].letters.join(''),
+    right: generated.board[1].letters.join(''),
+    bottom: generated.board[2].letters.join(''),
+    left: generated.board[3].letters.join(''),
+  });
+  setBoardInputMessage('Generated a valid board from solution words. Review and Apply Board.', 'success');
+}
+
+async function pasteBoardFromClipboard() {
+  if (!navigator.clipboard?.readText) {
+    setBoardInputMessage('Clipboard read is unavailable in this browser context.', 'error');
+    return;
+  }
+
+  try {
+    const text = await navigator.clipboard.readText();
+    if (boardPasteInput) {
+      boardPasteInput.value = text;
+    }
+    setBoardInputMessage('Pasted clipboard text. Click Parse Pasted Text.', 'success');
+  } catch {
+    setBoardInputMessage('Could not read clipboard. Paste manually into the text area.', 'error');
+  }
+}
+
+function parsePastedBoardText() {
+  const parsed = parseBoardText(boardPasteInput?.value || '');
+  if (parsed.error) {
+    setBoardInputMessage(parsed.error, 'error');
+    return;
+  }
+
+  fillBoardInputs(parsed.values);
+  setBoardInputMessage('Parsed board text into side inputs.', 'success');
 }
 
 function getTokenPoint(token) {
@@ -344,6 +715,12 @@ function updateUI() {
 function appendToken(letter, doubled) {
   const lower = letter.toLowerCase();
   const lastToken = state.tokens[state.tokens.length - 1];
+  const requiredStartingLetter = getRequiredStartingLetter();
+
+  if (state.tokens.length === 0 && requiredStartingLetter && lower !== requiredStartingLetter) {
+    setMessage(`This word must start with ${requiredStartingLetter.toUpperCase()}.`, 'error');
+    return;
+  }
 
   // Treat a repeated click on the same letter as intent to use x2.
   if (lastToken && lastToken.letter === lower) {
@@ -366,8 +743,31 @@ function appendToken(letter, doubled) {
 }
 
 function removeLastToken() {
-  if (state.tokens.length === 0) {
+  if (state.tokens.length === 0 && state.foundWords.length === 0) {
     setMessage('Nothing to undo yet.');
+    return;
+  }
+
+  if (state.tokens.length === 0) {
+    const [lastWord] = state.foundWords;
+    state.foundWords.shift();
+    state.score -= lastWord.length;
+    state.usedLetters.clear();
+
+    for (const entry of state.foundWords) {
+      for (const letter of entry.word) {
+        state.usedLetters.add(letter);
+      }
+    }
+
+    seedNextWord();
+    updateUI();
+    setMessage(`Retracted ${lastWord.word.toUpperCase()}. You can try for a lower word count.`, 'success');
+    return;
+  }
+
+  if (state.tokens.length === 1 && state.foundWords.length > 0) {
+    setMessage(`This word starts with ${state.tokens[0].letter.toUpperCase()}. Add the next letter or undo the previous word.`, 'error');
     return;
   }
 
@@ -384,10 +784,15 @@ function clearTokens(silent = false) {
     return;
   }
 
-  state.tokens = [];
+  seedNextWord();
   updateUI();
 
   if (!silent) {
+    if (state.tokens.length > 0) {
+      setMessage(`Cleared this attempt. Your next word still starts with ${state.tokens[0].letter.toUpperCase()}.`);
+      return;
+    }
+
     setMessage('Cleared the word builder.');
   }
 }
@@ -445,9 +850,15 @@ async function submitWord() {
 
   const word = wordFromTokens(state.tokens).toLowerCase();
   const length = word.length;
+  const requiredStartingLetter = getRequiredStartingLetter();
 
   if (length < 3) {
     setMessage('Words need at least 3 letters.', 'error');
+    return;
+  }
+
+  if (requiredStartingLetter && word[0] !== requiredStartingLetter) {
+    setMessage(`This word must start with ${requiredStartingLetter.toUpperCase()}.`, 'error');
     return;
   }
 
@@ -474,9 +885,21 @@ async function submitWord() {
     state.usedLetters.add(token.letter);
   }
 
+  const solved = state.usedLetters.size === lettersToSide.size;
+
   updateUI();
-  setMessage(`Accepted ${word.toUpperCase()}.`, 'success');
-  clearTokens(true);
+
+  if (solved) {
+    state.tokens = [];
+    updateUI();
+    setMessage(`Solved in ${state.foundWords.length} words. Undo to try for a lower count.`, 'success');
+    return;
+  }
+
+  seedNextWord();
+  updateUI();
+
+  setMessage(`Accepted ${word.toUpperCase()}. Next word begins with ${state.tokens[0].letter.toUpperCase()}.`, 'success');
 }
 
 function openHelpModal() {
@@ -497,22 +920,76 @@ function closeHelpModal() {
   helpButton?.focus();
 }
 
+function openBoardModal() {
+  if (!boardModal) {
+    return;
+  }
+
+  fillBoardInputsFromCurrentBoard();
+  setBoardInputMessage('');
+  boardModal.hidden = false;
+  boardTopInput?.focus();
+}
+
+function closeBoardModal() {
+  if (!boardModal) {
+    return;
+  }
+
+  boardModal.hidden = true;
+  setBoardButton?.focus();
+}
+
 submitButton.addEventListener('click', submitWord);
 undoButton.addEventListener('click', removeLastToken);
 clearButton.addEventListener('click', () => clearTokens());
+setBoardButton?.addEventListener('click', openBoardModal);
 helpButton?.addEventListener('click', openHelpModal);
 closeHelpButton?.addEventListener('click', closeHelpModal);
 gotItButton?.addEventListener('click', closeHelpModal);
+closeBoardButton?.addEventListener('click', closeBoardModal);
+applyBoardButton?.addEventListener('click', applyBoardFromInputs);
+pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
+parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
+generateBoardButton?.addEventListener('click', generateBoardFromWordsInput);
 helpModal?.addEventListener('click', (event) => {
   if (event.target === helpModal) {
     closeHelpModal();
   }
 });
+boardModal?.addEventListener('click', (event) => {
+  if (event.target === boardModal) {
+    closeBoardModal();
+  }
+});
+
+for (const input of Object.values(BOARD_INPUTS)) {
+  input?.addEventListener('input', () => {
+    input.value = normalizeSideInput(input.value);
+    setBoardInputMessage('');
+  });
+}
 
 window.addEventListener('keydown', (event) => {
+  if (!boardModal?.hidden && event.key === 'Escape') {
+    event.preventDefault();
+    closeBoardModal();
+    return;
+  }
+
   if (!helpModal?.hidden && event.key === 'Escape') {
     event.preventDefault();
     closeHelpModal();
+    return;
+  }
+
+  if (!boardModal?.hidden && event.key === 'Enter') {
+    event.preventDefault();
+    applyBoardFromInputs();
+    return;
+  }
+
+  if (!helpModal?.hidden) {
     return;
   }
 
@@ -531,6 +1008,9 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('resize', renderBoardLinks);
 
+BOARD = buildBoard();
+refreshLettersToSide();
+resetGameForBoard();
 renderBoard();
 updateUI();
 setMessage('Double letters are welcome here: tap a letter twice or use x2.');

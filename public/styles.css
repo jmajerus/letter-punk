@@ -98,7 +98,7 @@ h2 {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
   gap: 20px;
   align-items: start;
 }
@@ -130,6 +130,11 @@ h2 {
   flex-direction: column;
   align-items: end;
   gap: 10px;
+}
+
+.board-tool-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .stats {
@@ -398,6 +403,10 @@ button:active {
   margin-top: 6px;
 }
 
+#submitBtn {
+  margin-left: auto;
+}
+
 button {
   border: 0;
   border-radius: 16px;
@@ -619,6 +628,51 @@ button {
   margin-top: 14px;
   display: flex;
   justify-content: end;
+}
+
+.board-input-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.board-input-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.board-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 226, 167, 0.2);
+  background: linear-gradient(180deg, rgba(28, 21, 16, 0.95), rgba(19, 15, 12, 0.95));
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.board-paste {
+  margin-top: 6px;
+  resize: vertical;
+  min-height: 86px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.board-paste-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.board-input:focus-visible {
+  outline: 1px solid rgba(156, 200, 213, 0.6);
+  outline-offset: 1px;
 }
 
 @media (max-width: 1080px) {
