@@ -1246,14 +1246,15 @@ function removeLastToken() {
     return;
   }
 
-  if (state.tokens.length === 1 && state.foundWords.length > 0 && state.starterLocked) {
-    if (state.tokens[0].doubled) {
-      state.tokens[0].doubled = false;
-      updateUI();
-      setMessage('Removed the last move.');
-      return;
-    }
+  const lastToken = state.tokens[state.tokens.length - 1];
+  if (lastToken?.doubled) {
+    lastToken.doubled = false;
+    updateUI();
+    setMessage('Removed one letter.');
+    return;
+  }
 
+  if (state.tokens.length === 1 && state.foundWords.length > 0 && state.starterLocked) {
     backUpIntoPreviousWord();
     return;
   }
