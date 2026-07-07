@@ -214,6 +214,7 @@ const state = {
   foundWords: [],
   score: 0,
   usedLetters: new Set(),
+  starterLocked: false,
   messageTimer: null,
 };
 
@@ -238,16 +239,62 @@ function seedNextWord() {
   const requiredStartingLetter = getRequiredStartingLetter();
   if (!requiredStartingLetter) {
     state.tokens = [];
+    state.starterLocked = false;
     return;
   }
 
   state.tokens = [createToken(requiredStartingLetter, false)];
+  state.starterLocked = true;
 }
 
 function wordFromTokens(tokens) {
   return tokens
     .map((token) => (token.doubled ? token.letter + token.letter : token.letter))
     .join('');
+}
+
+function tokensFromWord(word) {
+  const tokens = [];
+  const lower = (word || '').toLowerCase();
+
+  for (let index = 0; index < lower.length; index += 1) {
+    const letter = lower[index];
+    const next = lower[index + 1];
+    if (next === letter) {
+      tokens.push(createToken(letter, true));
+      index += 1;
+      continue;
+    }
+
+    tokens.push(createToken(letter, false));
+  }
+
+  return tokens;
+}
+
+function rebuildUsedLettersFromFoundWords() {
+  state.usedLetters.clear();
+  for (const entry of state.foundWords) {
+    for (const letter of entry.word) {
+      state.usedLetters.add(letter);
+    }
+  }
+}
+
+function backUpIntoPreviousWord() {
+  if (state.foundWords.length === 0) {
+    return false;
+  }
+
+  const [lastWord] = state.foundWords;
+  state.foundWords.shift();
+  state.score -= lastWord.length;
+  rebuildUsedLettersFromFoundWords();
+  state.tokens = tokensFromWord(lastWord.word);
+  state.starterLocked = false;
+  updateUI();
+  setMessage('Removed the last move.');
+  return true;
 }
 
 function tokensAreValid(tokens) {
@@ -326,6 +373,7 @@ function resetGameForBoard() {
   state.foundWords = [];
   state.score = 0;
   state.usedLetters.clear();
+  state.starterLocked = false;
 }
 
 function fillBoardInputsFromCurrentBoard() {
@@ -749,36 +797,26 @@ function removeLastToken() {
   }
 
   if (state.tokens.length === 0) {
-    const [lastWord] = state.foundWords;
-    state.foundWords.shift();
-    state.score -= lastWord.length;
-    state.usedLetters.clear();
-
-    for (const entry of state.foundWords) {
-      for (const letter of entry.word) {
-        state.usedLetters.add(letter);
-      }
-    }
-
-    seedNextWord();
-    updateUI();
-    setMessage(`Retracted ${lastWord.word.toUpperCase()}. You can try for a lower word count.`, 'success');
+    backUpIntoPreviousWord();
     return;
   }
 
-  if (state.tokens.length === 1 && state.foundWords.length > 0) {
+  if (state.tokens.length === 1 && state.foundWords.length > 0 && state.starterLocked) {
     if (state.tokens[0].doubled) {
       state.tokens[0].doubled = false;
       updateUI();
-      setMessage(`Removed the extra ${state.tokens[0].letter.toUpperCase()}.`);
+      setMessage('Removed the last move.');
       return;
     }
 
-    setMessage(`This word starts with ${state.tokens[0].letter.toUpperCase()}. Add the next letter or undo the previous word.`, 'error');
+    backUpIntoPreviousWord();
     return;
   }
 
   state.tokens.pop();
+  if (state.tokens.length === 0) {
+    state.starterLocked = false;
+  }
   updateUI();
   setMessage('Removed the last move.');
 }
