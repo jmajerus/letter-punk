@@ -300,31 +300,37 @@ h2 {
 
 .tile {
   position: relative;
-  width: 94px;
-  height: 94px;
+  width: 104px;
+  height: 82px;
 }
 
 .tile-letter {
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(255, 232, 192, 0.28);
-  border-radius: 22px;
+  border: 1px solid rgba(255, 232, 192, 0.38);
+  border-radius: 999px;
   background:
+    linear-gradient(180deg, transparent 0 15%, rgba(255, 225, 172, 0.22) 15% 19%, transparent 19% 81%, rgba(65, 39, 24, 0.36) 81% 85%, transparent 85% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.18), transparent 26%),
     linear-gradient(180deg, #c78c52 0%, #8a4f2e 100%);
   color: #fff1d1;
   font-family: inherit;
   font-size: 2rem;
   font-weight: 700;
+  letter-spacing: 0.03em;
   box-shadow:
     0 12px 20px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(41, 24, 15, 0.45),
+    inset 10px 0 0 rgba(98, 64, 39, 0.28),
+    inset -10px 0 0 rgba(98, 64, 39, 0.28);
   cursor: pointer;
   transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
 }
 
 .tile-letter.used {
   background:
+    linear-gradient(180deg, transparent 0 15%, rgba(206, 239, 223, 0.2) 15% 19%, transparent 19% 81%, rgba(36, 56, 49, 0.32) 81% 85%, transparent 85% 100%),
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.14), transparent 26%),
     linear-gradient(180deg, #7ea694 0%, #4e6e62 100%);
   color: #eef7f1;
@@ -359,8 +365,8 @@ button:active {
 
 .tile-x2 {
   position: absolute;
-  right: -8px;
-  bottom: -8px;
+  right: -10px;
+  bottom: -10px;
   width: 32px;
   height: 32px;
   border-radius: 999px;
@@ -720,13 +726,12 @@ button {
   }
 
   .tile {
-    width: 78px;
-    height: 78px;
+    width: 86px;
+    height: 68px;
   }
 
   .tile-letter {
     font-size: 1.6rem;
-    border-radius: 18px;
   }
 
   .tile-x2 {

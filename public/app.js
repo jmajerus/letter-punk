@@ -595,7 +595,7 @@ function parsePastedBoardText() {
   setBoardInputMessage('Parsed board text into side inputs.', 'success');
 }
 
-function getTokenPoint(token) {
+function getTokenAnchor(token) {
   const button = letterButtons.get(token.letter);
   if (!button || !boardLinksElement) {
     return null;
@@ -603,9 +603,29 @@ function getTokenPoint(token) {
 
   const boardRect = boardLinksElement.getBoundingClientRect();
   const buttonRect = button.getBoundingClientRect();
+  const centerX = buttonRect.left + (buttonRect.width / 2) - boardRect.left;
+  const centerY = buttonRect.top + (buttonRect.height / 2) - boardRect.top;
+  const edgeInset = 2;
+
+  if (token.side === 0) {
+    return { x: centerX, y: buttonRect.bottom - boardRect.top + edgeInset };
+  }
+
+  if (token.side === 1) {
+    return { x: buttonRect.left - boardRect.left - edgeInset, y: centerY };
+  }
+
+  if (token.side === 2) {
+    return { x: centerX, y: buttonRect.top - boardRect.top - edgeInset };
+  }
+
+  if (token.side === 3) {
+    return { x: buttonRect.right - boardRect.left + edgeInset, y: centerY };
+  }
+
   return {
-    x: buttonRect.left + (buttonRect.width / 2) - boardRect.left,
-    y: buttonRect.top + (buttonRect.height / 2) - boardRect.top,
+    x: centerX,
+    y: centerY,
   };
 }
 
@@ -649,26 +669,120 @@ function createSvgCircle(className, cx, cy, r) {
   return circle;
 }
 
-function buildPipeRoute(from, to) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const points = [{ x: from.x, y: from.y }];
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
-  // Use elbow routes for most links so connectors look like rigid pipes.
-  if (Math.abs(dx) > 20 && Math.abs(dy) > 20) {
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      points.push({ x: to.x, y: from.y });
-    } else {
-      points.push({ x: from.x, y: to.y });
-    }
+function getCenterCorridor(width, height) {
+  return {
+    left: width * 0.3,
+    right: width * 0.7,
+    top: height * 0.3,
+    bottom: height * 0.7,
+    cx: width / 2,
+    cy: height / 2,
+  };
+}
+
+function buildEntryFromAnchor(anchor, side, corridor) {
+  const offset = 20;
+  if (side === 0) {
+    const x = clamp(anchor.x, corridor.left, corridor.right);
+    return {
+      points: [
+        { x: anchor.x, y: corridor.top - offset },
+        { x, y: corridor.top - offset },
+      ],
+      hub: { x, y: corridor.top },
+    };
   }
 
-  points.push({ x: to.x, y: to.y });
+  if (side === 1) {
+    const y = clamp(anchor.y, corridor.top, corridor.bottom);
+    return {
+      points: [
+        { x: corridor.right + offset, y: anchor.y },
+        { x: corridor.right + offset, y },
+      ],
+      hub: { x: corridor.right, y },
+    };
+  }
 
-  const d = points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
+  if (side === 2) {
+    const x = clamp(anchor.x, corridor.left, corridor.right);
+    return {
+      points: [
+        { x: anchor.x, y: corridor.bottom + offset },
+        { x, y: corridor.bottom + offset },
+      ],
+      hub: { x, y: corridor.bottom },
+    };
+  }
 
+  const y = clamp(anchor.y, corridor.top, corridor.bottom);
+  return {
+    points: [
+      { x: corridor.left - offset, y: anchor.y },
+      { x: corridor.left - offset, y },
+    ],
+    hub: { x: corridor.left, y },
+  };
+}
+
+function appendUniquePoint(points, point) {
+  const last = points[points.length - 1];
+  if (!last || last.x !== point.x || last.y !== point.y) {
+    points.push(point);
+  }
+}
+
+function appendInnerCorridorPath(points, fromHub, toHub, corridor) {
+  if (fromHub.x === toHub.x || fromHub.y === toHub.y) {
+    appendUniquePoint(points, toHub);
+    return;
+  }
+
+  const viaCenterXDistance = Math.abs(fromHub.x - corridor.cx) + Math.abs(toHub.x - corridor.cx);
+  const viaCenterYDistance = Math.abs(fromHub.y - corridor.cy) + Math.abs(toHub.y - corridor.cy);
+
+  if (viaCenterXDistance <= viaCenterYDistance) {
+    appendUniquePoint(points, { x: corridor.cx, y: fromHub.y });
+    appendUniquePoint(points, { x: corridor.cx, y: toHub.y });
+    appendUniquePoint(points, toHub);
+    return;
+  }
+
+  appendUniquePoint(points, { x: fromHub.x, y: corridor.cy });
+  appendUniquePoint(points, { x: toHub.x, y: corridor.cy });
+  appendUniquePoint(points, toHub);
+}
+
+function buildPipeRoute(fromToken, toToken, width, height) {
+  const from = getTokenAnchor(fromToken);
+  const to = getTokenAnchor(toToken);
+  if (!from || !to) {
+    return null;
+  }
+
+  const corridor = getCenterCorridor(width, height);
+  const startEntry = buildEntryFromAnchor(from, fromToken.side, corridor);
+  const endEntry = buildEntryFromAnchor(to, toToken.side, corridor);
+  const points = [];
+
+  appendUniquePoint(points, from);
+  for (const point of startEntry.points) {
+    appendUniquePoint(points, point);
+  }
+  appendUniquePoint(points, startEntry.hub);
+
+  appendInnerCorridorPath(points, startEntry.hub, endEntry.hub, corridor);
+
+  for (let index = endEntry.points.length - 1; index >= 0; index -= 1) {
+    appendUniquePoint(points, endEntry.points[index]);
+  }
+  appendUniquePoint(points, to);
+
+  const d = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
   return { d, points };
 }
 
@@ -706,16 +820,15 @@ function renderBoardLinks() {
 
   for (let index = 0; index < state.tokens.length; index += 1) {
     const token = state.tokens[index];
-    const point = getTokenPoint(token);
+    const point = getTokenAnchor(token);
     if (!point) {
       continue;
     }
 
     if (index > 0) {
-      const previousPoint = getTokenPoint(state.tokens[index - 1]);
-      if (previousPoint) {
-        const shouldAnimateLink = index === state.tokens.length - 1;
-        const route = buildPipeRoute(previousPoint, point);
+      const shouldAnimateLink = index === state.tokens.length - 1;
+      const route = buildPipeRoute(state.tokens[index - 1], token, width, height);
+      if (route) {
         appendPipePath(route.d, shouldAnimateLink);
         appendPipeJoints(route.points);
       }
