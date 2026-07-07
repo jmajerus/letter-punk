@@ -5,89 +5,26 @@ const BOARD = [
   { side: 3, name: 'left', letters: ['D', 'I', 'M'] },
 ];
 
-const WORD_BANK = new Set([
-  'code',
-  'cold',
-  'cord',
-  'core',
-  'cored',
-  'cedar',
-  'cinder',
-  'center',
-  'canter',
-  'caster',
-  'canteen',
-  'modern',
-  'random',
-  'remand',
-  'tornado',
-  'romance',
-  'sincere',
-  'declared',
-  'laced',
-  'alarm',
-  'carol',
-  'motion',
-  'tomato',
-  'domain',
-  'dances',
-  'dormant',
-  'related',
-  'metal',
-  'tailor',
-  'condor',
-  'decode',
-  'record',
-  'declare',
-  'lend',
-  'mend',
-  'cool',
-  'cooled',
-  'letter',
-  'dollar',
-  'mood',
-  'moon',
-  'tool',
-  'taller',
-  'noon',
-  'rood',
-  'seed',
-  'deed',
-  'need',
-  'dancer',
-  'sender',
-  'sedan',
-  'stared',
-  'stare',
-  'stain',
-  'stained',
-  'stolen',
-  'toner',
-  'donor',
-  'cadence',
-]);
-
-const SAMPLE_WORDS = [
-  'code',
-  'cool',
-  'modern',
-  'random',
-  'letter',
-  'moon',
-  'declare',
-  'tornado',
-];
+const DICTIONARY_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+const VALIDATION_TIMEOUT_MS = 3500;
+const validationCache = new Map();
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const boardElement = document.getElementById('board');
+const boardLinksElement = document.getElementById('boardLinks');
 const currentWordElement = document.getElementById('currentWord');
 const messageElement = document.getElementById('message');
 const foundWordsElement = document.getElementById('foundWords');
-const samplesElement = document.getElementById('samples');
 const scoreValueElement = document.getElementById('scoreValue');
 const foundCountElement = document.getElementById('foundCount');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
+const helpButton = document.getElementById('helpBtn');
+const helpModal = document.getElementById('helpModal');
+const closeHelpButton = document.getElementById('closeHelpBtn');
+const gotItButton = document.getElementById('gotItBtn');
+const letterButtons = new Map();
 
 const lettersToSide = new Map();
 for (const side of BOARD) {
@@ -132,33 +69,6 @@ function tokensAreValid(tokens) {
   return true;
 }
 
-function parseWordToTokens(word) {
-  const tokens = [];
-  const lower = word.toLowerCase();
-
-  for (let index = 0; index < lower.length; ) {
-    const letter = lower[index];
-    if (!lettersToSide.has(letter)) {
-      return null;
-    }
-
-    if (index + 2 < lower.length && lower[index + 1] === letter && lower[index + 2] === letter) {
-      return null;
-    }
-
-    if (index + 1 < lower.length && lower[index + 1] === letter) {
-      tokens.push(createToken(letter, true));
-      index += 2;
-      continue;
-    }
-
-    tokens.push(createToken(letter, false));
-    index += 1;
-  }
-
-  return tokens;
-}
-
 function setMessage(text, kind = '') {
   messageElement.textContent = text;
   messageElement.classList.remove('success', 'error');
@@ -178,6 +88,7 @@ function setMessage(text, kind = '') {
 
 function renderBoard() {
   boardElement.innerHTML = '';
+  letterButtons.clear();
 
   for (const side of BOARD) {
     const sideElement = document.createElement('div');
@@ -193,6 +104,7 @@ function renderBoard() {
       letterButton.textContent = letter;
       letterButton.setAttribute('aria-label', `Add ${letter}`);
       letterButton.addEventListener('click', () => appendToken(letter, false));
+      letterButtons.set(letter.toLowerCase(), letterButton);
 
       const badgeButton = document.createElement('button');
       badgeButton.type = 'button';
@@ -209,6 +121,89 @@ function renderBoard() {
     }
 
     boardElement.append(sideElement);
+  }
+
+  renderBoardLinks();
+}
+
+function getTokenPoint(token) {
+  const button = letterButtons.get(token.letter);
+  if (!button || !boardLinksElement) {
+    return null;
+  }
+
+  const boardRect = boardLinksElement.getBoundingClientRect();
+  const buttonRect = button.getBoundingClientRect();
+  return {
+    x: buttonRect.left + (buttonRect.width / 2) - boardRect.left,
+    y: buttonRect.top + (buttonRect.height / 2) - boardRect.top,
+  };
+}
+
+function createSvgPath(className, d, animate = false) {
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('class', animate ? `${className} is-new` : className);
+  path.setAttribute('d', d);
+  return path;
+}
+
+function renderBoardLinks() {
+  if (!boardLinksElement) {
+    return;
+  }
+
+  const width = boardLinksElement.clientWidth;
+  const height = boardLinksElement.clientHeight;
+  boardLinksElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  boardLinksElement.innerHTML = '';
+
+  if (state.tokens.length === 0) {
+    return;
+  }
+
+  const center = { x: width / 2, y: height / 2 };
+
+  for (let index = 0; index < state.tokens.length; index += 1) {
+    const token = state.tokens[index];
+    const point = getTokenPoint(token);
+    if (!point) {
+      continue;
+    }
+
+    if (index > 0) {
+      const previousPoint = getTokenPoint(state.tokens[index - 1]);
+      if (previousPoint) {
+        const shouldAnimateLink = index === state.tokens.length - 1;
+        const link = createSvgPath('board-link', `M ${previousPoint.x} ${previousPoint.y} L ${point.x} ${point.y}`, shouldAnimateLink);
+        boardLinksElement.append(link);
+      }
+    }
+
+    if (token.doubled) {
+      const towardCenterX = center.x - point.x;
+      const towardCenterY = center.y - point.y;
+      const vectorLength = Math.hypot(towardCenterX, towardCenterY) || 1;
+      const ux = towardCenterX / vectorLength;
+      const uy = towardCenterY / vectorLength;
+      const px = -uy;
+      const py = ux;
+
+      const c1x = point.x + (px * 20) + (ux * 10);
+      const c1y = point.y + (py * 20) + (uy * 10);
+      const c2x = point.x + (px * 24) + (ux * 34);
+      const c2y = point.y + (py * 24) + (uy * 34);
+      const mx = point.x + (ux * 42);
+      const my = point.y + (uy * 42);
+      const c3x = point.x - (px * 24) + (ux * 34);
+      const c3y = point.y - (py * 24) + (uy * 34);
+      const c4x = point.x - (px * 20) + (ux * 10);
+      const c4y = point.y - (py * 20) + (uy * 10);
+
+      const loopPath = `M ${point.x} ${point.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${mx} ${my} C ${c3x} ${c3y}, ${c4x} ${c4y}, ${point.x} ${point.y}`;
+      const shouldAnimateLoop = index === state.tokens.length - 1;
+      const loop = createSvgPath('board-loop', loopPath, shouldAnimateLoop);
+      boardLinksElement.append(loop);
+    }
   }
 }
 
@@ -253,19 +248,6 @@ function renderFoundWords() {
   }
 }
 
-function renderSamples() {
-  samplesElement.innerHTML = '';
-
-  for (const word of SAMPLE_WORDS) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'sample-word';
-    button.textContent = word;
-    button.addEventListener('click', () => loadExampleWord(word));
-    samplesElement.append(button);
-  }
-}
-
 function renderStats() {
   scoreValueElement.textContent = String(state.score);
   foundCountElement.textContent = String(state.foundWords.length);
@@ -275,9 +257,27 @@ function updateUI() {
   renderCurrentWord();
   renderFoundWords();
   renderStats();
+  renderBoardLinks();
 }
 
 function appendToken(letter, doubled) {
+  const lower = letter.toLowerCase();
+  const lastToken = state.tokens[state.tokens.length - 1];
+
+  // Treat a repeated click on the same letter as intent to use x2.
+  if (lastToken && lastToken.letter === lower) {
+    if (!lastToken.doubled) {
+      lastToken.doubled = true;
+      const word = wordFromTokens(state.tokens);
+      setMessage(`Doubled ${lower}${lower}. Current build: ${word.toUpperCase()}.`);
+      updateUI();
+      return;
+    }
+
+    setMessage(`${lower}${lower} is already doubled. Pick a letter from another side.`, 'error');
+    return;
+  }
+
   state.tokens.push(createToken(letter, doubled));
   const word = wordFromTokens(state.tokens);
   setMessage(`Added ${doubled ? `${letter}${letter}` : letter.toLowerCase()}. Current build: ${word.toUpperCase()}.`);
@@ -311,24 +311,47 @@ function clearTokens(silent = false) {
   }
 }
 
-function loadExampleWord(word) {
-  const tokens = parseWordToTokens(word);
-  if (!tokens) {
-    setMessage(`The demo example ${word} does not fit this board.`, 'error');
-    return;
-  }
+async function validateWordWithDictionaryApi(word) {
+  const endpoint = `${DICTIONARY_API_BASE}${encodeURIComponent(word)}`;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS);
 
-  if (!tokensAreValid(tokens)) {
-    setMessage(`The example ${word} breaks the side rule.`, 'error');
-    return;
-  }
+  try {
+    const response = await fetch(endpoint, { signal: controller.signal });
+    if (response.ok) {
+      return { isValid: true, source: 'dictionaryapi.dev' };
+    }
 
-  state.tokens = tokens;
-  updateUI();
-  setMessage(`Loaded ${word.toUpperCase()} as a practice word.`);
+    if (response.status === 404) {
+      return { isValid: false, source: 'dictionaryapi.dev' };
+    }
+
+    return { isValid: null, source: 'dictionaryapi.dev' };
+  } catch (error) {
+    return { isValid: null, source: 'dictionaryapi.dev' };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
-function submitWord() {
+async function validateWord(word) {
+  if (validationCache.has(word)) {
+    return validationCache.get(word);
+  }
+
+  const apiResult = await validateWordWithDictionaryApi(word);
+  if (apiResult.isValid !== null) {
+    validationCache.set(word, apiResult);
+    return apiResult;
+  }
+
+  return {
+    isValid: null,
+    source: 'dictionaryapi.dev',
+  };
+}
+
+async function submitWord() {
   if (state.tokens.length === 0) {
     setMessage('Add some letters first.', 'error');
     return;
@@ -347,13 +370,19 @@ function submitWord() {
     return;
   }
 
-  if (!WORD_BANK.has(word)) {
-    setMessage('That word is not in the demo lexicon yet.', 'error');
+  if (state.foundWords.some((entry) => entry.word === word)) {
+    setMessage('You already forged that word.', 'error');
     return;
   }
 
-  if (state.foundWords.some((entry) => entry.word === word)) {
-    setMessage('You already forged that word.', 'error');
+  const validation = await validateWord(word);
+  if (validation.isValid === null) {
+    setMessage('Dictionary service is unavailable right now. Please try again shortly.', 'error');
+    return;
+  }
+
+  if (!validation.isValid) {
+    setMessage('That word was not found in the dictionary.', 'error');
     return;
   }
 
@@ -364,10 +393,43 @@ function submitWord() {
   clearTokens(true);
 }
 
+function openHelpModal() {
+  if (!helpModal) {
+    return;
+  }
+
+  helpModal.hidden = false;
+  closeHelpButton?.focus();
+}
+
+function closeHelpModal() {
+  if (!helpModal) {
+    return;
+  }
+
+  helpModal.hidden = true;
+  helpButton?.focus();
+}
+
 submitButton.addEventListener('click', submitWord);
 undoButton.addEventListener('click', removeLastToken);
 clearButton.addEventListener('click', () => clearTokens());
+helpButton?.addEventListener('click', openHelpModal);
+closeHelpButton?.addEventListener('click', closeHelpModal);
+gotItButton?.addEventListener('click', closeHelpModal);
+helpModal?.addEventListener('click', (event) => {
+  if (event.target === helpModal) {
+    closeHelpModal();
+  }
+});
+
 window.addEventListener('keydown', (event) => {
+  if (!helpModal?.hidden && event.key === 'Escape') {
+    event.preventDefault();
+    closeHelpModal();
+    return;
+  }
+
   if (event.key === 'Enter') {
     event.preventDefault();
     submitWord();
@@ -381,7 +443,13 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+window.addEventListener('resize', renderBoardLinks);
+
 renderBoard();
-renderSamples();
 updateUI();
-setMessage('Try code, cool, modern, random, or letter to see the x2 mechanic in action.');
+setMessage('Double letters are welcome here: tap a letter twice or use x2.');
+
+if (helpModal && !localStorage.getItem('brassbox-help-seen')) {
+  openHelpModal();
+  localStorage.setItem('brassbox-help-seen', '1');
+}

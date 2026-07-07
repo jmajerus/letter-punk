@@ -6,6 +6,8 @@ For Cloudflare Workers, the project is intentionally static-only, so the Worker 
 
 For Cloudflare Pages, you can deploy the same static files directly from the `public/` directory.
 
+Dictionary validation uses the public endpoint at `https://dictionaryapi.dev/`.
+
 Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
 
 Run locally with:
@@ -23,7 +25,7 @@ npx wrangler deploy
 Deploy to Pages with:
 
 ```bash
-npx wrangler pages deploy .
+npx wrangler pages deploy public
 ```
 
 Repo structure:
@@ -36,5 +38,6 @@ Repo structure:
 The current prototype includes:
 - a steampunk-styled letter board
 - per-tile `x2` duplication buttons
+- repeated tap support (clicking the same letter twice is treated like `x2`)
 - manual tile entry, undo, and clear controls
-- demo word validation and a running score
+- live dictionary validation via dictionaryapi.dev and a running score

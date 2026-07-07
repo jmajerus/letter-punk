@@ -15,10 +15,10 @@
     <div class="backdrop"></div>
     <main class="app-shell">
       <header class="hero">
-        <p class="eyebrow">Prototype build</p>
+        <p class="eyebrow">Double letters welcome</p>
         <h1>Brassbox Lexicon</h1>
         <p class="subtitle">
-          A welcoming word puzzle inspired by Letter Boxed, with an always-available x2 valve on every letter.
+          A welcoming word puzzle inspired by Letter Boxed, now with the freedom to use double letters naturally.
         </p>
       </header>
 
@@ -29,24 +29,28 @@
               <p class="section-label">Steam board</p>
               <h2>Forge a word</h2>
             </div>
-            <div class="stats">
-              <div>
-                <span id="scoreValue">0</span>
-                <small>Score</small>
+            <div class="board-tools">
+              <div class="stats">
+                <div>
+                  <span id="scoreValue">0</span>
+                  <small>Score</small>
+                </div>
+                <div>
+                  <span id="foundCount">0</span>
+                  <small>Found</small>
+                </div>
               </div>
-              <div>
-                <span id="foundCount">0</span>
-                <small>Found</small>
-              </div>
+              <button id="helpBtn" class="help-btn" type="button" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
             </div>
           </div>
 
           <div class="board-wrap">
             <div class="board-frame">
+              <svg id="boardLinks" class="board-links" aria-hidden="true"></svg>
               <div id="board" class="board" aria-label="Letter board"></div>
               <div class="board-core">
                 <div class="core-ring"></div>
-                <div class="core-label">x2 is always on</div>
+                <div class="core-label">Tap twice to double</div>
               </div>
             </div>
           </div>
@@ -64,7 +68,7 @@
             <div id="currentWord" class="current-word" aria-live="polite"></div>
             <div id="message" class="message" aria-live="polite"></div>
             <p class="helper-text">
-              Click a letter to add it once. Click x2 to add a doubled letter token. Consecutive tokens still need to come from different sides.
+              Tap a letter once for a single token. Tap the same letter twice to double it. The x2 button is there as a friendly shortcut.
             </p>
           </section>
 
@@ -72,13 +76,28 @@
             <p class="section-label">Accepted words</p>
             <div id="foundWords" class="found-words"></div>
           </section>
-
-          <section class="panel-card">
-            <p class="section-label">Practice moves</p>
-            <div id="samples" class="sample-words"></div>
-          </section>
         </aside>
       </section>
     </main>
+
+    <div id="helpModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="helpTitle">Welcome to Brassbox Lexicon</h2>
+          <button id="closeHelpBtn" class="help-close" type="button" aria-label="Close help">Close</button>
+        </div>
+        <p class="help-copy">Friendly, familiar, and a little freer than classic Letter Boxed.</p>
+        <ul class="help-list">
+          <li>Tap a letter once for one token.</li>
+          <li>Tap the same letter twice for a doubled token, or use x2.</li>
+          <li>Consecutive tokens still need to come from different sides.</li>
+          <li>Submit words with 3+ letters.</li>
+          <li>Words are validated live with dictionaryapi.dev.</li>
+        </ul>
+        <div class="help-actions">
+          <button id="gotItBtn" class="primary" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
