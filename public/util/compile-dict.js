@@ -28,14 +28,14 @@ function escapeRegex(value) {
 
 function compileCondition(condition, type) {
 	if (!condition || condition === '.') {
-		return /.*/;
+		return /.*/i;
 	}
 
 	if (type === 'PFX') {
-		return new RegExp(`^${condition}`);
+		return new RegExp(`^${condition}`, 'i');
 	}
 
-	return new RegExp(`${condition}$`);
+	return new RegExp(`${condition}$`, 'i');
 }
 
 function parseAffFile(filePath) {
@@ -91,8 +91,8 @@ function parseAffFile(filePath) {
 
 				const addPart = addRaw.split('/')[0];
 				group.rules.push({
-					strip: stripRaw === '0' ? '' : stripRaw,
-					add: addPart === '0' ? '' : addPart,
+					strip: stripRaw === '0' ? '' : normalizeWord(stripRaw),
+					add: addPart === '0' ? '' : normalizeWord(addPart),
 					condition: compileCondition(conditionRaw, type),
 				});
 			}

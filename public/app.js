@@ -1689,6 +1689,12 @@ function appendToken(letter, doubled) {
     return;
   }
 
+  const newSide = lettersToSide.get(lower);
+  if (lastToken && !lastToken.repeatOfPrevious && newSide === lastToken.side) {
+    setMessage(`${lower.toUpperCase()} is on the same side as the previous letter. Pick from a different side.`, 'error');
+    return;
+  }
+
   state.tokens.push(createToken(letter, false));
   if (doubled) {
     state.tokens.push(createToken(letter, true));
@@ -1847,7 +1853,7 @@ async function submitWord() {
   }
 
   if (!tokensAreValid(state.tokens)) {
-    setMessage('Consecutive tokens need to come from different sides.', 'error');
+    setMessage('Each letter must come from a different side than the one before it.', 'error');
     return;
   }
 
