@@ -9,6 +9,7 @@
       content="A steampunk letter puzzle prototype with friendly double-letter x2 controls."
     />
     <link rel="stylesheet" href="styles.css" />
+    <script defer src="util/dawg-lookup-browser.js"></script>
     <script defer src="app.js"></script>
   </head>
   <body>
@@ -42,11 +43,13 @@
             <div>
               <p class="section-label">Steam board</p>
               <h2>Forge a word</h2>
+              <p id="dailyPuzzleStatus" class="puzzle-status" aria-live="polite"></p>
             </div>
             <div class="board-tools">
               <div class="board-tool-buttons">
                 <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board</button>
                 <button id="settingsBtn" class="help-btn" type="button" aria-label="Open settings" aria-haspopup="dialog" aria-controls="settingsModal">Settings</button>
+                <button id="yesterdayBtn" class="help-btn" type="button" aria-label="Open yesterday puzzle solution" aria-haspopup="dialog" aria-controls="yesterdayModal">Yesterday</button>
                 <button id="helpBtn" class="help-btn" type="button" aria-label="Open help" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
               </div>
             </div>
@@ -60,6 +63,11 @@
           </div>
 
           <div id="mainControls" class="controls" tabindex="-1" aria-label="Main gameplay controls">
+            <div class="puzzle-nav" aria-label="Puzzle navigation">
+              <button id="previousPuzzleBtn" class="secondary puzzle-nav-arrow" type="button" aria-label="Play previous puzzle">&lt;</button>
+              <button id="todayPuzzleBtn" class="secondary today-puzzle-btn" type="button" aria-label="Return to today's puzzle">Today's Puzzle</button>
+              <button id="nextPuzzleBtn" class="secondary puzzle-nav-arrow" type="button" aria-label="Play next puzzle">&gt;</button>
+            </div>
             <button id="clearBtn" class="secondary" aria-label="Restart game">Restart</button>
             <button id="undoBtn" class="secondary" aria-label="Delete last token">Delete</button>
             <button id="submitBtn" class="primary" aria-label="Enter current word">Enter</button>
@@ -105,10 +113,24 @@
           <li>Using every letter solves the board. If you can do better, Undo can retract your last accepted word.</li>
           <li>Unused letters appear as silver steel tanks.</li>
           <li>Used letters switch to patina tanks and add a check badge, dashed border, and striped tag for non-color clarity.</li>
-          <li>Words are validated live with dictionaryapi.dev.</li>
+          <li>Words are validated locally against a packed game dictionary.</li>
         </ul>
         <div class="help-actions">
           <button id="gotItBtn" class="primary" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="yesterdayModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="yesterdayTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="yesterdayTitle">Yesterday's Puzzle</h2>
+          <button id="closeYesterdayBtn" class="help-close" type="button" aria-label="Close yesterday puzzle solution">Close</button>
+        </div>
+        <p id="yesterdayPuzzleDate" class="help-copy"></p>
+        <p id="yesterdayPuzzleWords" class="yesterday-solution" aria-live="polite"></p>
+        <div class="help-actions">
+          <button id="yesterdayGotItBtn" class="primary" type="button">Got it</button>
         </div>
       </div>
     </div>

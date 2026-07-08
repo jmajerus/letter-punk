@@ -115,6 +115,20 @@ h2 {
   font-size: 1.45rem;
 }
 
+.puzzle-status {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.yesterday-solution {
+  margin: 4px 0 0;
+  color: #f2f6fb;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
 .subtitle {
   max-width: 68ch;
   margin: 0;
@@ -554,6 +568,26 @@ button:active {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 6px;
+}
+
+.puzzle-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.puzzle-nav-arrow {
+  width: 42px;
+  min-width: 42px;
+  padding: 12px 0;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.today-puzzle-btn {
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 #submitBtn {

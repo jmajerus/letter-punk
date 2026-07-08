@@ -1,0 +1,104 @@
+[
+  {
+    "id": "2026-07-06",
+    "board": {
+      "top": "ILR",
+      "right": "AOV",
+      "bottom": "EMN",
+      "left": "GTY"
+    },
+    "canonicalSolution": [
+      "MIGRATION",
+      "NAIVELY"
+    ],
+    "metadata": {
+      "seedWord": "MIGRATION",
+      "companionWord": "NAIVELY"
+    }
+  },
+  {
+    "id": "2026-07-07",
+    "board": {
+      "top": "AIN",
+      "right": "BES",
+      "bottom": "DGO",
+      "left": "LRT"
+    },
+    "canonicalSolution": [
+      "RELATIONS",
+      "SABOTAGED"
+    ],
+    "metadata": {
+      "seedWord": "RELATIONS",
+      "companionWord": "SABOTAGED"
+    }
+  },
+  {
+    "id": "2026-07-08",
+    "board": {
+      "top": "AEH",
+      "right": "ILS",
+      "bottom": "COR",
+      "left": "KNT"
+    },
+    "canonicalSolution": [
+      "RELATIONS",
+      "SACKCLOTH"
+    ],
+    "metadata": {
+      "seedWord": "RELATIONS",
+      "companionWord": "SACKCLOTH"
+    }
+  },
+  {
+    "id": "2026-07-09",
+    "board": {
+      "top": "AKO",
+      "right": "ENT",
+      "bottom": "CDL",
+      "left": "IRS"
+    },
+    "canonicalSolution": [
+      "RELATIONS",
+      "SACKED"
+    ],
+    "metadata": {
+      "seedWord": "RELATIONS",
+      "companionWord": "SACKED"
+    }
+  },
+  {
+    "id": "2026-07-10",
+    "board": {
+      "top": "ADV",
+      "right": "ILU",
+      "bottom": "ENT",
+      "left": "COY"
+    },
+    "canonicalSolution": [
+      "EDUCATION",
+      "NAIVELY"
+    ],
+    "metadata": {
+      "seedWord": "EDUCATION",
+      "companionWord": "NAIVELY"
+    }
+  },
+  {
+    "id": "2026-07-11",
+    "board": {
+      "top": "AIU",
+      "right": "DKO",
+      "bottom": "CLT",
+      "left": "ENY"
+    },
+    "canonicalSolution": [
+      "EDUCATION",
+      "NAKEDLY"
+    ],
+    "metadata": {
+      "seedWord": "EDUCATION",
+      "companionWord": "NAKEDLY"
+    }
+  }
+]

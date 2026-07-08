@@ -2,12 +2,18 @@ const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
 const VOWELS = ['A', 'E', 'I', 'O', 'U'];
 const CONSONANTS = ['R', 'S', 'T', 'L', 'N', 'D', 'M', 'C', 'P', 'H', 'G', 'B', 'F', 'K', 'W', 'Y', 'V', 'J', 'X', 'Q', 'Z'];
 
-const DICTIONARY_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
-const VALIDATION_TIMEOUT_MS = 3500;
 const validationCache = new Map();
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
+const PACKED_DICTIONARY_URL = 'util/compressed-dictionary.txt';
+const DAILY_PUZZLES_URL = 'data/daily-puzzles.json';
+const HISTORY_ROUTE_LIMIT = 8;
+const HISTORY_OPACITY_MAX = 0.68;
+const HISTORY_OPACITY_MIN = 0.22;
+const HISTORY_JOINT_OPACITY_BOOST = 0.08;
+
+let packedDictionaryPromise = null;
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -17,14 +23,25 @@ const foundWordsElement = document.getElementById('foundWords');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
+const previousPuzzleButton = document.getElementById('previousPuzzleBtn');
+const todayPuzzleButton = document.getElementById('todayPuzzleBtn');
+const nextPuzzleButton = document.getElementById('nextPuzzleBtn');
 const setBoardButton = document.getElementById('setBoardBtn');
 const settingsButton = document.getElementById('settingsBtn');
+const yesterdayButton = document.getElementById('yesterdayBtn');
 const helpButton = document.getElementById('helpBtn');
+const dailyPuzzleStatusElement = document.getElementById('dailyPuzzleStatus');
 const settingsModal = document.getElementById('settingsModal');
 const closeSettingsButton = document.getElementById('closeSettingsBtn');
 const saveSettingsButton = document.getElementById('saveSettingsBtn');
 const reducedMotionToggle = document.getElementById('reducedMotionToggle');
 const helpModal = document.getElementById('helpModal');
+const yesterdayModal = document.getElementById('yesterdayModal');
+const yesterdayTitleElement = document.getElementById('yesterdayTitle');
+const closeYesterdayButton = document.getElementById('closeYesterdayBtn');
+const yesterdayGotItButton = document.getElementById('yesterdayGotItBtn');
+const yesterdayPuzzleDateElement = document.getElementById('yesterdayPuzzleDate');
+const yesterdayPuzzleWordsElement = document.getElementById('yesterdayPuzzleWords');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const boardModal = document.getElementById('boardModal');
@@ -270,7 +287,263 @@ const state = {
   usedLetters: new Set(),
   starterLocked: false,
   messageTimer: null,
+  puzzleCatalog: [],
+  activePuzzleIndex: -1,
+  homePuzzleIndex: -1,
+  puzzleSource: 'random',
 };
+
+function boardFromPuzzleEntry(entry) {
+  return SIDE_NAMES.map((name, side) => ({
+    side,
+    name,
+    letters: (entry?.board?.[name] || '').toUpperCase().split(''),
+  }));
+}
+
+function getTodayPuzzleId() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getPuzzleStatusText() {
+  if (state.puzzleSource === 'catalog' && state.activePuzzleIndex >= 0) {
+    const entry = state.puzzleCatalog[state.activePuzzleIndex];
+    if (!entry) {
+      return '';
+    }
+
+    const todayId = getTodayPuzzleId();
+    if (entry.id === todayId) {
+      return 'Daily Puzzle';
+    }
+
+    if (entry.id > todayId) {
+      return `Play Ahead - ${entry.id}`;
+    }
+
+    return `Archive Puzzle - ${entry.id}`;
+  }
+
+  if (state.puzzleSource === 'custom') {
+    return 'Custom board';
+  }
+
+  return 'Random board';
+}
+
+function getYesterdayPuzzleData() {
+  if (state.puzzleSource !== 'catalog' || state.activePuzzleIndex <= 0) {
+    return null;
+  }
+
+  const previousEntry = state.puzzleCatalog[state.activePuzzleIndex - 1];
+  const canonicalSolution = Array.isArray(previousEntry?.canonicalSolution)
+    ? previousEntry.canonicalSolution.filter(Boolean).map((word) => String(word).toUpperCase())
+    : [];
+
+  if (canonicalSolution.length === 0) {
+    return null;
+  }
+
+  return {
+    id: previousEntry?.id || null,
+    words: canonicalSolution,
+  };
+}
+
+function isActiveCatalogPuzzleToday() {
+  if (state.puzzleSource !== 'catalog' || state.activePuzzleIndex < 0) {
+    return false;
+  }
+
+  const activeEntry = state.puzzleCatalog[state.activePuzzleIndex];
+  return Boolean(activeEntry?.id) && activeEntry.id === getTodayPuzzleId();
+}
+
+function getPreviousSolutionUiLabels() {
+  if (isActiveCatalogPuzzleToday()) {
+    return {
+      triggerText: 'Yesterday',
+      triggerAriaLabel: 'Open yesterday puzzle solution',
+      modalTitle: "Yesterday's Puzzle",
+    };
+  }
+
+  return {
+    triggerText: 'Previous',
+    triggerAriaLabel: 'Open previous puzzle solution',
+    modalTitle: 'Previous Puzzle',
+  };
+}
+
+function updatePuzzleNavigation() {
+  if (dailyPuzzleStatusElement) {
+    dailyPuzzleStatusElement.textContent = getPuzzleStatusText();
+  }
+
+  const previousSolutionUiLabels = getPreviousSolutionUiLabels();
+  if (yesterdayTitleElement) {
+    yesterdayTitleElement.textContent = previousSolutionUiLabels.modalTitle;
+  }
+
+  const yesterdayData = getYesterdayPuzzleData();
+  if (yesterdayButton) {
+    yesterdayButton.textContent = previousSolutionUiLabels.triggerText;
+    yesterdayButton.setAttribute('aria-label', previousSolutionUiLabels.triggerAriaLabel);
+    yesterdayButton.disabled = !yesterdayData;
+  }
+
+  if (yesterdayModal && !yesterdayModal.hidden && !yesterdayData) {
+    closeYesterdayModal();
+  }
+
+  const todayButtonTargetIndex = getTodayButtonTargetIndex();
+  const hasTodayButtonTarget = todayButtonTargetIndex >= 0;
+  if (todayPuzzleButton) {
+    todayPuzzleButton.disabled = !hasTodayButtonTarget
+      || (state.puzzleSource === 'catalog' && state.activePuzzleIndex === todayButtonTargetIndex);
+  }
+
+  const hasCatalog = state.puzzleCatalog.length > 0 && state.activePuzzleIndex >= 0;
+
+  if (previousPuzzleButton) {
+    previousPuzzleButton.disabled = !hasCatalog || state.activePuzzleIndex <= 0;
+  }
+
+  if (nextPuzzleButton) {
+    nextPuzzleButton.disabled = !hasCatalog || state.activePuzzleIndex >= state.puzzleCatalog.length - 1;
+  }
+}
+
+function setPuzzleContext(source, puzzleIndex = -1) {
+  state.puzzleSource = source;
+  state.activePuzzleIndex = puzzleIndex;
+  updatePuzzleNavigation();
+}
+
+function findInitialPuzzleIndex(catalog) {
+  if (catalog.length === 0) {
+    return -1;
+  }
+
+  const todayId = getTodayPuzzleId();
+  const exactMatchIndex = catalog.findIndex((entry) => entry.id === todayId);
+  if (exactMatchIndex >= 0) {
+    return exactMatchIndex;
+  }
+
+  const upcomingIndex = catalog.findIndex((entry) => entry.id > todayId);
+  if (upcomingIndex >= 0) {
+    return upcomingIndex;
+  }
+
+  return 0;
+}
+
+function findTodayPuzzleIndex(catalog = state.puzzleCatalog) {
+  if (!Array.isArray(catalog) || catalog.length === 0) {
+    return -1;
+  }
+
+  const todayId = getTodayPuzzleId();
+  return catalog.findIndex((entry) => entry.id === todayId);
+}
+
+function getHomePuzzleIndex() {
+  if (state.homePuzzleIndex >= 0 && state.homePuzzleIndex < state.puzzleCatalog.length) {
+    return state.homePuzzleIndex;
+  }
+
+  return findTodayPuzzleIndex();
+}
+
+function getTodayButtonTargetIndex() {
+  if (!Array.isArray(state.puzzleCatalog) || state.puzzleCatalog.length === 0) {
+    return -1;
+  }
+
+  const todayIndex = findTodayPuzzleIndex();
+  if (todayIndex >= 0) {
+    return todayIndex;
+  }
+
+  const homeIndex = getHomePuzzleIndex();
+  if (homeIndex >= 0) {
+    return homeIndex;
+  }
+
+  return findInitialPuzzleIndex(state.puzzleCatalog);
+}
+
+function applyCatalogPuzzle(index, announceMessage = true) {
+  const entry = state.puzzleCatalog[index];
+  if (!entry) {
+    return;
+  }
+
+  applyBoardDefinition(boardFromPuzzleEntry(entry));
+  setPuzzleContext('catalog', index);
+
+  if (announceMessage) {
+    setMessage(`Loaded puzzle ${index + 1} of ${state.puzzleCatalog.length}.`, 'success');
+  }
+}
+
+async function loadDailyPuzzleCatalog() {
+  try {
+    const response = await fetch(DAILY_PUZZLES_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to load puzzle catalog: ${response.status}`);
+    }
+
+    const catalog = await response.json();
+    if (!Array.isArray(catalog) || catalog.length === 0) {
+      throw new Error('Puzzle catalog is empty.');
+    }
+
+    state.puzzleCatalog = catalog;
+    const initialIndex = findInitialPuzzleIndex(catalog);
+    if (initialIndex >= 0) {
+      state.homePuzzleIndex = initialIndex;
+      applyCatalogPuzzle(initialIndex, false);
+      return;
+    }
+  } catch {
+    // Fall back to a random board when the catalog is unavailable.
+  }
+
+  setPuzzleContext('random');
+}
+
+function playPreviousPuzzle() {
+  if (state.activePuzzleIndex <= 0) {
+    return;
+  }
+
+  applyCatalogPuzzle(state.activePuzzleIndex - 1);
+}
+
+function playNextPuzzle() {
+  if (state.activePuzzleIndex < 0 || state.activePuzzleIndex >= state.puzzleCatalog.length - 1) {
+    return;
+  }
+
+  applyCatalogPuzzle(state.activePuzzleIndex + 1);
+}
+
+function playTodayPuzzle() {
+  const targetIndex = getTodayButtonTargetIndex();
+  if (targetIndex < 0) {
+    setMessage('Home puzzle is not available in the current catalog.', 'error');
+    return;
+  }
+
+  applyCatalogPuzzle(targetIndex);
+}
 
 function getRequiredStartingLetter() {
   if (state.foundWords.length === 0) {
@@ -594,6 +867,7 @@ function applyBoardFromInputs() {
   }
 
   applyBoardDefinition(parsed.board);
+  setPuzzleContext('custom');
   closeBoardModal();
   setMessage('Applied custom board. Forge away.');
 }
@@ -975,7 +1249,7 @@ function setPipeThickness(path, count, role) {
   path.style.strokeWidth = String(2 + (overlap * 0.55));
 }
 
-function appendFlowArrow(segment, count, isNewest = false) {
+function appendFlowArrow(segment, count, isNewest = false, opacity = 1) {
   if (segment.length < 28) {
     return;
   }
@@ -1006,10 +1280,12 @@ function appendFlowArrow(segment, count, isNewest = false) {
   };
 
   const arrowClass = `board-pipe-arrow${isNewest ? ' board-pipe-arrow-live' : ''}`;
-  boardLinksElement.append(createSvgPolygon(arrowClass, [tip, left, right]));
+  const arrow = createSvgPolygon(arrowClass, [tip, left, right]);
+  arrow.style.opacity = String(opacity);
+  boardLinksElement.append(arrow);
 }
 
-function appendPipeSegment(segment, count, animate = false, isNewest = false) {
+function appendPipeSegment(segment, count, animate = false, isNewest = false, opacity = 1) {
   const d = `M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`;
   const shell = createSvgPath('board-pipe-shell', d, false);
   const core = createSvgPath('board-pipe-core', d, animate);
@@ -1020,6 +1296,9 @@ function appendPipeSegment(segment, count, animate = false, isNewest = false) {
   setPipeThickness(shell, count, 'shell');
   setPipeThickness(core, count, 'core');
   setPipeThickness(highlight, count, 'highlight');
+  shell.style.opacity = String(opacity);
+  core.style.opacity = String(opacity);
+  highlight.style.opacity = String(Math.min(1, opacity + 0.12));
   boardLinksElement.append(shell, core, highlight);
 }
 
@@ -1046,7 +1325,12 @@ function findArrowSegment(segments, corridor) {
 }
 
 function appendRoutedPipe(route, usage, options = {}) {
-  const { animate = false, withArrow = true, isNewestRoute = false } = options;
+  const {
+    animate = false,
+    withArrow = true,
+    isNewestRoute = false,
+    opacity = 1,
+  } = options;
   const segments = buildSegmentsFromPoints(route.points);
   if (segments.length === 0) {
     return;
@@ -1058,15 +1342,15 @@ function appendRoutedPipe(route, usage, options = {}) {
     const segmentCount = usage.get(segment.key) || 1;
     const shouldAnimate = animate && index === segments.length - 1;
     const isNewestSegment = isNewestRoute && index === segments.length - 1;
-    appendPipeSegment(segment, segmentCount, shouldAnimate, isNewestSegment);
+    appendPipeSegment(segment, segmentCount, shouldAnimate, isNewestSegment, opacity);
 
     if (arrowSegment && segment.key === arrowSegment.key) {
-      appendFlowArrow(segment, segmentCount, isNewestRoute);
+      appendFlowArrow(segment, segmentCount, isNewestRoute, opacity);
     }
   }
 }
 
-function appendPipeJoints(points) {
+function appendPipeJoints(points, opacity = 1) {
   for (let index = 1; index < points.length - 1; index += 1) {
     const point = points[index];
     const jointOuter = createSvgCircle('board-pipe-joint-shell', point.x, point.y, 8.5);
@@ -1077,8 +1361,63 @@ function appendPipeJoints(points) {
       false,
     );
     const valveCore = createSvgCircle('board-pipe-valve-core', point.x, point.y, 1.2);
+    const jointOpacity = Math.min(1, opacity + HISTORY_JOINT_OPACITY_BOOST);
+    jointOuter.style.opacity = String(jointOpacity);
+    jointInner.style.opacity = String(jointOpacity);
+    valveCross.style.opacity = String(jointOpacity);
+    valveCore.style.opacity = String(jointOpacity);
     boardLinksElement.append(jointOuter, jointInner, valveCross, valveCore);
   }
+}
+
+function getHistoryOpacity(historyIndex) {
+  const clampedIndex = Math.max(0, historyIndex);
+  const scale = 1 / (clampedIndex + 1);
+  const opacity = HISTORY_OPACITY_MIN + ((HISTORY_OPACITY_MAX - HISTORY_OPACITY_MIN) * scale);
+  return Math.max(HISTORY_OPACITY_MIN, Math.min(HISTORY_OPACITY_MAX, opacity));
+}
+
+function pushRoutesFromTokens(tokens, width, height, options = {}) {
+  const {
+    animateNewest = false,
+    markNewest = false,
+    withArrows = true,
+    opacity = 1,
+  } = options;
+
+  const routes = [];
+
+  for (let index = 1; index < tokens.length; index += 1) {
+    const previousToken = tokens[index - 1];
+    const token = tokens[index];
+
+    if (token.repeatOfPrevious && token.letter === previousToken.letter) {
+      const route = buildDoubledLoopRoute(token, width, height);
+      if (route) {
+        routes.push({
+          route,
+          animate: animateNewest && index === tokens.length - 1,
+          withArrow: false,
+          isNewestRoute: false,
+          opacity,
+        });
+      }
+      continue;
+    }
+
+    const route = buildPipeRoute(previousToken, token, width, height);
+    if (route) {
+      routes.push({
+        route,
+        animate: animateNewest && index === tokens.length - 1,
+        withArrow: withArrows,
+        isNewestRoute: markNewest && index === tokens.length - 1,
+        opacity,
+      });
+    }
+  }
+
+  return routes;
 }
 
 function renderBoardLinks() {
@@ -1091,37 +1430,42 @@ function renderBoardLinks() {
   boardLinksElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
   boardLinksElement.innerHTML = '';
 
-  if (state.tokens.length === 0) {
+  const hasCurrentTokens = state.tokens.length > 1;
+  const hasHistory = state.foundWords.length > 0;
+  if (!hasCurrentTokens && !hasHistory) {
     return;
   }
 
   const routes = [];
-  for (let index = 1; index < state.tokens.length; index += 1) {
-    const previousToken = state.tokens[index - 1];
-    const token = state.tokens[index];
 
-    if (token.repeatOfPrevious && token.letter === previousToken.letter) {
-      const route = buildDoubledLoopRoute(token, width, height);
-      if (route) {
-        routes.push({
-          route,
-          animate: index === state.tokens.length - 1,
-          withArrow: false,
-          isNewestRoute: false,
-        });
-      }
+  const historyWords = state.foundWords.slice(0, HISTORY_ROUTE_LIMIT);
+  for (let historyIndex = historyWords.length - 1; historyIndex >= 0; historyIndex -= 1) {
+    const entry = historyWords[historyIndex];
+    const tokens = tokensFromWord(entry.word);
+    if (tokens.length < 2) {
       continue;
     }
 
-    const route = buildPipeRoute(previousToken, token, width, height);
-    if (route) {
-      routes.push({
-        route,
-        animate: index === state.tokens.length - 1,
-        withArrow: true,
-        isNewestRoute: index === state.tokens.length - 1,
-      });
-    }
+    const opacity = getHistoryOpacity(historyIndex);
+    routes.push(
+      ...pushRoutesFromTokens(tokens, width, height, {
+        animateNewest: false,
+        markNewest: false,
+        withArrows: false,
+        opacity,
+      }),
+    );
+  }
+
+  if (hasCurrentTokens) {
+    routes.push(
+      ...pushRoutesFromTokens(state.tokens, width, height, {
+        animateNewest: true,
+        markNewest: true,
+        withArrows: true,
+        opacity: 1,
+      }),
+    );
   }
 
   const segmentUsage = collectSegmentUsage(routes.map((entry) => entry.route));
@@ -1130,8 +1474,9 @@ function renderBoardLinks() {
       animate: entry.animate,
       withArrow: entry.withArrow,
       isNewestRoute: entry.isNewestRoute,
+      opacity: entry.opacity,
     });
-    appendPipeJoints(entry.route.points);
+    appendPipeJoints(entry.route.points, entry.opacity);
   }
 }
 
@@ -1191,6 +1536,7 @@ function updateUI() {
   renderFoundWords();
   renderLetterUsage();
   renderBoardLinks();
+  updatePuzzleNavigation();
 }
 
 function appendToken(letter, doubled) {
@@ -1271,26 +1617,31 @@ function clearTokens(silent = false) {
   }
 }
 
-async function validateWordWithDictionaryApi(word) {
-  const endpoint = `${DICTIONARY_API_BASE}${encodeURIComponent(word)}`;
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS);
-
+async function validateWordWithPackedDictionary(word) {
   try {
-    const response = await fetch(endpoint, { signal: controller.signal });
-    if (response.ok) {
-      return { isValid: true, source: 'dictionaryapi.dev' };
+    if (!packedDictionaryPromise) {
+      packedDictionaryPromise = fetch(PACKED_DICTIONARY_URL)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Failed to load packed dictionary: ${response.status}`);
+          }
+
+          return response.text();
+        })
+        .then((packedDictionary) => {
+          if (!window.DawgLookup?.PTrie) {
+            throw new Error('Packed trie runtime is unavailable.');
+          }
+
+          return new window.DawgLookup.PTrie(packedDictionary);
+        });
     }
 
-    if (response.status === 404) {
-      return { isValid: false, source: 'dictionaryapi.dev' };
-    }
-
-    return { isValid: null, source: 'dictionaryapi.dev' };
+    const ptrie = await packedDictionaryPromise;
+    const isValid = ptrie.isWord(word);
+    return { isValid, source: 'packed-dawg' };
   } catch (error) {
-    return { isValid: null, source: 'dictionaryapi.dev' };
-  } finally {
-    window.clearTimeout(timeoutId);
+    return { isValid: null, source: 'packed-dawg' };
   }
 }
 
@@ -1299,15 +1650,15 @@ async function validateWord(word) {
     return validationCache.get(word);
   }
 
-  const apiResult = await validateWordWithDictionaryApi(word);
-  if (apiResult.isValid !== null) {
-    validationCache.set(word, apiResult);
-    return apiResult;
+  const validationResult = await validateWordWithPackedDictionary(word);
+  if (validationResult.isValid !== null) {
+    validationCache.set(word, validationResult);
+    return validationResult;
   }
 
   return {
     isValid: null,
-    source: 'dictionaryapi.dev',
+    source: 'packed-dawg',
   };
 }
 
@@ -1384,6 +1735,35 @@ function openHelpModal() {
   closeHelpButton?.focus();
 }
 
+function openYesterdayModal() {
+  const yesterdayData = getYesterdayPuzzleData();
+  if (!yesterdayModal || !yesterdayData) {
+    return;
+  }
+
+  if (yesterdayPuzzleDateElement) {
+    yesterdayPuzzleDateElement.textContent = yesterdayData.id
+      ? `Date: ${yesterdayData.id}`
+      : 'Date: Yesterday';
+  }
+
+  if (yesterdayPuzzleWordsElement) {
+    yesterdayPuzzleWordsElement.textContent = yesterdayData.words.join(' -> ');
+  }
+
+  yesterdayModal.hidden = false;
+  closeYesterdayButton?.focus();
+}
+
+function closeYesterdayModal() {
+  if (!yesterdayModal) {
+    return;
+  }
+
+  yesterdayModal.hidden = true;
+  yesterdayButton?.focus();
+}
+
 function openSettingsModal() {
   if (!settingsModal) {
     return;
@@ -1441,6 +1821,10 @@ function getActiveModal() {
     return settingsModal;
   }
 
+  if (yesterdayModal && !yesterdayModal.hidden) {
+    return yesterdayModal;
+  }
+
   if (helpModal && !helpModal.hidden) {
     return helpModal;
   }
@@ -1481,11 +1865,17 @@ function trapFocusInModal(modal, event) {
 submitButton.addEventListener('click', submitWord);
 undoButton.addEventListener('click', removeLastToken);
 clearButton.addEventListener('click', () => clearTokens());
+previousPuzzleButton?.addEventListener('click', playPreviousPuzzle);
+todayPuzzleButton?.addEventListener('click', playTodayPuzzle);
+nextPuzzleButton?.addEventListener('click', playNextPuzzle);
 setBoardButton?.addEventListener('click', openBoardModal);
 settingsButton?.addEventListener('click', openSettingsModal);
+yesterdayButton?.addEventListener('click', openYesterdayModal);
 helpButton?.addEventListener('click', openHelpModal);
 closeSettingsButton?.addEventListener('click', closeSettingsModal);
 saveSettingsButton?.addEventListener('click', closeSettingsModal);
+closeYesterdayButton?.addEventListener('click', closeYesterdayModal);
+yesterdayGotItButton?.addEventListener('click', closeYesterdayModal);
 closeHelpButton?.addEventListener('click', closeHelpModal);
 gotItButton?.addEventListener('click', closeHelpModal);
 closeBoardButton?.addEventListener('click', closeBoardModal);
@@ -1506,6 +1896,11 @@ boardModal?.addEventListener('click', (event) => {
 settingsModal?.addEventListener('click', (event) => {
   if (event.target === settingsModal) {
     closeSettingsModal();
+  }
+});
+yesterdayModal?.addEventListener('click', (event) => {
+  if (event.target === yesterdayModal) {
+    closeYesterdayModal();
   }
 });
 
@@ -1549,6 +1944,11 @@ window.addEventListener('keydown', (event) => {
       return;
     }
 
+    if (activeModal === yesterdayModal) {
+      closeYesterdayModal();
+      return;
+    }
+
     closeHelpModal();
     return;
   }
@@ -1584,8 +1984,10 @@ BOARD = buildBoard();
 refreshLettersToSide();
 resetGameForBoard();
 renderBoard();
+setPuzzleContext('random');
 updateUI();
 setMessage('Double letters are welcome here: tap a letter twice or use x2.');
+loadDailyPuzzleCatalog();
 
 if (helpModal && !localStorage.getItem('brassbox-help-seen')) {
   openHelpModal();

@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "build:dictionary": "node public/util/compile-dict.js"
+  },
+  "dependencies": {
+    "dawg-lookup": "^2.2.1"
+  }
+}
