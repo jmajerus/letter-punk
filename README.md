@@ -22,7 +22,7 @@ Rebuild the packed dictionary with `npm run build:dictionary`.
 
 Each rebuild also writes `public/util/dictionary-source-report.json` (full unique-word lists) and `public/util/dictionary-source-report.md` (human-readable diff preview) so you can tune coverage deliberately.
 
-For a reusable implementation write-up aimed at other game developers, see `docs/dual-dictionary-validation.md`.
+For a reusable implementation write-up aimed at other game developers, see [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md).
 
 Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
 
