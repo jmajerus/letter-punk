@@ -6,19 +6,24 @@ const validationCache = new Map();
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
-const PACKED_DICTIONARY_URL = 'util/compressed-dictionary.txt';
+const PROVENANCE_BADGES_STORAGE_KEY = 'letter-punk.provenance-badges';
+const PACKED_DICTIONARY_SOURCES = [
+  { key: 'primary-packed-dawg', url: 'util/compressed-dictionary.txt' },
+  { key: 'fallback-packed-dawg', url: 'util/compressed-dictionary-fallback.txt', optional: true },
+];
 const DAILY_PUZZLES_URL = 'data/daily-puzzles.json';
 const HISTORY_ROUTE_LIMIT = 8;
 const HISTORY_OPACITY_MAX = 0.68;
 const HISTORY_OPACITY_MIN = 0.22;
 const HISTORY_JOINT_OPACITY_BOOST = 0.08;
 
-let packedDictionaryPromise = null;
+const packedDictionaryPromises = new Map();
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
 const currentWordElement = document.getElementById('currentWord');
 const messageElement = document.getElementById('message');
+const dictionarySourceIndicatorElement = document.getElementById('dictionarySourceIndicator');
 const foundWordsElement = document.getElementById('foundWords');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
@@ -35,6 +40,7 @@ const settingsModal = document.getElementById('settingsModal');
 const closeSettingsButton = document.getElementById('closeSettingsBtn');
 const saveSettingsButton = document.getElementById('saveSettingsBtn');
 const reducedMotionToggle = document.getElementById('reducedMotionToggle');
+const provenanceBadgesToggle = document.getElementById('provenanceBadgesToggle');
 const helpModal = document.getElementById('helpModal');
 const yesterdayModal = document.getElementById('yesterdayModal');
 const yesterdayTitleElement = document.getElementById('yesterdayTitle');
@@ -81,6 +87,25 @@ function readReducedMotionPreference() {
 
 let reducedMotionPreference = readReducedMotionPreference();
 
+function readProvenanceBadgesPreference() {
+  try {
+    const value = window.localStorage.getItem(PROVENANCE_BADGES_STORAGE_KEY);
+    if (value === 'on' || value === 'off') {
+      return value;
+    }
+  } catch {
+    // Ignore storage reads when unavailable.
+  }
+
+  return null;
+}
+
+let provenanceBadgesPreference = readProvenanceBadgesPreference();
+
+function isProvenanceBadgesEnabled() {
+  return provenanceBadgesPreference === 'on';
+}
+
 function isReducedMotionEnabled() {
   if (reducedMotionPreference === 'on') {
     return true;
@@ -114,6 +139,26 @@ function syncMotionPreferenceToUi() {
   document.body.classList.toggle('reduce-motion', reducedMotionEnabled);
   if (reducedMotionToggle) {
     reducedMotionToggle.checked = reducedMotionEnabled;
+  }
+}
+
+function setProvenanceBadgesPreference(enabled) {
+  provenanceBadgesPreference = enabled ? 'on' : 'off';
+
+  try {
+    window.localStorage.setItem(PROVENANCE_BADGES_STORAGE_KEY, provenanceBadgesPreference);
+  } catch {
+    // Ignore storage writes when unavailable.
+  }
+
+  if (provenanceBadgesToggle) {
+    provenanceBadgesToggle.checked = enabled;
+  }
+}
+
+function syncProvenanceBadgesPreferenceToUi() {
+  if (provenanceBadgesToggle) {
+    provenanceBadgesToggle.checked = isProvenanceBadgesEnabled();
   }
 }
 
@@ -286,6 +331,7 @@ const state = {
   foundWords: [],
   usedLetters: new Set(),
   starterLocked: false,
+  lastValidationSummary: '',
   messageTimer: null,
   puzzleCatalog: [],
   activePuzzleIndex: -1,
@@ -600,6 +646,22 @@ function rebuildUsedLettersFromFoundWords() {
   }
 }
 
+function getProspectiveUsedLetters() {
+  const prospectiveUsedLetters = new Set(state.usedLetters);
+  for (const token of state.tokens) {
+    prospectiveUsedLetters.add(token.letter);
+  }
+  return prospectiveUsedLetters;
+}
+
+function getCurrentTokenLetters() {
+  const currentTokenLetters = new Set();
+  for (const token of state.tokens) {
+    currentTokenLetters.add(token.letter);
+  }
+  return currentTokenLetters;
+}
+
 function backUpIntoPreviousWord() {
   if (state.foundWords.length === 0) {
     return false;
@@ -650,6 +712,55 @@ function setMessage(text, kind = '') {
   }, 4000);
 }
 
+function getValidationSourceLabel(sourceKey) {
+  if (sourceKey === 'primary-packed-dawg') {
+    return 'Primary';
+  }
+
+  if (sourceKey === 'fallback-packed-dawg') {
+    return 'Fallback';
+  }
+
+  return 'Unavailable';
+}
+
+function summarizeValidationSources(matchedSources) {
+  const uniqueSources = [...new Set((matchedSources || []).filter(Boolean))];
+
+  if (uniqueSources.length === 0) {
+    return {
+      badge: '',
+      detail: '',
+    };
+  }
+
+  if (uniqueSources.length > 1) {
+    return {
+      badge: 'Both',
+      detail: 'Accepted by both dictionaries.',
+    };
+  }
+
+  const label = getValidationSourceLabel(uniqueSources[0]);
+  return {
+    badge: label,
+    detail: `Accepted by the ${label.toLowerCase()} dictionary.`,
+  };
+}
+
+function renderValidationSourceIndicator() {
+  if (!dictionarySourceIndicatorElement) {
+    return;
+  }
+
+  if (!isProvenanceBadgesEnabled()) {
+    dictionarySourceIndicatorElement.textContent = '';
+    return;
+  }
+
+  dictionarySourceIndicatorElement.textContent = state.lastValidationSummary;
+}
+
 function renderBoard() {
   boardElement.innerHTML = '';
   letterButtons.clear();
@@ -695,6 +806,7 @@ function resetGameForBoard() {
   state.foundWords = [];
   state.usedLetters.clear();
   state.starterLocked = false;
+  state.lastValidationSummary = '';
 }
 
 function fillBoardInputsFromCurrentBoard() {
@@ -1519,21 +1631,36 @@ function renderFoundWords() {
   for (const word of state.foundWords) {
     const pill = document.createElement('div');
     pill.className = 'word-pill';
-    pill.textContent = word.word;
+
+    const label = document.createElement('span');
+    label.textContent = word.word;
+    pill.append(label);
+
+    if (isProvenanceBadgesEnabled() && word.validationBadge) {
+      const sourceBadge = document.createElement('span');
+      sourceBadge.className = 'word-pill-source';
+      sourceBadge.textContent = word.validationBadge;
+      sourceBadge.title = word.validationDetail || '';
+      pill.append(sourceBadge);
+    }
 
     foundWordsElement.append(pill);
   }
 }
 
 function renderLetterUsage() {
+  const prospectiveUsedLetters = getProspectiveUsedLetters();
+  const currentTokenLetters = getCurrentTokenLetters();
   for (const [letter, button] of letterButtons.entries()) {
-    button.classList.toggle('used', state.usedLetters.has(letter));
+    button.classList.toggle('used', prospectiveUsedLetters.has(letter));
+    button.classList.toggle('active-letter', currentTokenLetters.has(letter));
   }
 }
 
 function updateUI() {
   renderCurrentWord();
   renderFoundWords();
+  renderValidationSourceIndicator();
   renderLetterUsage();
   renderBoardLinks();
   updatePuzzleNavigation();
@@ -1617,31 +1744,48 @@ function clearTokens(silent = false) {
   }
 }
 
-async function validateWordWithPackedDictionary(word) {
+function loadPackedDictionary(source) {
+  if (!packedDictionaryPromises.has(source.key)) {
+    packedDictionaryPromises.set(source.key, fetch(source.url)
+      .then((response) => {
+        if (source.optional && response.status === 404) {
+          return null;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to load packed dictionary: ${response.status}`);
+        }
+
+        return response.text();
+      })
+      .then((packedDictionary) => {
+        if (packedDictionary === null) {
+          return null;
+        }
+
+        if (!window.DawgLookup?.PTrie) {
+          throw new Error('Packed trie runtime is unavailable.');
+        }
+
+        return new window.DawgLookup.PTrie(packedDictionary);
+      })
+      .catch(() => null));
+  }
+
+  return packedDictionaryPromises.get(source.key);
+}
+
+async function validateWordWithPackedDictionary(word, source) {
   try {
-    if (!packedDictionaryPromise) {
-      packedDictionaryPromise = fetch(PACKED_DICTIONARY_URL)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`Failed to load packed dictionary: ${response.status}`);
-          }
-
-          return response.text();
-        })
-        .then((packedDictionary) => {
-          if (!window.DawgLookup?.PTrie) {
-            throw new Error('Packed trie runtime is unavailable.');
-          }
-
-          return new window.DawgLookup.PTrie(packedDictionary);
-        });
+    const ptrie = await loadPackedDictionary(source);
+    if (!ptrie) {
+      return { isValid: null, source: source.key };
     }
 
-    const ptrie = await packedDictionaryPromise;
     const isValid = ptrie.isWord(word);
-    return { isValid, source: 'packed-dawg' };
-  } catch (error) {
-    return { isValid: null, source: 'packed-dawg' };
+    return { isValid, source: source.key };
+  } catch {
+    return { isValid: null, source: source.key };
   }
 }
 
@@ -1650,15 +1794,49 @@ async function validateWord(word) {
     return validationCache.get(word);
   }
 
-  const validationResult = await validateWordWithPackedDictionary(word);
-  if (validationResult.isValid !== null) {
+  let reachableSourceCount = 0;
+  const matchedSources = [];
+
+  for (const source of PACKED_DICTIONARY_SOURCES) {
+    const validationResult = await validateWordWithPackedDictionary(word, source);
+
+    if (validationResult.isValid === null) {
+      continue;
+    }
+
+    reachableSourceCount += 1;
+
+    if (validationResult.isValid) {
+      matchedSources.push(validationResult.source);
+    }
+  }
+
+  if (matchedSources.length > 0) {
+    const validationResult = {
+      isValid: true,
+      source: matchedSources.length > 1 ? 'stacked-packed-dawg' : matchedSources[0],
+      matchedSources,
+    };
+
+    validationCache.set(word, validationResult);
+    return validationResult;
+  }
+
+  if (reachableSourceCount > 0) {
+    const validationResult = {
+      isValid: false,
+      source: 'stacked-packed-dawg',
+      matchedSources: [],
+    };
+
     validationCache.set(word, validationResult);
     return validationResult;
   }
 
   return {
     isValid: null,
-    source: 'packed-dawg',
+    source: 'stacked-packed-dawg',
+    matchedSources: [],
   };
 }
 
@@ -1694,7 +1872,7 @@ async function submitWord() {
 
   const validation = await validateWord(word);
   if (validation.isValid === null) {
-    setMessage('Dictionary service is unavailable right now. Please try again shortly.', 'error');
+    setMessage('Dictionary files are unavailable right now. Please refresh and try again.', 'error');
     return;
   }
 
@@ -1703,7 +1881,15 @@ async function submitWord() {
     return;
   }
 
-  state.foundWords.unshift({ word, length });
+  const validationSummary = summarizeValidationSources(validation.matchedSources);
+  state.lastValidationSummary = validationSummary.detail;
+
+  state.foundWords.unshift({
+    word,
+    length,
+    validationBadge: validationSummary.badge,
+    validationDetail: validationSummary.detail,
+  });
 
   for (const token of state.tokens) {
     state.usedLetters.add(token.letter);
@@ -1770,8 +1956,9 @@ function openSettingsModal() {
   }
 
   syncMotionPreferenceToUi();
+  syncProvenanceBadgesPreferenceToUi();
   settingsModal.hidden = false;
-  reducedMotionToggle?.focus();
+  provenanceBadgesToggle?.focus();
 }
 
 function closeSettingsModal() {
@@ -1908,6 +2095,13 @@ reducedMotionToggle?.addEventListener('change', () => {
   setReducedMotionPreference(Boolean(reducedMotionToggle.checked));
   renderBoardLinks();
   setMessage(`Reduced motion ${reducedMotionToggle.checked ? 'enabled' : 'disabled'}.`, 'success');
+});
+
+provenanceBadgesToggle?.addEventListener('change', () => {
+  const enabled = Boolean(provenanceBadgesToggle.checked);
+  setProvenanceBadgesPreference(enabled);
+  updateUI();
+  setMessage(`Dictionary provenance badges ${enabled ? 'enabled' : 'disabled'}.`, 'success');
 });
 
 if (typeof SYSTEM_REDUCED_MOTION_QUERY.addEventListener === 'function') {

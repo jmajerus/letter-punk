@@ -27,6 +27,7 @@
             <p class="section-label">Word builder</p>
             <div id="currentWord" class="current-word" aria-live="polite" aria-label="Current word builder"></div>
             <div id="message" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
+            <p id="dictionarySourceIndicator" class="validation-source" aria-live="polite"></p>
             <p id="builderHelp" class="helper-text sr-only">
               Tap a letter once for a single token. Tap the same letter twice to double it. After the first word, each new word must begin with the last letter of the previous word.
             </p>
@@ -88,6 +89,13 @@
             <label for="reducedMotionToggle">Reduce motion effects</label>
           </div>
           <p class="help-copy">Turns off animated pipe pulses and line-draw effects.</p>
+        </div>
+        <div class="settings-option">
+          <div class="settings-toggle-row">
+            <input id="provenanceBadgesToggle" class="settings-checkbox" type="checkbox" />
+            <label for="provenanceBadgesToggle">Show dictionary provenance badges</label>
+          </div>
+          <p class="help-copy">Shows which dictionary accepted each word (Primary, Fallback, or Both). Default is off for a cleaner board.</p>
         </div>
         <div class="help-actions">
           <button id="saveSettingsBtn" class="primary" type="button">Done</button>
