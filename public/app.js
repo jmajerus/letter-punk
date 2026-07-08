@@ -64,6 +64,7 @@ const solutionWordsInput = document.getElementById('solutionWordsInput');
 const generateBoardButton = document.getElementById('generateBoardBtn');
 const boardInputMessageElement = document.getElementById('boardInputMessage');
 const letterButtons = new Map();
+const invalidTileFlashTimers = new WeakMap();
 
 const BOARD_INPUTS = {
   top: boardTopInput,
@@ -1657,6 +1658,30 @@ function renderLetterUsage() {
   }
 }
 
+function flashInvalidTile(letter) {
+  const button = letterButtons.get(letter);
+  if (!button) {
+    return;
+  }
+
+  const existingTimer = invalidTileFlashTimers.get(button);
+  if (existingTimer) {
+    window.clearTimeout(existingTimer);
+  }
+
+  button.classList.remove('invalid-flash');
+  // Force reflow so repeated invalid taps retrigger the animation.
+  void button.offsetWidth;
+  button.classList.add('invalid-flash');
+
+  const timer = window.setTimeout(() => {
+    button.classList.remove('invalid-flash');
+    invalidTileFlashTimers.delete(button);
+  }, 360);
+
+  invalidTileFlashTimers.set(button, timer);
+}
+
 function updateUI() {
   renderCurrentWord();
   renderFoundWords();
@@ -1672,12 +1697,14 @@ function appendToken(letter, doubled) {
   const requiredStartingLetter = getRequiredStartingLetter();
 
   if (state.tokens.length === 0 && requiredStartingLetter && lower !== requiredStartingLetter) {
+    flashInvalidTile(lower);
     setMessage(`This word must start with ${requiredStartingLetter.toUpperCase()}.`, 'error');
     return;
   }
 
   if (lastToken && lastToken.letter === lower) {
     if (lastToken.repeatOfPrevious) {
+      flashInvalidTile(lower);
       setMessage(`${lower}${lower} is already doubled. Pick a letter from another side.`, 'error');
       return;
     }
@@ -1691,6 +1718,7 @@ function appendToken(letter, doubled) {
 
   const newSide = lettersToSide.get(lower);
   if (lastToken && !lastToken.repeatOfPrevious && newSide === lastToken.side) {
+    flashInvalidTile(lower);
     setMessage(`${lower.toUpperCase()} is on the same side as the previous letter. Pick from a different side.`, 'error');
     return;
   }
