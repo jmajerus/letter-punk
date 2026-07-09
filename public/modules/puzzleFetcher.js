@@ -1,3 +1,7 @@
+/**
+ * Puzzle fetcher owns daily puzzle catalog state and navigation semantics.
+ * Board application is delegated to the provided applyBoard callback.
+ */
 const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
 
 function boardFromPuzzleEntry(entry) {
@@ -35,6 +39,10 @@ function findInitialPuzzleIndex(catalog) {
   return 0;
 }
 
+/**
+ * Creates a puzzle service that loads catalog data and exposes previous/today/
+ * next navigation helpers plus derived UI state.
+ */
 export function createPuzzleFetcher(options = {}) {
   const {
     fetchImpl = fetch,

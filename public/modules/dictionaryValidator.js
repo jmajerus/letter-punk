@@ -1,3 +1,7 @@
+/**
+ * Ordered dictionary sources checked by validateWord.
+ * Earlier sources have precedence for single-source attribution.
+ */
 export const PACKED_DICTIONARY_SOURCES = [
   { key: 'primary-packed-dawg', url: 'util/compressed-dictionary.txt' },
   { key: 'fallback-packed-dawg', url: 'util/compressed-dictionary-fallback.txt', optional: true },
@@ -43,6 +47,10 @@ export function summarizeValidationSources(matchedSources) {
   };
 }
 
+/**
+ * Creates a word validator backed by packed trie dictionaries with an optional
+ * API fallback when local sources are unavailable.
+ */
 export function createDictionaryValidator(options = {}) {
   const {
     sources = PACKED_DICTIONARY_SOURCES,

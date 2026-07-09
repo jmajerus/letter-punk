@@ -1,3 +1,6 @@
+/**
+ * Shared board side order used across board parsing, generation, and rendering.
+ */
 export const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
 const VOWELS = ['A', 'E', 'I', 'O', 'U'];
 const CONSONANTS = ['R', 'S', 'T', 'L', 'N', 'D', 'M', 'C', 'P', 'H', 'G', 'B', 'F', 'K', 'W', 'Y', 'V', 'J', 'X', 'Q', 'Z'];
@@ -265,6 +268,12 @@ export function generateBoardFromSolutionWords(words) {
   };
 }
 
+/**
+ * Creates the gameplay rules engine.
+ *
+ * The engine owns mutable gameplay state (tokens, found words, used letters),
+ * enforces side/x2 rules, and emits snapshots to the UI layer through callbacks.
+ */
 export function createGameEngine(options) {
   const {
     initialBoard,

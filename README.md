@@ -68,9 +68,66 @@ Why Letter Punk Exists:
 Repo structure:
 
 - `public/` static site files served by Workers or Pages
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`
+- `public/app.js` app bootstrap and UI orchestration
 - `wrangler.toml` Cloudflare Worker config
+- `docs/ai-edit-map.md` AI agent routing guide and prompt templates
 - `README.md` project and deployment notes
 - `Letter-Boxed-Game-Logic-Copyright.md` concept notes
+
+---
+
+## Agent Request Snippets
+
+Copy-paste these when working with an AI coding agent. Keeping requests scoped to one file and one concern reduces context overhead and improves result quality.
+
+**Side or chaining rule change**
+```
+Target: public/modules/gameLogic.js
+Change: [describe the rule change]
+Constraints: no UI changes, no renames, no reformatting outside touched lines
+Output: minimal patch + one-sentence rationale
+```
+
+**SVG pipe or board visual change**
+```
+Target: public/modules/boardRenderer.js
+Change: [describe the visual change]
+Constraints: no gameplay logic changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Dictionary loading or word validation change**
+```
+Target: public/modules/dictionaryValidator.js
+Change: [describe the validation change]
+Constraints: no UI or routing changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Daily puzzle fetch or catalog navigation change**
+```
+Target: public/modules/puzzleFetcher.js
+Change: [describe the puzzle/navigation change]
+Constraints: no rendering or game-rule changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Modal, settings, keyboard, or event wiring change**
+```
+Target: public/app.js
+Change: [describe the UI/event change]
+Constraints: no changes to module files
+Output: minimal patch + one-sentence rationale
+```
+
+**Dictionary word list rebuild**
+```
+Run: npm run build:dictionary
+Then verify: public/util/dictionary-source-report.md
+```
+
+**Multi-file changes** — list each file separately with its own constraint line, and confirm one file's output before starting the next to avoid cascading errors.
 
 Current feature set:
 - Steampunk-themed board and route visualization designed for high readability.

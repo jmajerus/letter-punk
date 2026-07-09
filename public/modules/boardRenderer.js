@@ -1,3 +1,7 @@
+/**
+ * Board renderer owns DOM + SVG rendering for tiles and steampunk pipe routes.
+ * Gameplay state remains external and is provided via render calls.
+ */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HISTORY_ROUTE_LIMIT = 8;
 const HISTORY_OPACITY_MAX = 0.68;
@@ -210,6 +214,10 @@ function getHistoryOpacity(historyIndex) {
   return Math.max(HISTORY_OPACITY_MIN, Math.min(HISTORY_OPACITY_MAX, opacity));
 }
 
+/**
+ * Creates a renderer facade for board tiles, current-word links, and historical
+ * routed paths. Consumers call render methods with state snapshots.
+ */
 export function createBoardRenderer(options) {
   const {
     boardElement,
