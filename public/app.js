@@ -232,6 +232,30 @@ function getPreviousSolutionUiLabels() {
   return puzzleFetcher.getNavigationState().previousLabels;
 }
 
+function getActiveCanonicalCharacterCount() {
+  const puzzleState = puzzleFetcher.getState();
+  if (puzzleState.puzzleSource !== 'catalog' || puzzleState.activePuzzleIndex < 0) {
+    return null;
+  }
+
+  const entry = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex];
+  if (!Array.isArray(entry?.canonicalSolution) || entry.canonicalSolution.length === 0) {
+    return null;
+  }
+
+  let total = 0;
+  for (const word of entry.canonicalSolution) {
+    const normalized = String(word || '').trim();
+    if (!normalized) {
+      continue;
+    }
+
+    total += normalized.length;
+  }
+
+  return total > 0 ? total : null;
+}
+
 function updatePuzzleNavigation() {
   if (dailyPuzzleStatusElement) {
     dailyPuzzleStatusElement.textContent = puzzleFetcher.getPuzzleStatusText();
@@ -656,6 +680,7 @@ function initializeGame() {
     initialBoard: buildBoard(),
     validateWord: dictionaryValidator.validateWord,
     summarizeValidationSources,
+    getCanonicalCharacterCount: getActiveCanonicalCharacterCount,
     onStateChange(snapshot) {
       renderUi(snapshot);
     },

@@ -19,7 +19,7 @@
     <main class="app-shell" id="mainContent">
       <header class="hero">
         <p class="eyebrow">Double letters welcome</p>
-        <h1>Letter Punk</h1>
+        <h1>Letter Punk</h2>
       </header>
 
       <section class="layout">
@@ -70,8 +70,8 @@
               <button id="todayPuzzleBtn" class="secondary today-puzzle-btn" type="button" aria-label="Return to today's puzzle">Today's Puzzle</button>
               <button id="nextPuzzleBtn" class="secondary puzzle-nav-arrow" type="button" aria-label="Play next puzzle">&gt;</button>
             </div>
-            <button id="clearBtn" class="secondary" aria-label="Restart game">Restart</button>
-            <button id="undoBtn" class="secondary" aria-label="Delete last token">Delete</button>
+            <button id="clearBtn" class="secondary" aria-label="Delete current word">Undo Word</button>
+            <button id="undoBtn" class="secondary" aria-label="Delete last character">Undo Letter</button>
             <button id="submitBtn" class="primary" aria-label="Enter current word">Enter</button>
           </div>
         </div>
@@ -117,9 +117,10 @@
           <li>Consecutive tokens still need to come from different sides.</li>
           <li>After the first word, the next word must begin with the previous word's final letter.</li>
           <li>Submit words with 3+ letters.</li>
-          <li>Delete backs up through the current word and can continue into previous accepted words.</li>
+          <li>Delete Char removes one letter at a time and can back up into previous accepted words.</li>
+          <li>Delete Word clears your current word; press it repeatedly to remove previous accepted words.</li>
           <li>Use Set Board to copy daily Letter Boxed letters and compare solve paths.</li>
-          <li>Using every letter solves the board. If you can do better, Undo can retract your last accepted word.</li>
+          <li>Using every letter solves the board. If you can do better, Delete Char can retract your last accepted word.</li>
           <li>Unused letters appear as silver steel tanks.</li>
           <li>Used letters switch to patina tanks and add a check badge, dashed border, and striped tag for non-color clarity.</li>
           <li>Words are validated locally against a packed game dictionary.</li>

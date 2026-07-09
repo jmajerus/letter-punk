@@ -12,6 +12,7 @@ export function createGameEngine(options) {
     initialBoard,
     validateWord,
     summarizeValidationSources,
+    getCanonicalCharacterCount,
     onStateChange,
     onMessage,
     onInvalidLetter,
@@ -103,6 +104,17 @@ export function createGameEngine(options) {
         state.usedLetters.add(letter);
       }
     }
+  }
+
+  function removeLatestFoundWord() {
+    if (state.foundWords.length === 0) {
+      return false;
+    }
+
+    state.foundWords.shift();
+    rebuildUsedLettersFromFoundWords();
+    seedNextWord();
+    return true;
   }
 
   function seedNextWord() {
@@ -268,12 +280,43 @@ export function createGameEngine(options) {
   }
 
   function clearTokens(silent = false) {
+    if (state.tokens.length === 0) {
+      if (removeLatestFoundWord()) {
+        emitStateChange();
+        if (!silent) {
+          emitMessage('Removed the previous accepted word.');
+        }
+        return;
+      }
+
+      if (!silent) {
+        emitMessage('The word builder is already clear.');
+      }
+      return;
+    }
+
+    const requiredStartingLetter = getRequiredStartingLetter();
+    const onlyStarterToken = Boolean(
+      state.starterLocked
+      && state.tokens.length === 1
+      && requiredStartingLetter
+      && state.tokens[0].letter === requiredStartingLetter,
+    );
+
+    if (onlyStarterToken && removeLatestFoundWord()) {
+      emitStateChange();
+      if (!silent) {
+        emitMessage('Removed the previous accepted word.');
+      }
+      return;
+    }
+
     seedNextWord();
     emitStateChange();
 
     if (!silent) {
       if (state.tokens.length > 0) {
-        emitMessage(`Cleared this attempt. Your next word still starts with ${state.tokens[0].letter.toUpperCase()}.`);
+        emitMessage(`Cleared this attempt. Next word still starts with ${state.tokens[0].letter.toUpperCase()}. Press Delete Word again to remove the previous accepted word.`);
         return;
       }
 
@@ -350,7 +393,41 @@ export function createGameEngine(options) {
     if (solved) {
       state.tokens = [];
       emitStateChange();
-      emitMessage(`Solved in ${state.foundWords.length} words. Undo to try for a lower count.`, 'success');
+      const playerCharacterCount = state.foundWords.reduce((total, entry) => total + entry.length, 0);
+      const canonicalCharacterCount = Number(
+        typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
+      );
+
+      if (
+        Number.isFinite(canonicalCharacterCount)
+        && canonicalCharacterCount > 0
+        && playerCharacterCount < canonicalCharacterCount
+      ) {
+        emitMessage(
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Incredible: you beat the canonical ${canonicalCharacterCount}-character solution!`,
+          'success',
+        );
+        return;
+      }
+
+      if (
+        Number.isFinite(canonicalCharacterCount)
+        && canonicalCharacterCount > 0
+        && playerCharacterCount === canonicalCharacterCount
+      ) {
+        emitMessage(
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Nice work: you matched the canonical character count!`,
+          'success',
+        );
+        return;
+      }
+
+      if (state.foundWords.length <= 2) {
+        emitMessage(`Solved in ${state.foundWords.length} words. Outstanding solve!`, 'success');
+        return;
+      }
+
+      emitMessage(`Solved in ${state.foundWords.length} words. Great solve.`, 'success');
       return;
     }
 

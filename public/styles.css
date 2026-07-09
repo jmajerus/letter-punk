@@ -30,12 +30,12 @@ body {
   font-family: "Atkinson Hyperlegible", "Segoe UI", "Trebuchet MS", "Verdana", sans-serif;
   font-size: 17px;
   color: var(--text);
-  background:
+  /* background:
     radial-gradient(circle at 50% 0%, rgba(180, 193, 203, 0.16), transparent 28%),
     radial-gradient(circle at 18% 18%, rgba(235, 241, 246, 0.11), transparent 18%),
     radial-gradient(circle at 84% 16%, rgba(224, 229, 234, 0.08), transparent 20%),
     radial-gradient(circle at 50% 52%, rgba(104, 114, 123, 0.18), transparent 26%),
-    linear-gradient(180deg, #14181d 0%, #0f1317 42%, #090c0f 100%);
+    linear-gradient(180deg, #14181d 0%, #0f1317 42%, #090c0f 100%); */
 }
 
 .skip-link {
@@ -105,7 +105,7 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(2.6rem, 4vw, 4.6rem);
+  font-size: clamp(2.0rem, 4vw, 3.6rem);
   line-height: 0.95;
   color: #fff2d6;
   text-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
