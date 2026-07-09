@@ -11,6 +11,8 @@ import {
 import { createBoardRenderer } from './modules/boardRenderer.js';
 import { createDictionaryValidator, summarizeValidationSources } from './modules/dictionaryValidator.js';
 import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
+import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
+import { recordFinishedGame } from './modules/historyManager.js';
 
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
@@ -84,6 +86,8 @@ function readPreference(storageKey) {
 let reducedMotionPreference = readPreference(REDUCED_MOTION_STORAGE_KEY);
 let provenanceBadgesPreference = readPreference(PROVENANCE_BADGES_STORAGE_KEY);
 let messageTimer = null;
+let lastRenderedBoardSignature = '';
+const completedPuzzleIds = new Set();
 
 function isProvenanceBadgesEnabled() {
   return provenanceBadgesPreference === 'on';
@@ -187,7 +191,7 @@ const renderer = createBoardRenderer({
 });
 
 const puzzleFetcher = createPuzzleFetcher({
-  puzzlesUrl: 'data/daily-puzzles.json',
+  puzzlesUrl: '/api/puzzles',
   applyBoard(nextBoard) {
     gameEngine.applyBoardDefinition(nextBoard);
   },
@@ -263,6 +267,15 @@ function updatePuzzleNavigation() {
 }
 
 function renderUi(snapshot = gameEngine.getSnapshot()) {
+  const boardSignature = snapshot.board
+    .map((side) => `${side.name}:${side.letters.join('')}`)
+    .join('|');
+
+  if (boardSignature !== lastRenderedBoardSignature) {
+    renderer.renderBoard(snapshot.board);
+    lastRenderedBoardSignature = boardSignature;
+  }
+
   renderer.renderCurrentWord(currentWordElement, snapshot.tokens);
   renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, isProvenanceBadgesEnabled());
   renderValidationSourceIndicator(snapshot);
@@ -424,6 +437,7 @@ function applyBoardFromInputs() {
 
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
+  trackPuzzleLoad('custom', '');
   closeBoardModal();
   setMessage('Applied custom board. Forge away.');
 }
@@ -479,6 +493,8 @@ async function playPreviousPuzzle() {
   }
 
   const puzzleState = puzzleFetcher.getState();
+  const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
+  trackPuzzleLoad('catalog', puzzleId);
   setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
 }
 
@@ -488,6 +504,8 @@ async function playNextPuzzle() {
   }
 
   const puzzleState = puzzleFetcher.getState();
+  const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
+  trackPuzzleLoad('catalog', puzzleId);
   setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
 }
 
@@ -499,6 +517,8 @@ async function playTodayPuzzle() {
   }
 
   const puzzleState = puzzleFetcher.getState();
+  const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
+  trackPuzzleLoad('catalog', puzzleId);
   setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
 }
 
@@ -643,9 +663,24 @@ function initializeGame() {
     onInvalidLetter(letter) {
       renderer.flashInvalidTile(letter);
     },
+    onWordResult({ outcome, validationSource, wordLength, word, solved }) {
+      const pState = puzzleFetcher.getState();
+      const puzzleId = pState.puzzleSource === 'catalog'
+        ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
+        : '';
+      trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
+      if (solved) {
+        const snapshot = gameEngine.getSnapshot();
+        trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId);
+
+        if (puzzleId && !completedPuzzleIds.has(puzzleId)) {
+          recordFinishedGame(puzzleId, true, snapshot.foundWords.length);
+          completedPuzzleIds.add(puzzleId);
+        }
+      }
+    },
   });
 
-  renderer.renderBoard(gameEngine.getBoard());
   renderUi();
 
   wireEvents();
@@ -659,6 +694,11 @@ function initializeGame() {
   renderUi();
 
   puzzleFetcher.loadDailyPuzzleCatalog().then(() => {
+    const pState = puzzleFetcher.getState();
+    const puzzleId = pState.puzzleSource === 'catalog'
+      ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
+      : '';
+    trackPuzzleLoad(pState.puzzleSource, puzzleId);
     renderUi();
   });
 

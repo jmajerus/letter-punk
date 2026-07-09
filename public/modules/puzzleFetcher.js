@@ -46,7 +46,7 @@ function findInitialPuzzleIndex(catalog) {
 export function createPuzzleFetcher(options = {}) {
   const {
     fetchImpl = fetch,
-    puzzlesUrl = 'data/daily-puzzles.json',
+    puzzlesUrl = '/api/puzzles',
     applyBoard,
   } = options;
 
@@ -195,15 +195,48 @@ export function createPuzzleFetcher(options = {}) {
   }
 
   async function loadDailyPuzzleCatalog() {
+    const todayYear = getTodayPuzzleId().slice(0, 4);
+    function withYearQuery(url) {
+      try {
+        const resolved = new URL(url, window.location.href);
+        if (!resolved.searchParams.has('year')) {
+          resolved.searchParams.set('year', todayYear);
+        }
+        return resolved.pathname + resolved.search;
+      } catch {
+        return `${url}${url.includes('?') ? '&' : '?'}year=${todayYear}`;
+      }
+    }
+
+    const candidateUrls = [];
+    for (const url of [withYearQuery(puzzlesUrl), '/data/daily-puzzles.json']) {
+      if (url && !candidateUrls.includes(url)) {
+        candidateUrls.push(url);
+      }
+    }
+
     try {
-      const response = await fetchImpl(puzzlesUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to load puzzle catalog: ${response.status}`);
+      let catalog = null;
+
+      for (const url of candidateUrls) {
+        const response = await fetchImpl(url);
+        if (!response.ok) {
+          continue;
+        }
+
+        const payload = await response.json().catch(() => null);
+        const looksLikeCatalog = Array.isArray(payload)
+          && payload.length > 0
+          && payload.every((entry) => typeof entry?.id === 'string' && typeof entry?.board === 'object');
+
+        if (looksLikeCatalog) {
+          catalog = payload;
+          break;
+        }
       }
 
-      const catalog = await response.json();
-      if (!Array.isArray(catalog) || catalog.length === 0) {
-        throw new Error('Puzzle catalog is empty.');
+      if (!catalog) {
+        throw new Error('Puzzle catalog is unavailable.');
       }
 
       state.puzzleCatalog = catalog;

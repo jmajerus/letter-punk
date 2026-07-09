@@ -282,7 +282,14 @@ export function createGameEngine(options) {
     onStateChange,
     onMessage,
     onInvalidLetter,
+    onWordResult,
   } = options;
+
+  function emitWordResult(result) {
+    if (typeof onWordResult === 'function') {
+      onWordResult(result);
+    }
+  }
 
   let board = initialBoard;
   const lettersToSide = new Map();
@@ -458,6 +465,13 @@ export function createGameEngine(options) {
     const lower = letter.toLowerCase();
     const lastToken = state.tokens[state.tokens.length - 1];
     const requiredStartingLetter = getRequiredStartingLetter();
+    const newSide = lettersToSide.get(lower);
+
+    if (newSide === undefined) {
+      flashInvalid(lower);
+      emitMessage(`${lower.toUpperCase()} is not on this board.`, 'error');
+      return;
+    }
 
     if (state.tokens.length === 0 && requiredStartingLetter && lower !== requiredStartingLetter) {
       flashInvalid(lower);
@@ -479,7 +493,6 @@ export function createGameEngine(options) {
       return;
     }
 
-    const newSide = lettersToSide.get(lower);
     if (lastToken && !lastToken.repeatOfPrevious && newSide === lastToken.side) {
       flashInvalid(lower);
       emitMessage(`${lower.toUpperCase()} is on the same side as the previous letter. Pick from a different side.`, 'error');
@@ -568,6 +581,7 @@ export function createGameEngine(options) {
     }
 
     if (state.foundWords.some((entry) => entry.word === word)) {
+      emitWordResult({ outcome: 'duplicate', validationSource: '', wordLength: length, word });
       emitMessage('You already forged that word.', 'error');
       return;
     }
@@ -579,6 +593,7 @@ export function createGameEngine(options) {
     }
 
     if (!validation.isValid) {
+      emitWordResult({ outcome: 'rejected', validationSource: validation.source || '', wordLength: length, word });
       emitMessage('That word was not found in the dictionary.', 'error');
       return;
     }
@@ -598,6 +613,14 @@ export function createGameEngine(options) {
     }
 
     const solved = state.usedLetters.size === lettersToSide.size;
+    emitWordResult({
+      outcome: 'accepted',
+      validationSource: validation.source || '',
+      wordLength: length,
+      word,
+      solved,
+    });
+
     if (solved) {
       state.tokens = [];
       emitStateChange();

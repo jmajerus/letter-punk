@@ -1,7 +1,26 @@
 name = "letter-punk"
+main = "src/worker.js"
 compatibility_date = "2026-07-06"
 workers_dev = true
 
 [assets]
 directory = "public"
 not_found_handling = "single-page-application"
+binding = "ASSETS"
+# Invoke the Worker script for API and admin routes; assets are served directly otherwise.
+run_worker_first = ["/api/*", "/admin", "/admin/*"]
+
+[vars]
+# Replace with your 32-character Cloudflare account ID (not a secret).
+ACCOUNT_ID = "eec00739050a8a4cbf359a1dedb8cad3"
+
+# Optional yearly puzzle storage in KV (recommended for /api/puzzles).
+# Use keys like: puzzles:2026
+# [[kv_namespaces]]
+# binding = "PUZZLES_KV"
+# id = "<your-kv-namespace-id>"
+# preview_id = "<your-kv-preview-id>"
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "letter_punk_events"

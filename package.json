@@ -1,7 +1,9 @@
 {
   "private": true,
   "scripts": {
-    "build:dictionary": "node public/util/compile-dict.js"
+    "build:dictionary": "node public/util/compile-dict.js",
+    "build:puzzles": "node scripts/generate-daily-puzzles.js",
+    "build:puzzles:dry": "node scripts/generate-daily-puzzles.js --dry-run"
   },
   "dependencies": {
     "dawg-lookup": "^2.2.1"

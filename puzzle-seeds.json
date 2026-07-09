@@ -1,0 +1,7 @@
+{
+  "2026-12-25": {
+    "seedWord": "HOLIDAY",
+    "theme": "holiday",
+    "notes": "Default flow uses a single seedWord and auto-picks a companion from dictionary. Optional override: companionWord or solutionWords."
+  }
+}
