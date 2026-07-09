@@ -39,6 +39,10 @@ function findInitialPuzzleIndex(catalog) {
   return 0;
 }
 
+function sortCatalogById(catalog) {
+  return [...catalog].sort((left, right) => String(left?.id || '').localeCompare(String(right?.id || '')));
+}
+
 /**
  * Creates a puzzle service that loads catalog data and exposes previous/today/
  * next navigation helpers plus derived UI state.
@@ -103,8 +107,8 @@ export function createPuzzleFetcher(options = {}) {
       return false;
     }
 
-    applyBoard(boardFromPuzzleEntry(entry));
     setPuzzleContext('catalog', index);
+    applyBoard(boardFromPuzzleEntry(entry));
     return true;
   }
 
@@ -239,8 +243,8 @@ export function createPuzzleFetcher(options = {}) {
         throw new Error('Puzzle catalog is unavailable.');
       }
 
-      state.puzzleCatalog = catalog;
-      const initialIndex = findInitialPuzzleIndex(catalog);
+      state.puzzleCatalog = sortCatalogById(catalog);
+      const initialIndex = findInitialPuzzleIndex(state.puzzleCatalog);
       if (initialIndex >= 0) {
         state.homePuzzleIndex = initialIndex;
         applyCatalogPuzzle(initialIndex);

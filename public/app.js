@@ -6,8 +6,8 @@ import {
   parseBoardText,
   wordsFromSolutionInput,
   generateBoardFromSolutionWords,
-  createGameEngine,
-} from './modules/gameLogic.js';
+} from './modules/buildLogic.js';
+import { createGameEngine } from './modules/gameLogic.js';
 import { createBoardRenderer } from './modules/boardRenderer.js';
 import { createDictionaryValidator, summarizeValidationSources } from './modules/dictionaryValidator.js';
 import { createPuzzleFetcher } from './modules/puzzleFetcher.js';

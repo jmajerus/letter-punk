@@ -1,7 +1,218 @@
 {
-  "2026-12-25": {
-    "seedWord": "HOLIDAY",
-    "theme": "holiday",
-    "notes": "Default flow uses a single seedWord and auto-picks a companion from dictionary. Optional override: companionWord or solutionWords."
+  "2026-07-01": {
+    "seedWord": "AARDVARK"
+  },
+  "2026-07-02": {
+    "seedWord": "CAPITULATE"
+  },
+  "2026-07-03": {
+    "seedWord": "LIONESS"
+  },
+  "2026-07-04": {
+    "seedWord": "SASSAFRASS"
+  },
+  "2026-07-05": {
+    "seedWord": "COMPLETION"
+  },
+  "2026-07-06": {
+    "seedWord": "INTRINSIC"
+  },
+  "2026-07-07": {
+    "seedWord": "SPARINGLY"
+  },
+  "2026-07-08": {
+    "seedWord": "MEATLESS"
+  },
+  "2026-07-09": {
+    "seedWord": "SIMPLETON"
+  },
+  "2026-07-10": {
+    "seedWord": "HYDROFOIL"
+  },
+  "2026-07-11": {
+    "seedWord": "SEPARATION"
+  },
+  "2026-07-12": {
+    "seedWord": "SITUATION"
+  },
+  "2026-07-13": {
+    "seedWord": "DELEGATION"
+  },
+  "2026-07-14": {
+    "seedWord": "RELEGATION"
+  },
+  "2026-07-15": {
+    "seedWord": "REMEDIATION"
+  },
+  "2026-07-16": {
+    "seedWord": "VENTILATION"
+  },
+  "2026-07-17": {
+    "seedWord": "LEXICON"
+  },
+  "2026-07-18": {
+    "seedWord": "QUIXOTIC"
+  },
+  "2026-07-19": {
+    "seedWord": "QUAKERS"
+  },
+  "2026-07-20": {
+    "seedWord": "SPINSTER"
+  },
+  "2026-07-21": {
+    "seedWord": "PILLOWCASE"
+  },
+  "2026-07-22": {
+    "seedWord": "BOOKSHELF"
+  },
+  "2026-07-23": {
+    "seedWord": "AQUARIUM"
+  },
+  "2026-07-24": {
+    "seedWord": "LIQUIDATE"
+  },
+  "2026-07-25": {
+    "seedWord": "HIPPOPOTAMUS"
+  },
+  "2026-07-26": {
+    "seedWord": "WALLABY"
+  },
+  "2026-07-27": {
+    "seedWord": "KANGAROO"
+  },
+  "2026-07-28": {
+    "seedWord": "GIRAFFE"
+  },
+  "2026-07-29": {
+    "seedWord": "MYSTERIOUS"
+  },
+  "2026-07-30": {
+    "seedWord": "DELICIOUS"
+  },
+  "2026-07-31": {
+    "seedWord": "TAXIWAY"
+  },
+  "2026-08-01": {
+    "seedWord": "LICORICE"
+  },
+  "2026-08-02": {
+    "seedWord": "SEPARATE"
+  },
+  "2026-08-03": {
+    "seedWord": "MYSTERIOUS"
+  },
+  "2026-08-04": {
+    "seedWord": "SEMITONE"
+  },
+  "2026-08-05": {
+    "seedWord": "VARIANT"
+  },
+  "2026-08-06": {
+    "seedWord": "SPECIALIST"
+  },
+  "2026-08-07": {
+    "seedWord": "ASSISTANCE"
+  },
+  "2026-08-08": {
+    "seedWord": "SPECULATE"
+  },
+  "2026-08-09": {
+    "seedWord": "AMBULANCE"
+  },
+  "2026-08-10": {
+    "seedWord": "QUIESCENT"
+  },
+  "2026-08-11": {
+    "seedWord": "LUMINESCENT"
+  },
+  "2026-08-12": {
+    "seedWord": "ALLUSION"
+  },
+  "2026-08-13": {
+    "seedWord": "ALIGNMENT"
+  },
+  "2026-08-14": {
+    "seedWord": "STUDIOUS"
+  },
+  "2026-08-15": {
+    "seedWord": "EQUATOR"
+  },
+  "2026-08-16": {
+    "seedWord": "INFURIATE"
+  },
+  "2026-08-17": {
+    "seedWord": "PASSIVE"
+  },
+  "2026-08-18": {
+    "seedWord": "QUIETLY"
+  },
+  "2026-08-19": {
+    "seedWord": "MASSIVE"
+  },
+  "2026-08-20": {
+    "seedWord": "ILLUMINATE"
+  },
+  "2026-08-21": {
+    "seedWord": "CURIOSITY"
+  },
+  "2026-08-22": {
+    "seedWord": "SPURIOUSNESS"
+  },
+  "2026-08-23": {
+    "seedWord": "QUALITATIVE"
+  },
+  "2026-08-24": {
+    "seedWord": "QUANTITATIVE"
+  },
+  "2026-08-25": {
+    "seedWord": "AGGREGATE"
+  },
+  "2026-08-26": {
+    "seedWord": "SIMPLISTIC"
+  },
+  "2026-08-27": {
+    "seedWord": "SITUATIONAL"
+  },
+  "2026-08-28": {
+    "seedWord": "FLUCTUATION"
+  },
+  "2026-08-29": {
+    "seedWord": "LUBRICANT"
+  },
+  "2026-08-30": {
+    "seedWord": "DEVIATION"
+  },
+  "2026-08-31": {
+    "seedWord": "REGURGITATE"
+  },
+  "2026-09-01": {
+    "seedWord": "MONSTROUS"
+  },
+  "2026-09-02": {
+    "seedWord": "VENTILATION"
+  },
+  "2026-09-03": {
+    "seedWord": "ILLUSORY"
+  },
+  "2026-09-04": {
+    "seedWord": "ILLUSION"
+  },
+  "2026-09-05": {
+    "seedWord": "CAPTIVATION"
+  },
+  "2026-09-06": {
+    "seedWord": "SEPARATION"
+  },
+  "2026-09-07": {
+    "seedWord": "COMMUNICATE"
+  },
+  "2026-09-08": {
+    "seedWord": "COMMANDMENT"
+  },
+  "2026-09-09": {
+    "seedWord": "SILHOUETTE"
+  },
+  "2026-09-10": {
+    "seedWord": "SIMPLIFICATION"
   }
 }

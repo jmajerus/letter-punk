@@ -1,104 +1,1370 @@
 [
   {
-    "id": "2026-07-06",
+    "id": "2026-07-01",
     "board": {
-      "top": "ILR",
-      "right": "AOV",
-      "bottom": "EMN",
-      "left": "GTY"
+      "top": "RVI",
+      "right": "ADE",
+      "bottom": "KLM",
+      "left": "OTS"
     },
     "canonicalSolution": [
-      "MIGRATION",
-      "NAIVELY"
+      "AARDVARK",
+      "KILOMETRES"
     ],
     "metadata": {
-      "seedWord": "MIGRATION",
-      "companionWord": "NAIVELY"
+      "seedWord": "AARDVARK",
+      "companionWord": "KILOMETRES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 34
+    }
+  },
+  {
+    "id": "2026-07-02",
+    "board": {
+      "top": "AIE",
+      "right": "PTN",
+      "bottom": "CUG",
+      "left": "LRZ"
+    },
+    "canonicalSolution": [
+      "CAPITULATE",
+      "ENERGIZING"
+    ],
+    "metadata": {
+      "seedWord": "CAPITULATE",
+      "companionWord": "ENERGIZING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 702
+    }
+  },
+  {
+    "id": "2026-07-03",
+    "board": {
+      "top": "IET",
+      "right": "ORP",
+      "bottom": "NSA",
+      "left": "LHC"
+    },
+    "canonicalSolution": [
+      "LIONESS",
+      "STRATOSPHERIC"
+    ],
+    "metadata": {
+      "seedWord": "LIONESS",
+      "companionWord": "STRATOSPHERIC",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 376
+    }
+  },
+  {
+    "id": "2026-07-04",
+    "board": {
+      "top": "AEI",
+      "right": "SFC",
+      "bottom": "RPH",
+      "left": "LGT"
+    },
+    "canonicalSolution": [
+      "SASSAFRASS",
+      "SPACEFLIGHT"
+    ],
+    "metadata": {
+      "seedWord": "SASSAFRASS",
+      "companionWord": "SPACEFLIGHT",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 238
+    }
+  },
+  {
+    "id": "2026-07-05",
+    "board": {
+      "top": "OPE",
+      "right": "MLT",
+      "bottom": "IBK",
+      "left": "CNS"
+    },
+    "canonicalSolution": [
+      "COMPLETION",
+      "NOTEBOOKS"
+    ],
+    "metadata": {
+      "seedWord": "COMPLETION",
+      "companionWord": "NOTEBOOKS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 345
+    }
+  },
+  {
+    "id": "2026-07-06",
+    "board": {
+      "top": "IUE",
+      "right": "TSC",
+      "bottom": "NRL",
+      "left": "MAV"
+    },
+    "canonicalSolution": [
+      "INTRINSIC",
+      "CUMULATIVE"
+    ],
+    "metadata": {
+      "seedWord": "INTRINSIC",
+      "companionWord": "CUMULATIVE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 424
     }
   },
   {
     "id": "2026-07-07",
     "board": {
-      "top": "AIN",
-      "right": "BES",
-      "bottom": "DGO",
-      "left": "LRT"
+      "top": "AIG",
+      "right": "PRN",
+      "bottom": "LWD",
+      "left": "SYE"
     },
     "canonicalSolution": [
-      "RELATIONS",
-      "SABOTAGED"
+      "SPARINGLY",
+      "YAWED"
     ],
     "metadata": {
-      "seedWord": "RELATIONS",
-      "companionWord": "SABOTAGED"
+      "seedWord": "SPARINGLY",
+      "companionWord": "YAWED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 40
     }
   },
   {
     "id": "2026-07-08",
     "board": {
-      "top": "AEH",
-      "right": "ILS",
-      "bottom": "COR",
-      "left": "KNT"
+      "top": "ETU",
+      "right": "MAL",
+      "bottom": "SBN",
+      "left": "CIG"
     },
     "canonicalSolution": [
-      "RELATIONS",
-      "SACKCLOTH"
+      "MEATLESS",
+      "SUCCUMBING"
     ],
     "metadata": {
-      "seedWord": "RELATIONS",
-      "companionWord": "SACKCLOTH"
+      "seedWord": "MEATLESS",
+      "companionWord": "SUCCUMBING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 600
     }
   },
   {
     "id": "2026-07-09",
     "board": {
-      "top": "AKO",
-      "right": "ENT",
-      "bottom": "CDL",
-      "left": "IRS"
+      "top": "IPE",
+      "right": "MLT",
+      "bottom": "OAV",
+      "left": "SNY"
     },
     "canonicalSolution": [
-      "RELATIONS",
-      "SACKED"
+      "SIMPLETON",
+      "NAIVETY"
     ],
     "metadata": {
-      "seedWord": "RELATIONS",
-      "companionWord": "SACKED"
+      "seedWord": "SIMPLETON",
+      "companionWord": "NAIVETY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 288
     }
   },
   {
     "id": "2026-07-10",
     "board": {
-      "top": "ADV",
-      "right": "ILU",
-      "bottom": "ENT",
-      "left": "COY"
+      "top": "YOE",
+      "right": "RFS",
+      "bottom": "DIA",
+      "left": "HLV"
     },
     "canonicalSolution": [
-      "EDUCATION",
-      "NAIVELY"
+      "HYDROFOIL",
+      "LIFESAVER"
     ],
     "metadata": {
-      "seedWord": "EDUCATION",
-      "companionWord": "NAIVELY"
+      "seedWord": "HYDROFOIL",
+      "companionWord": "LIFESAVER",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 505
     }
   },
   {
     "id": "2026-07-11",
     "board": {
-      "top": "AIU",
-      "right": "DKO",
-      "bottom": "CLT",
-      "left": "ENY"
+      "top": "AIH",
+      "right": "EOG",
+      "bottom": "PRN",
+      "left": "STB"
     },
     "canonicalSolution": [
-      "EDUCATION",
-      "NAKEDLY"
+      "SEPARATION",
+      "NEIGHBORING"
     ],
     "metadata": {
-      "seedWord": "EDUCATION",
-      "companionWord": "NAKEDLY"
+      "seedWord": "SEPARATION",
+      "companionWord": "NEIGHBORING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 240
+    }
+  },
+  {
+    "id": "2026-07-12",
+    "board": {
+      "top": "IAL",
+      "right": "TOV",
+      "bottom": "UNG",
+      "left": "SBE"
+    },
+    "canonicalSolution": [
+      "SITUATION",
+      "NAVIGABLE"
+    ],
+    "metadata": {
+      "seedWord": "SITUATION",
+      "companionWord": "NAVIGABLE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 109
+    }
+  },
+  {
+    "id": "2026-07-13",
+    "board": {
+      "top": "AIH",
+      "right": "ETO",
+      "bottom": "GBR",
+      "left": "DLN"
+    },
+    "canonicalSolution": [
+      "DELEGATION",
+      "NEIGHBORING"
+    ],
+    "metadata": {
+      "seedWord": "DELEGATION",
+      "companionWord": "NEIGHBORING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 280
+    }
+  },
+  {
+    "id": "2026-07-14",
+    "board": {
+      "top": "ETO",
+      "right": "GIN",
+      "bottom": "RAC",
+      "left": "LKS"
+    },
+    "canonicalSolution": [
+      "RELEGATION",
+      "NECKTIES"
+    ],
+    "metadata": {
+      "seedWord": "RELEGATION",
+      "companionWord": "NECKTIES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 257
+    }
+  },
+  {
+    "id": "2026-07-15",
+    "board": {
+      "top": "EIG",
+      "right": "DAN",
+      "bottom": "TOB",
+      "left": "RML"
+    },
+    "canonicalSolution": [
+      "REMEDIATION",
+      "NIBBLING"
+    ],
+    "metadata": {
+      "seedWord": "REMEDIATION",
+      "companionWord": "NIBBLING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 314
+    }
+  },
+  {
+    "id": "2026-07-16",
+    "board": {
+      "top": "NIR",
+      "right": "AOC",
+      "bottom": "ETL",
+      "left": "VMY"
+    },
+    "canonicalSolution": [
+      "VENTILATION",
+      "NECROMANCY"
+    ],
+    "metadata": {
+      "seedWord": "VENTILATION",
+      "companionWord": "NECROMANCY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 171
+    }
+  },
+  {
+    "id": "2026-07-17",
+    "board": {
+      "top": "EIA",
+      "right": "LXT",
+      "bottom": "CNU",
+      "left": "ORS"
+    },
+    "canonicalSolution": [
+      "LEXICON",
+      "NATURALIST"
+    ],
+    "metadata": {
+      "seedWord": "LEXICON",
+      "companionWord": "NATURALIST",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 175
+    }
+  },
+  {
+    "id": "2026-07-18",
+    "board": {
+      "top": "UXT",
+      "right": "IAS",
+      "bottom": "OCE",
+      "left": "QWY"
+    },
+    "canonicalSolution": [
+      "QUIXOTIC",
+      "CAUSEWAYS"
+    ],
+    "metadata": {
+      "seedWord": "QUIXOTIC",
+      "companionWord": "CAUSEWAYS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1601
+    }
+  },
+  {
+    "id": "2026-07-19",
+    "board": {
+      "top": "UKI",
+      "right": "ART",
+      "bottom": "ESL",
+      "left": "QPY"
+    },
+    "canonicalSolution": [
+      "QUAKERS",
+      "SPIRITUALITY"
+    ],
+    "metadata": {
+      "seedWord": "QUAKERS",
+      "companionWord": "SPIRITUALITY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1352
+    }
+  },
+  {
+    "id": "2026-07-20",
+    "board": {
+      "top": "SIE",
+      "right": "PNT",
+      "bottom": "RDC",
+      "left": "AHO"
+    },
+    "canonicalSolution": [
+      "SPINSTER",
+      "RADICCHIOS"
+    ],
+    "metadata": {
+      "seedWord": "SPINSTER",
+      "companionWord": "RADICCHIOS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 282
+    }
+  },
+  {
+    "id": "2026-07-21",
+    "board": {
+      "top": "IWE",
+      "right": "OCS",
+      "bottom": "PLA",
+      "left": "YNR"
+    },
+    "canonicalSolution": [
+      "PILLOWCASE",
+      "EYEOPENER"
+    ],
+    "metadata": {
+      "seedWord": "PILLOWCASE",
+      "companionWord": "EYEOPENER",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 816
+    }
+  },
+  {
+    "id": "2026-07-22",
+    "board": {
+      "top": "OEF",
+      "right": "SLR",
+      "bottom": "KHN",
+      "left": "BAC"
+    },
+    "canonicalSolution": [
+      "BOOKSHELF",
+      "FREELANCES"
+    ],
+    "metadata": {
+      "seedWord": "BOOKSHELF",
+      "companionWord": "FREELANCES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 667
+    }
+  },
+  {
+    "id": "2026-07-23",
+    "board": {
+      "top": "URS",
+      "right": "AIO",
+      "bottom": "QCN",
+      "left": "MED"
+    },
+    "canonicalSolution": [
+      "AQUARIUM",
+      "MICROSECONDS"
+    ],
+    "metadata": {
+      "seedWord": "AQUARIUM",
+      "companionWord": "MICROSECONDS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 441
+    }
+  },
+  {
+    "id": "2026-07-24",
+    "board": {
+      "top": "IAE",
+      "right": "QDT",
+      "bottom": "URS",
+      "left": "LNG"
+    },
+    "canonicalSolution": [
+      "LIQUIDATE",
+      "ENERGISED"
+    ],
+    "metadata": {
+      "seedWord": "LIQUIDATE",
+      "companionWord": "ENERGISED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 686
+    }
+  },
+  {
+    "id": "2026-07-25",
+    "board": {
+      "top": "IAE",
+      "right": "PSD",
+      "bottom": "OML",
+      "left": "HTU"
+    },
+    "canonicalSolution": [
+      "HIPPOPOTAMUS",
+      "SIDESADDLE"
+    ],
+    "metadata": {
+      "seedWord": "HIPPOPOTAMUS",
+      "companionWord": "SIDESADDLE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 2519
+    }
+  },
+  {
+    "id": "2026-07-26",
+    "board": {
+      "top": "AOR",
+      "right": "BGU",
+      "bottom": "YHT",
+      "left": "WLS"
+    },
+    "canonicalSolution": [
+      "WALLABY",
+      "YOGHOURTS"
+    ],
+    "metadata": {
+      "seedWord": "WALLABY",
+      "companionWord": "YOGHOURTS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 11
+    }
+  },
+  {
+    "id": "2026-07-27",
+    "board": {
+      "top": "AOT",
+      "right": "NRS",
+      "bottom": "GUI",
+      "left": "KPC"
+    },
+    "canonicalSolution": [
+      "KANGAROO",
+      "OPPORTUNISTIC"
+    ],
+    "metadata": {
+      "seedWord": "KANGAROO",
+      "companionWord": "OPPORTUNISTIC",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 255
+    }
+  },
+  {
+    "id": "2026-07-28",
+    "board": {
+      "top": "IEP",
+      "right": "AXN",
+      "bottom": "RFO",
+      "left": "GTL"
+    },
+    "canonicalSolution": [
+      "GIRAFFE",
+      "EXPONENTIAL"
+    ],
+    "metadata": {
+      "seedWord": "GIRAFFE",
+      "companionWord": "EXPONENTIAL",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 358
+    }
+  },
+  {
+    "id": "2026-07-29",
+    "board": {
+      "top": "SEI",
+      "right": "YTR",
+      "bottom": "OWV",
+      "left": "MUL"
+    },
+    "canonicalSolution": [
+      "MYSTERIOUS",
+      "SWIVELS"
+    ],
+    "metadata": {
+      "seedWord": "MYSTERIOUS",
+      "companionWord": "SWIVELS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 2278
+    }
+  },
+  {
+    "id": "2026-07-30",
+    "board": {
+      "top": "EIU",
+      "right": "LOS",
+      "bottom": "DPR",
+      "left": "CAN"
+    },
+    "canonicalSolution": [
+      "DELICIOUS",
+      "SPARSENESS"
+    ],
+    "metadata": {
+      "seedWord": "DELICIOUS",
+      "companionWord": "SPARSENESS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1821
+    }
+  },
+  {
+    "id": "2026-07-31",
+    "board": {
+      "top": "AIB",
+      "right": "XWY",
+      "bottom": "ERK",
+      "left": "TOS"
+    },
+    "canonicalSolution": [
+      "TAXIWAY",
+      "YEARBOOKS"
+    ],
+    "metadata": {
+      "seedWord": "TAXIWAY",
+      "companionWord": "YEARBOOKS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 14
+    }
+  },
+  {
+    "id": "2026-08-01",
+    "board": {
+      "top": "CRH",
+      "right": "IOE",
+      "bottom": "TNA",
+      "left": "LGP"
+    },
+    "canonicalSolution": [
+      "LICORICE",
+      "ETHNOGRAPHER"
+    ],
+    "metadata": {
+      "seedWord": "LICORICE",
+      "companionWord": "ETHNOGRAPHER",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 297
+    }
+  },
+  {
+    "id": "2026-08-02",
+    "board": {
+      "top": "EAO",
+      "right": "PCL",
+      "bottom": "STG",
+      "left": "RIY"
+    },
+    "canonicalSolution": [
+      "SEPARATE",
+      "ECOLOGICALLY"
+    ],
+    "metadata": {
+      "seedWord": "SEPARATE",
+      "companionWord": "ECOLOGICALLY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 273
+    }
+  },
+  {
+    "id": "2026-08-03",
+    "board": {
+      "top": "SEI",
+      "right": "YTR",
+      "bottom": "MOF",
+      "left": "ULD"
+    },
+    "canonicalSolution": [
+      "MYSTERIOUS",
+      "STIFLED"
+    ],
+    "metadata": {
+      "seedWord": "MYSTERIOUS",
+      "companionWord": "STIFLED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 2278
+    }
+  },
+  {
+    "id": "2026-08-04",
+    "board": {
+      "top": "EIO",
+      "right": "SMT",
+      "bottom": "NQA",
+      "left": "ULR"
+    },
+    "canonicalSolution": [
+      "SEMITONE",
+      "EQUALISER"
+    ],
+    "metadata": {
+      "seedWord": "SEMITONE",
+      "companionWord": "EQUALISER",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 342
+    }
+  },
+  {
+    "id": "2026-08-05",
+    "board": {
+      "top": "ATU",
+      "right": "RNH",
+      "bottom": "IME",
+      "left": "VBD"
+    },
+    "canonicalSolution": [
+      "VARIANT",
+      "THUMBED"
+    ],
+    "metadata": {
+      "seedWord": "VARIANT",
+      "companionWord": "THUMBED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 202
+    }
+  },
+  {
+    "id": "2026-08-06",
+    "board": {
+      "top": "PIO",
+      "right": "SCA",
+      "bottom": "ELT",
+      "left": "XNM"
+    },
+    "canonicalSolution": [
+      "SPECIALIST",
+      "TAXONOMIES"
+    ],
+    "metadata": {
+      "seedWord": "SPECIALIST",
+      "companionWord": "TAXONOMIES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 572
+    }
+  },
+  {
+    "id": "2026-08-07",
+    "board": {
+      "top": "TNL",
+      "right": "AIE",
+      "bottom": "SCX",
+      "left": "RZG"
+    },
+    "canonicalSolution": [
+      "ASSISTANCE",
+      "EXTERNALIZING"
+    ],
+    "metadata": {
+      "seedWord": "ASSISTANCE",
+      "companionWord": "EXTERNALIZING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 304
+    }
+  },
+  {
+    "id": "2026-08-08",
+    "board": {
+      "top": "EUA",
+      "right": "SCL",
+      "bottom": "PNO",
+      "left": "TDR"
+    },
+    "canonicalSolution": [
+      "SPECULATE",
+      "ENDORSES"
+    ],
+    "metadata": {
+      "seedWord": "SPECULATE",
+      "companionWord": "ENDORSES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 705
+    }
+  },
+  {
+    "id": "2026-08-09",
+    "board": {
+      "top": "ABC",
+      "right": "MUN",
+      "bottom": "LEI",
+      "left": "TOS"
+    },
+    "canonicalSolution": [
+      "AMBULANCE",
+      "EMANATIONS"
+    ],
+    "metadata": {
+      "seedWord": "AMBULANCE",
+      "companionWord": "EMANATIONS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 697
+    }
+  },
+  {
+    "id": "2026-08-10",
+    "board": {
+      "top": "UEB",
+      "right": "ISN",
+      "bottom": "CTR",
+      "left": "QAL"
+    },
+    "canonicalSolution": [
+      "QUIESCENT",
+      "TURNTABLES"
+    ],
+    "metadata": {
+      "seedWord": "QUIESCENT",
+      "companionWord": "TURNTABLES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 733
+    }
+  },
+  {
+    "id": "2026-08-11",
+    "board": {
+      "top": "UET",
+      "right": "LMN",
+      "bottom": "ISA",
+      "left": "COD"
+    },
+    "canonicalSolution": [
+      "LUMINESCENT",
+      "TOTALED"
+    ],
+    "metadata": {
+      "seedWord": "LUMINESCENT",
+      "companionWord": "TOTALED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 997
+    }
+  },
+  {
+    "id": "2026-08-12",
+    "board": {
+      "top": "UIE",
+      "right": "LSO",
+      "bottom": "NCT",
+      "left": "AXV"
+    },
+    "canonicalSolution": [
+      "ALLUSION",
+      "NONEXECUTIVE"
+    ],
+    "metadata": {
+      "seedWord": "ALLUSION",
+      "companionWord": "NONEXECUTIVE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 101
+    }
+  },
+  {
+    "id": "2026-08-13",
+    "board": {
+      "top": "LGE",
+      "right": "INY",
+      "bottom": "MTS",
+      "left": "APR"
+    },
+    "canonicalSolution": [
+      "ALIGNMENT",
+      "TYPESETTERS"
+    ],
+    "metadata": {
+      "seedWord": "ALIGNMENT",
+      "companionWord": "TYPESETTERS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 658
+    }
+  },
+  {
+    "id": "2026-08-14",
+    "board": {
+      "top": "UIP",
+      "right": "SDO",
+      "bottom": "TEL",
+      "left": "CAY"
+    },
+    "canonicalSolution": [
+      "STUDIOUS",
+      "SPECIALLY"
+    ],
+    "metadata": {
+      "seedWord": "STUDIOUS",
+      "companionWord": "SPECIALLY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 696
+    }
+  },
+  {
+    "id": "2026-08-15",
+    "board": {
+      "top": "EUT",
+      "right": "QON",
+      "bottom": "ARI",
+      "left": "FCM"
+    },
+    "canonicalSolution": [
+      "EQUATOR",
+      "REINFORCEMENT"
+    ],
+    "metadata": {
+      "seedWord": "EQUATOR",
+      "companionWord": "REINFORCEMENT",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 557
+    }
+  },
+  {
+    "id": "2026-08-16",
+    "board": {
+      "top": "IFE",
+      "right": "NUA",
+      "bottom": "RTC",
+      "left": "XGY"
+    },
+    "canonicalSolution": [
+      "INFURIATE",
+      "EXIGENCY"
+    ],
+    "metadata": {
+      "seedWord": "INFURIATE",
+      "companionWord": "EXIGENCY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 669
+    }
+  },
+  {
+    "id": "2026-08-17",
+    "board": {
+      "top": "AIE",
+      "right": "SVN",
+      "bottom": "ZMT",
+      "left": "PYC"
+    },
+    "canonicalSolution": [
+      "PASSIVE",
+      "ENZYMATIC"
+    ],
+    "metadata": {
+      "seedWord": "PASSIVE",
+      "companionWord": "ENZYMATIC",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 366
+    }
+  },
+  {
+    "id": "2026-08-18",
+    "board": {
+      "top": "ITY",
+      "right": "UEL",
+      "bottom": "AKN",
+      "left": "QCG"
+    },
+    "canonicalSolution": [
+      "QUIETLY",
+      "YACKING"
+    ],
+    "metadata": {
+      "seedWord": "QUIETLY",
+      "companionWord": "YACKING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 14
+    }
+  },
+  {
+    "id": "2026-08-19",
+    "board": {
+      "top": "AIE",
+      "right": "SVC",
+      "bottom": "MUO",
+      "left": "XTN"
+    },
+    "canonicalSolution": [
+      "MASSIVE",
+      "EXECUTION"
+    ],
+    "metadata": {
+      "seedWord": "MASSIVE",
+      "companionWord": "EXECUTION",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 350
+    }
+  },
+  {
+    "id": "2026-08-20",
+    "board": {
+      "top": "IUE",
+      "right": "LMN",
+      "bottom": "TXR",
+      "left": "APG"
+    },
+    "canonicalSolution": [
+      "ILLUMINATE",
+      "EXPERIMENTING"
+    ],
+    "metadata": {
+      "seedWord": "ILLUMINATE",
+      "companionWord": "EXPERIMENTING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 667
+    }
+  },
+  {
+    "id": "2026-08-21",
+    "board": {
+      "top": "UIY",
+      "right": "ROT",
+      "bottom": "SWE",
+      "left": "CLD"
+    },
+    "canonicalSolution": [
+      "CURIOSITY",
+      "YOWLED"
+    ],
+    "metadata": {
+      "seedWord": "CURIOSITY",
+      "companionWord": "YOWLED",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 30
+    }
+  },
+  {
+    "id": "2026-08-22",
+    "board": {
+      "top": "SIC",
+      "right": "UNL",
+      "bottom": "PRO",
+      "left": "EHG"
+    },
+    "canonicalSolution": [
+      "SPURIOUSNESS",
+      "SLOUCHING"
+    ],
+    "metadata": {
+      "seedWord": "SPURIOUSNESS",
+      "companionWord": "SLOUCHING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1546
+    }
+  },
+  {
+    "id": "2026-08-23",
+    "board": {
+      "top": "AIE",
+      "right": "ULT",
+      "bottom": "VNO",
+      "left": "QCD"
+    },
+    "canonicalSolution": [
+      "QUALITATIVE",
+      "ENCODE"
+    ],
+    "metadata": {
+      "seedWord": "QUALITATIVE",
+      "companionWord": "ENCODE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 698
+    }
+  },
+  {
+    "id": "2026-08-24",
+    "board": {
+      "top": "AIE",
+      "right": "UTV",
+      "bottom": "NXL",
+      "left": "QHS"
+    },
+    "canonicalSolution": [
+      "QUANTITATIVE",
+      "EXHALES"
+    ],
+    "metadata": {
+      "seedWord": "QUANTITATIVE",
+      "companionWord": "EXHALES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 697
+    }
+  },
+  {
+    "id": "2026-08-25",
+    "board": {
+      "top": "AEI",
+      "right": "GTX",
+      "bottom": "RPU",
+      "left": "DOS"
+    },
+    "canonicalSolution": [
+      "AGGREGATE",
+      "EXPEDITIOUS"
+    ],
+    "metadata": {
+      "seedWord": "AGGREGATE",
+      "companionWord": "EXPEDITIOUS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 159
+    }
+  },
+  {
+    "id": "2026-08-26",
+    "board": {
+      "top": "IPA",
+      "right": "SML",
+      "bottom": "TCN",
+      "left": "HFG"
+    },
+    "canonicalSolution": [
+      "SIMPLISTIC",
+      "CHAFFING"
+    ],
+    "metadata": {
+      "seedWord": "SIMPLISTIC",
+      "companionWord": "CHAFFING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1331
+    }
+  },
+  {
+    "id": "2026-08-27",
+    "board": {
+      "top": "IUE",
+      "right": "AOM",
+      "bottom": "TNL",
+      "left": "SBR"
+    },
+    "canonicalSolution": [
+      "SITUATIONAL",
+      "LUMBERMEN"
+    ],
+    "metadata": {
+      "seedWord": "SITUATIONAL",
+      "companionWord": "LUMBERMEN",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 283
+    }
+  },
+  {
+    "id": "2026-08-28",
+    "board": {
+      "top": "FUO",
+      "right": "LCN",
+      "bottom": "TEG",
+      "left": "AIR"
+    },
+    "canonicalSolution": [
+      "FLUCTUATION",
+      "NEUROLOGICAL"
+    ],
+    "metadata": {
+      "seedWord": "FLUCTUATION",
+      "companionWord": "NEUROLOGICAL",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 345
+    }
+  },
+  {
+    "id": "2026-08-29",
+    "board": {
+      "top": "URA",
+      "right": "BIN",
+      "bottom": "CTP",
+      "left": "LMO"
+    },
+    "canonicalSolution": [
+      "LUBRICANT",
+      "TAMPON"
+    ],
+    "metadata": {
+      "seedWord": "LUBRICANT",
+      "companionWord": "TAMPON",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1064
+    }
+  },
+  {
+    "id": "2026-08-30",
+    "board": {
+      "top": "EIN",
+      "right": "VAO",
+      "bottom": "TUF",
+      "left": "DLY"
+    },
+    "canonicalSolution": [
+      "DEVIATION",
+      "NULLIFY"
+    ],
+    "metadata": {
+      "seedWord": "DEVIATION",
+      "companionWord": "NULLIFY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 220
+    }
+  },
+  {
+    "id": "2026-08-31",
+    "board": {
+      "top": "EUA",
+      "right": "GTQ",
+      "bottom": "RIN",
+      "left": "VLC"
+    },
+    "canonicalSolution": [
+      "REGURGITATE",
+      "EQUIVALENCE"
+    ],
+    "metadata": {
+      "seedWord": "REGURGITATE",
+      "companionWord": "EQUIVALENCE",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 471
+    }
+  },
+  {
+    "id": "2026-09-01",
+    "board": {
+      "top": "OSD",
+      "right": "NRU",
+      "bottom": "TIE",
+      "left": "MBA"
+    },
+    "canonicalSolution": [
+      "MONSTROUS",
+      "SIDEBOARD"
+    ],
+    "metadata": {
+      "seedWord": "MONSTROUS",
+      "companionWord": "SIDEBOARD",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 1379
+    }
+  },
+  {
+    "id": "2026-09-02",
+    "board": {
+      "top": "TLO",
+      "right": "EIS",
+      "bottom": "NAR",
+      "left": "VHY"
+    },
+    "canonicalSolution": [
+      "VENTILATION",
+      "NORTHEASTERLY"
+    ],
+    "metadata": {
+      "seedWord": "VENTILATION",
+      "companionWord": "NORTHEASTERLY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 171
+    }
+  },
+  {
+    "id": "2026-09-03",
+    "board": {
+      "top": "ISR",
+      "right": "LOY",
+      "bottom": "UAC",
+      "left": "DTK"
+    },
+    "canonicalSolution": [
+      "ILLUSORY",
+      "YARDSTICK"
+    ],
+    "metadata": {
+      "seedWord": "ILLUSORY",
+      "companionWord": "YARDSTICK",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 8
+    }
+  },
+  {
+    "id": "2026-09-04",
+    "board": {
+      "top": "LSN",
+      "right": "UOA",
+      "bottom": "IRE",
+      "left": "CPY"
+    },
+    "canonicalSolution": [
+      "ILLUSION",
+      "NARCOLEPSY"
+    ],
+    "metadata": {
+      "seedWord": "ILLUSION",
+      "companionWord": "NARCOLEPSY",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 81
+    }
+  },
+  {
+    "id": "2026-09-05",
+    "board": {
+      "top": "AIE",
+      "right": "TVO",
+      "bottom": "PNG",
+      "left": "CRS"
+    },
+    "canonicalSolution": [
+      "CAPTIVATION",
+      "NEGRESSES"
+    ],
+    "metadata": {
+      "seedWord": "CAPTIVATION",
+      "companionWord": "NEGRESSES",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 265
+    }
+  },
+  {
+    "id": "2026-09-06",
+    "board": {
+      "top": "SAI",
+      "right": "PTO",
+      "bottom": "ENG",
+      "left": "RHC"
+    },
+    "canonicalSolution": [
+      "SEPARATION",
+      "NIGHTCAPS"
+    ],
+    "metadata": {
+      "seedWord": "SEPARATION",
+      "companionWord": "NIGHTCAPS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 240
+    }
+  },
+  {
+    "id": "2026-09-07",
+    "board": {
+      "top": "ONA",
+      "right": "CMT",
+      "bottom": "UIY",
+      "left": "EVS"
+    },
+    "canonicalSolution": [
+      "COMMUNICATE",
+      "ENVOYS"
+    ],
+    "metadata": {
+      "seedWord": "COMMUNICATE",
+      "companionWord": "ENVOYS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 890
+    }
+  },
+  {
+    "id": "2026-09-08",
+    "board": {
+      "top": "MNR",
+      "right": "CAT",
+      "bottom": "ODI",
+      "left": "ESP"
+    },
+    "canonicalSolution": [
+      "COMMANDMENT",
+      "TRANSCRIPT"
+    ],
+    "metadata": {
+      "seedWord": "COMMANDMENT",
+      "companionWord": "TRANSCRIPT",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 747
+    }
+  },
+  {
+    "id": "2026-09-09",
+    "board": {
+      "top": "IHE",
+      "right": "LUT",
+      "bottom": "OQV",
+      "left": "SAN"
+    },
+    "canonicalSolution": [
+      "SILHOUETTE",
+      "EQUIVALENT"
+    ],
+    "metadata": {
+      "seedWord": "SILHOUETTE",
+      "companionWord": "EQUIVALENT",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 692
+    }
+  },
+  {
+    "id": "2026-09-10",
+    "board": {
+      "top": "IPA",
+      "right": "SML",
+      "bottom": "CTO",
+      "left": "FNY"
+    },
+    "canonicalSolution": [
+      "SIMPLIFICATION",
+      "NAYS"
+    ],
+    "metadata": {
+      "seedWord": "SIMPLIFICATION",
+      "companionWord": "NAYS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 247
     }
   }
 ]
