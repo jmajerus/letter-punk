@@ -38,6 +38,14 @@ Refresh the packed dictionary first if you change the source word list:
 npm run build:dictionary
 ```
 
+Run the test suite with:
+
+```bash
+npm test
+```
+
+See [docs/testing.md](docs/testing.md) for what's covered, what isn't, and the harness pattern to follow when adding new tests.
+
 Recommended dictionary layering:
 
 - `public/data/en_US.dic` plus `public/data/en_US.aff`: preferred broad base dictionary with real Hunspell affix expansion.
@@ -71,7 +79,9 @@ Repo structure:
 - `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`
 - `public/app.js` app bootstrap and UI orchestration
 - `wrangler.toml` Cloudflare Worker config
+- `test/` Node built-in test runner suite for `public/modules/gameLogic.js` and `public/modules/dictionaryValidator.js`
 - `docs/ai-edit-map.md` AI agent routing guide and prompt templates
+- `docs/testing.md` test coverage summary and how to add new tests
 - `README.md` project and deployment notes
 - `Letter-Boxed-Game-Logic-Copyright.md` concept notes
 

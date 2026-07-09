@@ -1,0 +1,53 @@
+# Testing
+
+Letter Punk uses Node's built-in test runner (`node:test` + `node:assert/strict`). No test framework dependency is installed — this keeps the project's zero-bundler, minimal-tooling posture intact.
+
+## Running the suite
+
+```bash
+npm test
+```
+
+This runs `node --test`, which auto-discovers every file under `test/`.
+
+## Layout
+
+- `test/gameLogic.test.js` — gameplay rules engine (`public/modules/gameLogic.js`)
+- `test/dictionaryValidator.test.js` — dictionary loading and validation (`public/modules/dictionaryValidator.js`)
+- `public/modules/package.json` and `test/package.json` — each set `{"type": "module"}`, scoped only to their own directory. This lets Node resolve the existing `import`/`export` syntax in `public/modules/*.js` correctly without changing the root `package.json`, which must stay CommonJS for `scripts/generate-daily-puzzles.js` and `public/util/compile-dict.js` (both use `require`).
+
+## Why these two modules first
+
+`gameLogic.js` and `dictionaryValidator.js` are both written as pure, dependency-injected factories (`createGameEngine(options)`, `createDictionaryValidator(options)`) with no hard-coded DOM, `fetch`, or `window` access baked into their construction. Every test builds a small in-memory **harness**: a fixed test board, a mocked `validateWord`/`fetchImpl`/`ptrieFactory`, and plain callback arrays that record `onStateChange`/`onMessage`/`onWordResult` events for assertions. No network calls, no browser globals, no real dictionary files are touched.
+
+One exception: `dictionaryValidator.js`'s API-fallback path reads `window.location.href` directly (a hard dependency on running in a browser). The one test exercising that path stubs a minimal `globalThis.window` for its duration and tears it down in `t.after()` — this is a test-environment workaround, not a source change.
+
+## Current coverage
+
+**`gameLogic.js`** (`createGameEngine`):
+- Side-adjacency rule (reject a letter from the same board side as the previous letter)
+- Letter doubling (`x2`): one repeat allowed, a second repeat rejected
+- Minimum word length and duplicate-word rejection
+- Dictionary accept/reject wiring through `validateWord`
+- Required-starting-letter enforcement, including the multi-word backspace path where it's non-obvious (see below)
+- Both "undo" controls end-to-end:
+  - `removeLastToken` (single-character delete): nothing-to-undo, direct back-up on an already-empty builder, back-up from a locked lone starter, and generic mid-word pop
+  - `clearTokens` (delete-word): already-clear, direct found-word removal on an empty builder, wiping an in-progress first word, the post-acceptance reset-to-starter, and the second-press remove-found-word
+- Full-board solve, including the canonical-character-count comparison messages
+
+**`dictionaryValidator.js`** (`createDictionaryValidator`):
+- Primary-only match, stacked (both dictionaries) match, and reachable-but-absent
+- Per-word result caching vs. `clearCache()` (dictionary fetches are cached independently and are not re-fetched by `clearCache()`)
+- API fallback when no local dictionary is reachable
+- `getValidationSourceLabel` and `summarizeValidationSources` helpers
+
+The multi-word backspace path is worth calling out: after accepting two words, deleting back through the second word's letters resets an internal `starterLocked` flag, so continued deletes fully empty the builder while the *first* word's required starting letter is still active — typing the wrong letter at that point correctly triggers "This word must start with X." That interaction isn't obvious from reading `appendToken` or `removeLastToken` in isolation; `test/gameLogic.test.js` traces it step by step so a future refactor can't silently break it.
+
+## Not covered yet
+
+- `boardRenderer.js` — SVG/DOM rendering; would need a DOM environment (e.g. `jsdom`) to test meaningfully, which is a bigger tooling addition than the pure-logic modules above.
+- `puzzleFetcher.js`, `buildLogic.js`, `historyManager.js`, `analyticsClient.js` — not yet covered. `buildLogic.js` in particular is a good next candidate: it's pure (no DOM/network) like the two modules above.
+
+## Adding a new test
+
+Follow the harness pattern already in `test/gameLogic.test.js` and `test/dictionaryValidator.test.js`: inject mocks for anything that would otherwise touch the network, the DOM, or `window`, and assert against the returned snapshot/result objects and recorded callback events rather than internal state.
