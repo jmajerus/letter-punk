@@ -274,3 +274,29 @@ export function generateBoardFromSolutionWords(words) {
 		})),
 	};
 }
+
+/**
+ * Reports where a sequence of solution words breaks the normal chained-play
+ * rule (each word after the first must start with the previous word's last
+ * letter). generateBoardFromSolutionWords only checks the letter/adjacency
+ * shape of a board — it doesn't guarantee the words are actually submittable
+ * back-to-back in gameplay, so callers that care about that check this
+ * separately. Returns an empty array when the whole sequence chains cleanly.
+ */
+export function findChainBreaks(words) {
+	const breaks = [];
+	for (let index = 1; index < words.length; index += 1) {
+		const previous = words[index - 1];
+		const current = words[index];
+		if (!previous || !current) {
+			continue;
+		}
+
+		const requiredStart = previous[previous.length - 1];
+		if (current[0] !== requiredStart) {
+			breaks.push({ word: current, previousWord: previous, requiredStart });
+		}
+	}
+
+	return breaks;
+}

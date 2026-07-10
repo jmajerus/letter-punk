@@ -6,6 +6,7 @@ import {
   parseBoardText,
   wordsFromSolutionInput,
   generateBoardFromSolutionWords,
+  findChainBreaks,
 } from './modules/buildLogic.js';
 import { createGameEngine } from './modules/gameLogic.js';
 import { createBoardRenderer } from './modules/boardRenderer.js';
@@ -13,6 +14,7 @@ import { createDictionaryValidator, summarizeValidationSources } from './modules
 import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
 import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
 import { recordFinishedGame } from './modules/historyManager.js';
+import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
 
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
@@ -61,6 +63,8 @@ const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
 const solutionWordsInput = document.getElementById('solutionWordsInput');
 const generateBoardButton = document.getElementById('generateBoardBtn');
+const copyShareLinkButton = document.getElementById('copyShareLinkBtn');
+const copySolvedLinkButton = document.getElementById('copySolvedLinkBtn');
 const boardInputMessageElement = document.getElementById('boardInputMessage');
 
 const BOARD_INPUTS = {
@@ -452,6 +456,28 @@ function trapFocusInModal(modal, event) {
   }
 }
 
+// Whitelists solution words for the currently-applied board — a proper
+// noun or another game's word can define the board shape but still fail
+// normal dictionary validation, which would make the puzzle unsolvable by
+// its own intended solution. Skips words that are already real dictionary
+// words: validateWord checks session overrides before the packed
+// dictionaries, so overriding an already-valid word would silently swap
+// its accepted-word badge from Primary/Fallback/Both to "Custom" for no
+// reason. Resets on every call, not just added to.
+async function applySolutionWordOverrides(words) {
+  dictionaryValidator.clearSessionOverrides();
+  const overrideWords = [];
+  for (const word of words) {
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await dictionaryValidator.validateWord(word.toLowerCase());
+    if (existing.isValid !== true) {
+      dictionaryValidator.addSessionOverride(word);
+      overrideWords.push(word);
+    }
+  }
+  return overrideWords;
+}
+
 async function applyBoardFromInputs() {
   const values = {
     top: boardTopInput?.value,
@@ -469,27 +495,8 @@ async function applyBoardFromInputs() {
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
 
-  // Whitelist the solution words this board was generated from — a proper
-  // noun or another game's word can define the board shape but still fail
-  // normal dictionary validation, which would make the puzzle unsolvable
-  // by its own intended solution. Scoped to this custom board only: reset
-  // on every apply, not just added to.
-  //
-  // Skip words that are already real dictionary words: validateWord checks
-  // session overrides before the packed dictionaries, so overriding an
-  // already-valid word would silently swap its accepted-word badge from
-  // Primary/Fallback/Both to "Custom" for no reason.
-  dictionaryValidator.clearSessionOverrides();
   const solutionWords = persistedSolutionWordsText ? persistedSolutionWordsText.split(/\s+/).filter(Boolean) : [];
-  const overrideWords = [];
-  for (const word of solutionWords) {
-    // eslint-disable-next-line no-await-in-loop
-    const existing = await dictionaryValidator.validateWord(word.toLowerCase());
-    if (existing.isValid !== true) {
-      dictionaryValidator.addSessionOverride(word);
-      overrideWords.push(word);
-    }
-  }
+  const overrideWords = await applySolutionWordOverrides(solutionWords);
 
   trackPuzzleLoad('custom', '');
   closeBoardModal();
@@ -561,6 +568,12 @@ async function generateBoardFromWordsInput() {
   // puzzle is actually loaded (see the puzzleFetcher applyBoard callback).
   persistedSolutionWordsText = words.join(' ');
 
+  // Non-blocking, like the dictionary-recognition check below: the board's
+  // letter layout is still valid either way, but a chain break means these
+  // words can't actually be submitted back-to-back in normal chained play
+  // (they'd still work individually via a session override once applied).
+  const chainBreaks = findChainBreaks(words);
+
   // Non-blocking, unlike the blocklist gate above: a word simply not being
   // in the dictionary doesn't mean it's disallowed — proper nouns and
   // vocabulary from other word games are fine, this is informational only.
@@ -573,16 +586,55 @@ async function generateBoardFromWordsInput() {
     }
   }
 
+  const warnings = [];
+  if (chainBreaks.length > 0) {
+    warnings.push(chainBreaks
+      .map((brk) => `"${brk.word}" must start with "${brk.requiredStart}" to follow "${brk.previousWord}" in normal play`)
+      .join('; '));
+  }
   if (unrecognized.length > 0) {
     const plural = unrecognized.length > 1;
-    setBoardInputMessage(
-      `Generated a board, but ${plural ? 'these words are' : 'this word is'} not recognized by the dictionary: ${unrecognized.join(', ')}. Review and Apply Board.`,
-      'success',
-    );
+    warnings.push(`${plural ? 'these words are' : 'this word is'} not recognized by the dictionary: ${unrecognized.join(', ')}`);
+  }
+
+  if (warnings.length > 0) {
+    setBoardInputMessage(`Generated a board, but ${warnings.join('. Also, ')}. Review and Apply Board.`, 'success');
     return;
   }
 
   setBoardInputMessage('Generated a valid board from solution words. Review and Apply Board.', 'success');
+}
+
+async function copyShareLink({ solved }) {
+  const board = gameEngine.getBoard();
+  const words = persistedSolutionWordsText ? persistedSolutionWordsText.split(/\s+/).filter(Boolean) : [];
+  const effectiveSolved = solved && words.length > 0;
+
+  let hash;
+  try {
+    hash = encodeShareHash({ board, words, solved: effectiveSolved });
+  } catch {
+    setBoardInputMessage('Could not build a share link for this board.', 'error');
+    return;
+  }
+
+  const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+
+  if (!navigator.clipboard?.writeText) {
+    setBoardInputMessage(`Clipboard write is unavailable. Copy this link manually: ${url}`, 'error');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
+    if (solved && !effectiveSolved) {
+      setBoardInputMessage('This board has no known solution words to share as solved, so an unsolved link was copied instead.', 'success');
+      return;
+    }
+    setBoardInputMessage(effectiveSolved ? 'Copied a solved share link to your clipboard.' : 'Copied a share link to your clipboard.', 'success');
+  } catch {
+    setBoardInputMessage(`Could not copy automatically. Copy this link manually: ${url}`, 'error');
+  }
 }
 
 async function pasteBoardFromClipboard() {
@@ -670,6 +722,8 @@ function wireEvents() {
   pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
   generateBoardButton?.addEventListener('click', generateBoardFromWordsInput);
+  copyShareLinkButton?.addEventListener('click', () => copyShareLink({ solved: false }));
+  copySolvedLinkButton?.addEventListener('click', () => copyShareLink({ solved: true }));
 
   helpModal?.addEventListener('click', (event) => {
     if (event.target === helpModal) {
@@ -777,6 +831,53 @@ function wireEvents() {
   });
 }
 
+// Replays a solved link's words through the real engine, exactly the way a
+// player would type them, so the resulting state (found words, used
+// letters, pipe routes) is indistinguishable from an actual solve.
+async function replaySolvedWords(words) {
+  for (const word of words) {
+    // After the first word, the engine auto-seeds the builder with the
+    // required next starting letter — only append what's left to type.
+    const already = gameEngine.getSnapshot().tokens.map((token) => token.letter).join('');
+    const lower = word.toLowerCase();
+    const remaining = lower.startsWith(already) ? lower.slice(already.length) : lower;
+    for (const letter of remaining) {
+      gameEngine.appendToken(letter);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await gameEngine.submitWord();
+  }
+}
+
+async function hydrateSharedPuzzle(words, solved) {
+  await applySolutionWordOverrides(words);
+
+  if (solved && words.length > 0) {
+    await replaySolvedWords(words);
+    setMessage('Loaded a shared, completed puzzle.', 'success');
+    return;
+  }
+
+  setMessage('Loaded a shared puzzle. Forge away.', 'success');
+}
+
+// Synchronous on purpose: the board itself must be applied immediately (and
+// puzzleFetcher told not to load today's puzzle over it) before any async
+// work starts. The word-override/solved-replay part continues in the
+// background via hydrateSharedPuzzle.
+function tryLoadSharedPuzzleFromHash() {
+  const decoded = decodeShareHash(window.location.hash);
+  if (!decoded) {
+    return false;
+  }
+
+  gameEngine.applyBoardDefinition(decoded.board);
+  puzzleFetcher.markCustomBoard();
+  hydrateSharedPuzzle(decoded.words, decoded.solved);
+
+  return true;
+}
+
 function initializeGame() {
   gameEngine = createGameEngine({
     initialBoard: buildBoard(),
@@ -817,10 +918,21 @@ function initializeGame() {
 
   setMessage('Double letters are welcome here: tap a letter twice or use x2.');
 
-  puzzleFetcher.markRandomBoard();
+  const sharedPuzzleLoaded = tryLoadSharedPuzzleFromHash();
+
+  if (!sharedPuzzleLoaded) {
+    puzzleFetcher.markRandomBoard();
+  }
   renderUi();
 
-  puzzleFetcher.loadDailyPuzzleCatalog().then(() => {
+  // The catalog still loads either way — Next/Previous/Today's Puzzle need
+  // it — but a shared link's board must not be replaced by today's puzzle.
+  puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: !sharedPuzzleLoaded }).then(() => {
+    if (sharedPuzzleLoaded) {
+      renderUi();
+      return;
+    }
+
     const pState = puzzleFetcher.getState();
     const puzzleId = pState.puzzleSource === 'catalog'
       ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')

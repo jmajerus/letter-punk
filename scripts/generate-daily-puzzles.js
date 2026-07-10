@@ -126,6 +126,30 @@ function unionSize(wordA, wordB) {
   return set.size;
 }
 
+// Mirrors public/modules/buildLogic.js's findChainBreaks. Duplicated rather
+// than shared, matching this script's existing standalone copy of
+// generateBoardFromSolutionWords — auto-generated companions are already
+// guaranteed chainable by pickDeterministicCompanion's own candidate
+// filter, so this only ever catches manually-authored solutionWords or a
+// manually-provided companionWord in puzzle-seeds.json.
+function findChainBreaks(words) {
+  const breaks = [];
+  for (let index = 1; index < words.length; index += 1) {
+    const previous = words[index - 1];
+    const current = words[index];
+    if (!previous || !current) {
+      continue;
+    }
+
+    const requiredStart = previous[previous.length - 1];
+    if (current[0] !== requiredStart) {
+      breaks.push({ word: current, previousWord: previous, requiredStart });
+    }
+  }
+
+  return breaks;
+}
+
 function wordsFromSolutionEntry(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -355,6 +379,17 @@ function buildPuzzleEntry(id, seedEntry, dictionaryWords, blockedWords) {
     if (blockedWords.has(word)) {
       throw new Error(`${id}: solution word "${word}" is on the blocklist (public/data/dictionary-blocklist.txt).`);
     }
+  }
+
+  // Hard failure, unlike the client-side tool's non-blocking warning for the
+  // same check: this produces a permanent, published catalog entry, so a
+  // puzzle that isn't solvable via normal chained play should never ship.
+  const chainBreaks = findChainBreaks(solutionWords);
+  if (chainBreaks.length > 0) {
+    const details = chainBreaks
+      .map((brk) => `"${brk.word}" must start with "${brk.requiredStart}" to follow "${brk.previousWord}"`)
+      .join('; ');
+    throw new Error(`${id}: solution words are not chainable in normal play: ${details}.`);
   }
 
   const generated = generateBoardFromSolutionWords(solutionWords);

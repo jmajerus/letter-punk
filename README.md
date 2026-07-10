@@ -16,7 +16,9 @@ Project-specific additions can be placed in `public/data/dictionary-overrides.tx
 
 Project-specific removals can be placed in `public/data/dictionary-blocklist.txt` and are subtracted during `npm run build:dictionary`.
 
-Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client.
+Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client. Rebuild the catalog from `puzzle-seeds.json` with `npm run build:puzzles` (add `:dry` to preview without writing). Generation enforces `public/data/dictionary-blocklist.txt` — a blocked word can never be auto-picked as a companion, and a manually-authored `solutionWords`/`companionWord` in the seed file that's blocked, or that isn't actually chainable in normal play (each word after the first must start with the previous word's last letter), fails the build rather than shipping a broken puzzle.
+
+Check whether a specific word is recognized, blocked, or overridden with `npm run check-word -- WORD [WORD...]` — it reads the same packed dictionaries and blocklist the live game uses, and warns if the packed dictionaries look older than their sources.
 
 Rebuild the packed dictionary with `npm run build:dictionary`.
 
@@ -60,7 +62,7 @@ Recommended dictionary layering:
 - `public/data/scowl.txt`: plain-text backup base source if a Hunspell dictionary has not been added yet.
 - `public/data/3of6game.txt`: compatibility fallback that is packed separately and checked alongside the primary dictionary at runtime.
 - `public/data/dictionary-overrides.txt`: small allowlist for temporary or project-specific additions.
-- `public/data/dictionary-blocklist.txt`: small denylist for words you decide are poor fits for gameplay.
+- `public/data/dictionary-blocklist.txt`: denylist for words you decide are poor fits for gameplay. Subtracted from the packed dictionaries (`npm run build:dictionary`) *and* excluded from daily-puzzle companion-word selection (`npm run build:puzzles`) — one file, both build steps.
 
 Deploy with:
 
@@ -84,10 +86,13 @@ Why Letter Punk Exists:
 Repo structure:
 
 - `public/` static site files served by Workers or Pages
-- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`
 - `public/app.js` app bootstrap and UI orchestration
+- `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from `puzzle-seeds.json`
+- `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
+- `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
 - `wrangler.toml` Cloudflare Worker config
-- `test/` Node built-in test runner suite for `public/modules/gameLogic.js` and `public/modules/dictionaryValidator.js`
+- `test/` Node built-in test runner suite — see `docs/testing.md` for current coverage
 - `docs/ai-edit-map.md` AI agent routing guide and prompt templates
 - `docs/testing.md` test coverage summary and how to add new tests
 - `README.md` project and deployment notes
@@ -159,7 +164,8 @@ Current feature set:
 - Compact puzzle navigation controls: previous (`<`), next (`>`), and return-to-home (`Today's Puzzle`).
 - Play-ahead and archive traversal across catalog entries.
 - "Yesterday/Previous" modal showing canonical solution words for the prior catalog puzzle.
-- Custom board tools: paste/parse board text and generate a valid board from solution words.
+- Custom board tools: paste/parse board text, or generate a board from two solution words. A single word is treated as a seed and paired with a randomly-selected, non-blocked companion word found by searching the live packed dictionaries. Non-blocking warnings flag words the dictionary doesn't recognize or a word pair that isn't actually chainable in normal play; blocked words are always rejected outright. Solution words that aren't real dictionary entries (proper nouns, another game's vocabulary) are still guaranteed solvable once applied, via a per-board session override that never overrides a word already valid on its own.
+- Shareable puzzle links: "Copy Share Link" / "Copy Solved Link" in the board-setup dialog encode the active board (and, for the solved variant, a replay of its solution) into a compact URL fragment. Solution words are never written as plain text — each letter is stored as its board position, obfuscated by a shift keyed to the word's own length — so a recipient's address bar doesn't hand them the answer before they've opened the link.
 - Route history rendering with recency fading so active routes stay emphasized while retaining additive context.
 - Reduced-motion setting that preserves readability while limiting animation.
 - Keyboard/focus-aware modal behavior with focus trapping and escape-to-close support.

@@ -198,7 +198,7 @@ export function createPuzzleFetcher(options = {}) {
     };
   }
 
-  async function loadDailyPuzzleCatalog() {
+  async function loadDailyPuzzleCatalog({ applyBoard: shouldApplyBoard = true } = {}) {
     const todayYear = getTodayPuzzleId().slice(0, 4);
     function withYearQuery(url) {
       try {
@@ -247,7 +247,13 @@ export function createPuzzleFetcher(options = {}) {
       const initialIndex = findInitialPuzzleIndex(state.puzzleCatalog);
       if (initialIndex >= 0) {
         state.homePuzzleIndex = initialIndex;
-        applyCatalogPuzzle(initialIndex);
+        // When false, the catalog (and therefore Next/Previous/Today's
+        // Puzzle navigation) still loads normally, but today's board is
+        // not applied over whatever is currently shown — used when a
+        // shared-puzzle link has already applied its own board.
+        if (shouldApplyBoard) {
+          applyCatalogPuzzle(initialIndex);
+        }
         return { loaded: true, source: 'catalog' };
       }
     } catch {
