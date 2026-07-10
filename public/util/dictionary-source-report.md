@@ -1,17 +1,17 @@
 # Dictionary Source Diff Report
 
-Generated: 2026-07-08T04:02:11.716Z
+Generated: 2026-07-10T03:02:21.615Z
 
 ## Summary
 
 | Metric | Value |
 | --- | ---: |
 | Primary source | public/data/en_US.dic |
-| Primary words | 88573 |
-| Primary-only words | 30356 |
-| Shared words | 58217 |
+| Primary words | 88565 |
+| Primary-only words | 30351 |
+| Shared words | 58214 |
 | Fallback source | public/data/3of6game.txt |
-| Fallback words | 61383 |
+| Fallback words | 61380 |
 | Fallback-only words | 3166 |
 
 ## Primary-Only Preview (+)
@@ -137,7 +137,7 @@ Generated: 2026-07-08T04:02:11.716Z
 + ACCEPTATION
 + ACCEPTATIONS
 + ACCIDENTALS
-+ ... and 30236 more
++ ... and 30231 more
 ```
 
 ## Fallback-Only Preview (-)

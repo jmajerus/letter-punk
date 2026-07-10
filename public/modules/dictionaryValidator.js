@@ -7,6 +7,8 @@ export const PACKED_DICTIONARY_SOURCES = [
   { key: 'fallback-packed-dawg', url: 'util/compressed-dictionary-fallback.txt', optional: true },
 ];
 
+export const DEFAULT_BLOCKLIST_URL = 'data/dictionary-blocklist.txt';
+
 export function getValidationSourceLabel(sourceKey) {
   if (sourceKey === 'primary-packed-dawg') {
     return 'Primary';
@@ -55,12 +57,44 @@ export function createDictionaryValidator(options = {}) {
   const {
     sources = PACKED_DICTIONARY_SOURCES,
     fallbackApiUrl = '',
+    blocklistUrl = DEFAULT_BLOCKLIST_URL,
     fetchImpl = fetch,
     ptrieFactory = () => window.DawgLookup?.PTrie,
   } = options;
 
   const packedDictionaryPromises = new Map();
   const validationCache = new Map();
+  let blocklistPromise = null;
+
+  // Distinct from validateWord: a word can be "not found" (typo, proper
+  // noun, vocabulary from another game — informational only) or explicitly
+  // "blocked" (offensive content — always rejected, no exceptions). The
+  // packed dictionaries alone can't tell these apart, since blocked words
+  // are simply absent from them just like any other unrecognized word.
+  function loadBlocklist() {
+    if (!blocklistPromise) {
+      blocklistPromise = fetchImpl(blocklistUrl)
+        .then((response) => (response.ok ? response.text() : ''))
+        .then((text) => new Set(
+          (text || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim().toUpperCase())
+            .filter(Boolean),
+        ))
+        // Fails open: a network hiccup on this supplementary check
+        // shouldn't lock a player out of the custom-board tool. The
+        // authoritative guard is build-time exclusion from the packed
+        // dictionaries and the daily-puzzle catalog, both unaffected here.
+        .catch(() => new Set());
+    }
+
+    return blocklistPromise;
+  }
+
+  async function isBlocked(word) {
+    const blockedWords = await loadBlocklist();
+    return blockedWords.has(String(word || '').trim().toUpperCase());
+  }
 
   function loadPackedDictionary(source) {
     if (!packedDictionaryPromises.has(source.key)) {
@@ -196,8 +230,71 @@ export function createDictionaryValidator(options = {}) {
     };
   }
 
+  function toLetterSet(word) {
+    return new Set(word.split(''));
+  }
+
+  function unionSize(wordA, wordB) {
+    const set = toLetterSet(wordA);
+    for (const letter of wordB) {
+      set.add(letter);
+    }
+    return set.size;
+  }
+
+  /**
+   * Finds a companion word for a single-word "seed": a word starting with
+   * the seed's last letter whose combined unique letters with the seed
+   * total exactly 12 (a full board), excluding blocked words. Mirrors
+   * scripts/generate-daily-puzzles.js's pickDeterministicCompanion, but
+   * picks randomly among valid candidates (this is an interactive one-off
+   * tool, not a reproducible daily puzzle) and enumerates candidates via
+   * the already-loaded packed dictionaries' prefix search rather than a
+   * separate plain-text word list fetch.
+   */
+  async function findCompanionWord(seedWord) {
+    const seed = String(seedWord || '').trim().toLowerCase();
+    if (seed.length < 3) {
+      return { error: 'Seed word must be at least 3 letters.' };
+    }
+
+    if (toLetterSet(seed).size >= 12) {
+      return { error: 'Seed word already uses 12 or more unique letters.' };
+    }
+
+    const seedLast = seed[seed.length - 1];
+    const blockedWords = await loadBlocklist();
+    const candidateWords = new Set();
+
+    for (const source of sources) {
+      // eslint-disable-next-line no-await-in-loop
+      const trie = await loadPackedDictionary(source);
+      if (!trie) {
+        continue;
+      }
+      for (const word of trie.completions(seedLast)) {
+        candidateWords.add(word);
+      }
+    }
+
+    const candidates = [...candidateWords].filter((word) => (
+      word !== seed
+      && !blockedWords.has(word.toUpperCase())
+      && unionSize(seed, word) === 12
+    ));
+
+    if (candidates.length === 0) {
+      return { error: `No companion word found for "${seed.toUpperCase()}".` };
+    }
+
+    const companionWord = candidates[Math.floor(Math.random() * candidates.length)];
+    return { companionWord, candidateCount: candidates.length };
+  }
+
   return {
     validateWord,
+    isBlocked,
+    findCompanionWord,
     clearCache() {
       validationCache.clear();
     },

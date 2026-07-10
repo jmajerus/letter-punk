@@ -4,6 +4,7 @@ import {
   createDictionaryValidator,
   getValidationSourceLabel,
   summarizeValidationSources,
+  DEFAULT_BLOCKLIST_URL,
 } from '../public/modules/dictionaryValidator.js';
 
 const PRIMARY_URL = 'util/compressed-dictionary.txt';
@@ -23,6 +24,10 @@ function fakePTrieFactory() {
 
     isWord(word) {
       return this.words.has(word);
+    }
+
+    completions(prefix) {
+      return [...this.words].filter((word) => word.startsWith(prefix));
     }
   };
 }
@@ -142,6 +147,145 @@ test('validateWord falls back to the API when no local dictionary is reachable',
   const result = await validator.validateWord('cat');
   assert.equal(result.isValid, true);
   assert.equal(result.source, 'fallback-api');
+});
+
+test('isBlocked matches blocklist entries case-insensitively and rejects everything else', async () => {
+  const fetchImpl = async (url) => {
+    if (url === DEFAULT_BLOCKLIST_URL) {
+      return { ok: true, status: 200, text: async () => 'NEGRO\nPIKEY\n' };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: [], fetchImpl });
+
+  assert.equal(await validator.isBlocked('negro'), true);
+  assert.equal(await validator.isBlocked('NEGRO'), true);
+  assert.equal(await validator.isBlocked('PiKeY'), true);
+  assert.equal(await validator.isBlocked('cat'), false, 'a word not on the blocklist must not be flagged as blocked');
+});
+
+test('isBlocked distinguishes "blocked" from "not found" — this is the whole point of the method', async () => {
+  // isBlocked and validateWord must disagree here: "zzz" is neither a real
+  // word nor blocked, while "negro" is blocked specifically, not merely
+  // absent from the dictionary. Conflating the two was the actual bug this
+  // method exists to fix (see app.js's generateBoardFromWordsInput).
+  const fetchImpl = async (url) => {
+    if (url === DEFAULT_BLOCKLIST_URL) {
+      return { ok: true, status: 200, text: async () => 'NEGRO\n' };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: [], fetchImpl });
+
+  assert.equal(await validator.isBlocked('negro'), true);
+  assert.equal(await validator.isBlocked('zzz'), false);
+});
+
+test('isBlocked fetches the blocklist at most once, regardless of how many words are checked', async () => {
+  let fetchCount = 0;
+  const fetchImpl = async (url) => {
+    if (url === DEFAULT_BLOCKLIST_URL) {
+      fetchCount += 1;
+      return { ok: true, status: 200, text: async () => 'NEGRO\n' };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: [], fetchImpl });
+
+  await validator.isBlocked('negro');
+  await validator.isBlocked('cat');
+  await validator.isBlocked('pikey');
+
+  assert.equal(fetchCount, 1);
+});
+
+test('isBlocked fails open (returns false) when the blocklist cannot be fetched', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 404 });
+  const validator = createDictionaryValidator({ sources: [], fetchImpl });
+
+  assert.equal(await validator.isBlocked('negro'), false, 'a network hiccup on this supplementary check should not lock out the custom-board tool');
+});
+
+test('isBlocked respects a custom blocklistUrl option', async () => {
+  const fetchImpl = async (url) => {
+    if (url === 'custom-blocklist.txt') {
+      return { ok: true, status: 200, text: async () => 'BADWORD\n' };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: [], fetchImpl, blocklistUrl: 'custom-blocklist.txt' });
+
+  assert.equal(await validator.isBlocked('badword'), true);
+});
+
+// Seed "adg" has 3 unique letters {a,d,g}. A valid companion must start
+// with 'g' and, combined with the seed, total exactly 12 unique letters —
+// so it needs 'g' plus 9 other distinct new letters (10 distinct total).
+const COMPANION_SEED = 'adg';
+const VALID_COMPANION_A = 'gbcefhijkl'; // g,b,c,e,f,h,i,j,k,l (10 distinct) + a,d,g = 12
+const VALID_COMPANION_B = 'gbcefhijkm'; // same shape, different last letter
+
+test('findCompanionWord finds a word starting with the seed\'s last letter that totals 12 unique letters', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [VALID_COMPANION_A], [FALLBACK_URL]: [] });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.equal(result.companionWord, VALID_COMPANION_A);
+  assert.equal(result.candidateCount, 1);
+});
+
+test('findCompanionWord searches across both dictionary sources', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [VALID_COMPANION_A] });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.equal(result.companionWord, VALID_COMPANION_A);
+});
+
+test('findCompanionWord never returns a blocklisted candidate', async () => {
+  const fetchImpl = async (url) => {
+    if (url === PRIMARY_URL) {
+      return { ok: true, status: 200, text: async () => JSON.stringify([VALID_COMPANION_A, VALID_COMPANION_B]) };
+    }
+    if (url === FALLBACK_URL) {
+      return { ok: true, status: 200, text: async () => JSON.stringify([]) };
+    }
+    if (url === DEFAULT_BLOCKLIST_URL) {
+      return { ok: true, status: 200, text: async () => `${VALID_COMPANION_A}\n` };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: SOURCES, fetchImpl, ptrieFactory: fakePTrieFactory });
+
+  // Run several times since selection is random among candidates — the
+  // blocked word must never come back, not just usually.
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await validator.findCompanionWord(COMPANION_SEED);
+    assert.equal(result.companionWord, VALID_COMPANION_B, 'the blocklisted candidate must never be selected');
+  }
+});
+
+test('findCompanionWord rejects seeds shorter than 3 letters', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  const result = await validator.findCompanionWord('ab');
+  assert.match(result.error, /at least 3 letters/);
+});
+
+test('findCompanionWord rejects a seed that already uses 12 or more unique letters', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  const result = await validator.findCompanionWord('abcdefghijkl');
+  assert.match(result.error, /already uses 12 or more/);
+});
+
+test('findCompanionWord reports an error when no candidate satisfies the letter constraint', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: ['gxy'], // starts with 'g' but far too few unique letters
+    [FALLBACK_URL]: [],
+  });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.match(result.error, /No companion word found/);
 });
 
 test('getValidationSourceLabel maps known source keys to display labels', () => {

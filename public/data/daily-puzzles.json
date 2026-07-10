@@ -59,18 +59,18 @@
   {
     "id": "2026-07-04",
     "board": {
-      "top": "AEI",
-      "right": "SFC",
-      "bottom": "RPH",
-      "left": "LGT"
+      "top": "SFO",
+      "right": "AHP",
+      "bottom": "RLE",
+      "left": "ITD"
     },
     "canonicalSolution": [
       "SASSAFRAS",
-      "SPACEFLIGHT"
+      "SHOPLIFTED"
     ],
     "metadata": {
       "seedWord": "SASSAFRAS",
-      "companionWord": "SPACEFLIGHT",
+      "companionWord": "SHOPLIFTED",
       "companionSource": "auto-dictionary",
       "companionCandidateCount": 238
     }
@@ -91,7 +91,7 @@
       "seedWord": "COMPLETION",
       "companionWord": "NOTEBOOKS",
       "companionSource": "auto-dictionary",
-      "companionCandidateCount": 345
+      "companionCandidateCount": 342
     }
   },
   {
@@ -167,7 +167,7 @@
       "seedWord": "SIMPLETON",
       "companionWord": "NAIVETY",
       "companionSource": "auto-dictionary",
-      "companionCandidateCount": 288
+      "companionCandidateCount": 287
     }
   },
   {
@@ -433,7 +433,7 @@
       "seedWord": "AQUARIUM",
       "companionWord": "MICROSECONDS",
       "companionSource": "auto-dictionary",
-      "companionCandidateCount": 441
+      "companionCandidateCount": 440
     }
   },
   {
@@ -1256,20 +1256,20 @@
   {
     "id": "2026-09-05",
     "board": {
-      "top": "AIE",
-      "right": "TVO",
-      "bottom": "PNG",
-      "left": "CRS"
+      "top": "TVE",
+      "right": "AIN",
+      "bottom": "POS",
+      "left": "CRD"
     },
     "canonicalSolution": [
       "CAPTIVATION",
-      "NEGRESSES"
+      "NONRESIDENTS"
     ],
     "metadata": {
       "seedWord": "CAPTIVATION",
-      "companionWord": "NEGRESSES",
+      "companionWord": "NONRESIDENTS",
       "companionSource": "auto-dictionary",
-      "companionCandidateCount": 265
+      "companionCandidateCount": 262
     }
   },
   {

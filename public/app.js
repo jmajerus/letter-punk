@@ -190,9 +190,15 @@ const renderer = createBoardRenderer({
   },
 });
 
+// Persists across "Set Board" modal opens/closes as long as the same puzzle
+// stays loaded — cleared only when puzzleFetcher actually loads a different
+// board (see the applyBoard callback below), not on every modal open.
+let persistedSolutionWordsText = '';
+
 const puzzleFetcher = createPuzzleFetcher({
   puzzlesUrl: '/api/puzzles',
   applyBoard(nextBoard) {
+    persistedSolutionWordsText = '';
     gameEngine.applyBoardDefinition(nextBoard);
   },
 });
@@ -211,7 +217,7 @@ function fillBoardInputsFromCurrentBoard() {
   }
 
   if (solutionWordsInput) {
-    solutionWordsInput.value = '';
+    solutionWordsInput.value = persistedSolutionWordsText;
   }
 }
 
@@ -466,8 +472,50 @@ function applyBoardFromInputs() {
   setMessage('Applied custom board. Forge away.');
 }
 
-function generateBoardFromWordsInput() {
-  const words = wordsFromSolutionInput(solutionWordsInput?.value || '');
+async function generateBoardFromWordsInput() {
+  let words = wordsFromSolutionInput(solutionWordsInput?.value || '');
+
+  // A single word is treated as a seed: find a companion word ourselves,
+  // the same way the daily-puzzle generator does, then continue below as
+  // if both words had been typed. Check the seed against the blocklist
+  // first — no point searching for a companion to an offensive seed.
+  if (words.length === 1) {
+    const [seed] = words;
+    if (await dictionaryValidator.isBlocked(seed)) {
+      setBoardInputMessage(`${seed} isn't allowed. Choose a different seed word.`, 'error');
+      return;
+    }
+
+    setBoardInputMessage(`Finding a companion word for ${seed}…`, '');
+    const companion = await dictionaryValidator.findCompanionWord(seed);
+    if (companion.error) {
+      setBoardInputMessage(companion.error, 'error');
+      return;
+    }
+
+    words = [seed, companion.companionWord.toUpperCase()];
+    if (solutionWordsInput) {
+      solutionWordsInput.value = words.join(' ');
+    }
+  }
+
+  // Hard gate, checked before anything else: blocked words are always
+  // rejected, with no "proper noun" or "other game" exception. This is
+  // distinct from dictionary recognition below, which is informational only.
+  const blocked = [];
+  for (const word of words) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await dictionaryValidator.isBlocked(word)) {
+      blocked.push(word);
+    }
+  }
+
+  if (blocked.length > 0) {
+    const plural = blocked.length > 1;
+    setBoardInputMessage(`${blocked.join(', ')} ${plural ? "aren't allowed" : "isn't allowed"}. Choose different solution words.`, 'error');
+    return;
+  }
+
   const generated = generateBoardFromSolutionWords(words);
   if (generated.error) {
     setBoardInputMessage(generated.error, 'error');
@@ -480,6 +528,32 @@ function generateBoardFromWordsInput() {
     bottom: generated.board[2].letters.join(''),
     left: generated.board[3].letters.join(''),
   });
+
+  // Persists in the input field across modal opens/closes until a different
+  // puzzle is actually loaded (see the puzzleFetcher applyBoard callback).
+  persistedSolutionWordsText = words.join(' ');
+
+  // Non-blocking, unlike the blocklist gate above: a word simply not being
+  // in the dictionary doesn't mean it's disallowed — proper nouns and
+  // vocabulary from other word games are fine, this is informational only.
+  const unrecognized = [];
+  for (const word of words) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await dictionaryValidator.validateWord(word.toLowerCase());
+    if (result.isValid === false) {
+      unrecognized.push(word);
+    }
+  }
+
+  if (unrecognized.length > 0) {
+    const plural = unrecognized.length > 1;
+    setBoardInputMessage(
+      `Generated a board, but ${plural ? 'these words are' : 'this word is'} not recognized by the dictionary: ${unrecognized.join(', ')}. Review and Apply Board.`,
+      'success',
+    );
+    return;
+  }
+
   setBoardInputMessage('Generated a valid board from solution words. Review and Apply Board.', 'success');
 }
 

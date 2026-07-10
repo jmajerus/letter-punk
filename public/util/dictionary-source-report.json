@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-08T04:02:11.716Z",
+  "generatedAt": "2026-07-10T03:02:21.615Z",
   "primary": {
     "source": "public/data/en_US.dic",
-    "wordCount": 88573,
-    "uniqueWordCount": 30356,
+    "wordCount": 88565,
+    "uniqueWordCount": 30351,
     "uniqueWords": [
       "AAA",
       "AACHEN",
@@ -17941,12 +17941,8 @@
       "NEGLECTFULLY",
       "NEGLECTFULNESS",
       "NEGOTIABILITY",
-      "NEGRESS",
-      "NEGRESSES",
       "NEGRITUDE",
-      "NEGRO",
       "NEGROES",
-      "NEGROID",
       "NEGROS",
       "NEH",
       "NEHEMIAH",
@@ -24396,7 +24392,6 @@
       "SHEENA",
       "SHEENIER",
       "SHEENIEST",
-      "SHEENY",
       "SHEEPFOLD",
       "SHEEPFOLDS",
       "SHEEPHERDER",
@@ -30365,7 +30360,7 @@
   },
   "fallback": {
     "source": "public/data/3of6game.txt",
-    "wordCount": 61383,
+    "wordCount": 61380,
     "uniqueWordCount": 3166,
     "uniqueWords": [
       "ABDOMINALS",
@@ -33536,5 +33531,5 @@
       "ZINGS"
     ]
   },
-  "sharedWordCount": 58217
+  "sharedWordCount": 58214
 }

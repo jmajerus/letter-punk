@@ -5,6 +5,7 @@
     "build:puzzles": "node scripts/generate-daily-puzzles.js",
     "build:puzzles:dry": "node scripts/generate-daily-puzzles.js --dry-run",
     "build:pipe-art": "node scripts/generate-pipe-art.js",
+    "check-word": "node scripts/check-word.js",
     "test": "node --test"
   },
   "dependencies": {
