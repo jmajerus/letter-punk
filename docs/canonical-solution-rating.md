@@ -2,7 +2,7 @@
 
 This document describes how Letter Punk rates a completed solve against a "canonical" reference solution, and why the design deliberately avoids computing the objectively best possible answer.
 
-The short version: **"canonical" means "the solution we picked," not "the best solution that exists."** Once that's the definition, a much simpler and more game-appropriate scoring system falls out — one that rewards two different kinds of player skill instead of pushing everyone toward the same narrow answer.
+The short version: **"canonical" means "the solution we picked," not "the best solution that exists."** Once that's the definition, a much simpler and more game-appropriate scoring system falls out — one that rewards three different kinds of player skill instead of pushing everyone toward the same narrow answer: efficiency, elaborateness, and precision.
 
 ## The Starting Point
 
@@ -20,11 +20,11 @@ That means a search that truly minimizes character count would first exhaust eve
 
 The fix wasn't a smarter search — it was rejecting the premise. "Canonical" doesn't have to mean "provably optimal." In every other case in the codebase (a daily puzzle's author-picked words, a custom board's seed-derived words), "canonical" already just means "the solution we happened to pick." Nothing about the word implies effort or optimality. Once that's accepted, there's no obligation to search exhaustively for anything — we just need to pick *a* reasonable reference, honestly, and not oversell what it is.
 
-## Symmetric Scoring Instead of One Winning Direction
+## Winning in the Center and to Either Side
 
 The original messaging (`gameLogic.js`) only had two branches: the player beat the canonical count, or matched it. A longer solve got no acknowledgment at all — silence, as if it wasn't worth mentioning. That silence was itself a value judgment: it implicitly treated "shorter" as the only praiseworthy outcome, the same bias that made exhaustive minimization a bad idea in the first place.
 
-The fix was to add a third branch that treats a longer solve as its own kind of accomplishment, not a lesser one:
+The fix adds a third branch, but the more important shift is treating all three outcomes as equally deliberate goals rather than "two directions plus a tie":
 
 ```js
 // public/modules/gameLogic.js
@@ -38,7 +38,13 @@ if (playerCharacterCount < canonicalCharacterCount) {
 }
 ```
 
-Efficiency (fewest characters) and elaborateness (most creative reuse of the board) are framed as two different, equally valid skills — like a golf par versus a trick-shot leaderboard. Neither direction is "more correct." This applies to every puzzle source, not just computed boards, so a daily-puzzle player who finds a longer path now gets a genuine compliment instead of nothing.
+- **Shorter — efficiency.** Finding the tightest possible path through the board.
+- **Longer — elaborateness.** Deliberately weaving in extra letters and repeats: the double-letter mechanic put to full use.
+- **Exact match — precision.** Reading the puzzle well enough to land squarely on the reference count on a genuine first attempt.
+
+The exact-match case is worth calling out specifically, because it's easy to file it away as a rounding-error tie rather than a real achievement. Beating or exceeding the canonical count is an open target — many different word combinations satisfy "fewer than N" or "more than N." Landing on exactly N, via a word choice that isn't just the reference solution replayed after seeing it (e.g. via "Yesterday"), is a single point in a much larger space. It's likely rare in real play, which is exactly why it earns its own message instead of folding invisibly into a generic "you solved it."
+
+None of the three is "more correct" than the others — efficient, elaborate, and precise are just different, equally valid ways to be good at this game. This applies to every puzzle source, not just computed boards, so a daily-puzzle player who finds a longer path — or lands exactly on par — now gets a genuine compliment instead of nothing.
 
 ## Picking a Reference Without an Exhaustive Search
 
@@ -70,5 +76,5 @@ If your game has a "beat the designer's solution" scoring mechanic:
 
 - Decide what "canonical" is allowed to mean *before* you build a solver for it. If it just means "a reference we chose," you don't owe players (or yourself) a proof of optimality.
 - Check whether your scoring metric quietly penalizes a mechanic your game is supposed to celebrate. Minimizing a raw count is an easy trap when the count itself is only low *because* a feature was avoided.
-- If there's more than one legitimate way to be "good" at your game (efficient vs. elaborate, fast vs. thorough, safe vs. risky), score both directions instead of picking one as correct and staying silent about the other.
+- If there's more than one legitimate way to be "good" at your game (efficient vs. elaborate, fast vs. thorough, safe vs. risky), score every direction — including landing exactly on the reference — instead of picking one as correct and staying silent about the rest. The exact-match case is often the rarest of the set and deserves its own recognition, not just a tie-breaker shrug.
 - A bounded, "good enough" search that reuses machinery you already have is usually a better trade than a purpose-built optimal solver — especially when "optimal" wasn't actually the right target to begin with.
