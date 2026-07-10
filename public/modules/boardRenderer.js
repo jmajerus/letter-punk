@@ -8,6 +8,56 @@ const HISTORY_OPACITY_MAX = 0.68;
 const HISTORY_OPACITY_MIN = 0.22;
 const HISTORY_JOINT_OPACITY_BOOST = 0.08;
 
+// Which labeled book-cover glyph(s) render for each dictionary-source badge.
+// A pictogram alone reads ambiguously at badge scale (could be a book,
+// could be a butterfly) — the short code on the cover does the actual
+// identifying work, the book shape is just supporting context. "Both"
+// renders as two covers side by side, one per source, rather than one
+// glyph trying to represent two things at once.
+const SOURCE_GLYPH_CODES = {
+  Primary: ['D1'],
+  Fallback: ['D2'],
+  Both: ['D1', 'D2'],
+  API: ['AP'],
+  Custom: ['CU'],
+};
+
+/**
+ * A small book-cover glyph with a short code (e.g. "D1") as its cover
+ * title. Drawn with currentColor so it always matches the badge's own
+ * text color, rather than a platform emoji that wouldn't.
+ */
+function createDictionaryGlyph(code) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 20 24');
+  svg.setAttribute('width', '21');
+  svg.setAttribute('height', '25');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'word-pill-source-glyph');
+
+  const cover = document.createElementNS(SVG_NS, 'rect');
+  cover.setAttribute('x', '1');
+  cover.setAttribute('y', '1');
+  cover.setAttribute('width', '18');
+  cover.setAttribute('height', '22');
+  cover.setAttribute('rx', '2.5');
+  cover.setAttribute('class', 'word-pill-source-glyph-cover');
+
+  const spine = document.createElementNS(SVG_NS, 'path');
+  spine.setAttribute('d', 'M3.5 1h-0.5a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h0.5z');
+  spine.setAttribute('class', 'word-pill-source-glyph-spine');
+
+  const text = document.createElementNS(SVG_NS, 'text');
+  text.setAttribute('x', '12');
+  text.setAttribute('y', '16');
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('class', 'word-pill-source-glyph-text');
+  text.textContent = code;
+
+  svg.append(cover, spine, text);
+  return svg;
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -605,14 +655,32 @@ export function createBoardRenderer(options) {
       pill.className = 'word-pill';
 
       const label = document.createElement('span');
+      label.className = 'word-pill-label';
       label.textContent = word.word;
       pill.append(label);
 
       if (badgesEnabled && word.validationBadge) {
         const sourceBadge = document.createElement('span');
         sourceBadge.className = 'word-pill-source';
-        sourceBadge.textContent = word.validationBadge;
         sourceBadge.title = word.validationDetail || '';
+
+        // The visible badge is glyphs only now — "Both" renders as two
+        // book covers (D1, D2) side by side rather than a single glyph
+        // trying to represent two sources at once. The full word
+        // ("Primary"/"Both"/...) still exists as screen-reader-only text,
+        // since a sighted user gets it from the glyph codes but that
+        // information would otherwise disappear entirely for anyone using
+        // assistive tech (the SVGs themselves are aria-hidden).
+        const codes = SOURCE_GLYPH_CODES[word.validationBadge] || [];
+        for (const code of codes) {
+          sourceBadge.append(createDictionaryGlyph(code));
+        }
+
+        const srLabel = document.createElement('span');
+        srLabel.className = 'sr-only';
+        srLabel.textContent = word.validationBadge;
+        sourceBadge.append(srLabel);
+
         pill.append(sourceBadge);
       }
 

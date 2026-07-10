@@ -262,6 +262,22 @@ test('solving the full board reports solved:true and the correct message when wo
   assert.match(lastMessage(events).text, /matched the canonical character count/);
 });
 
+test('solving with more characters than the canonical count still gets a positive message, not silence', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getCanonicalCharacterCount: () => 10, // fewer than the actual 14 characters played
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const finalResult = events.wordResults.at(-1);
+  assert.equal(finalResult.solved, true);
+  assert.match(lastMessage(events).text, /longer than the canonical 10-character solution/);
+});
+
 test('removeLastToken pops a letter, then backs up into the previous accepted word once empty', async () => {
   const { engine, events } = createHarness({ acceptedWords: ['adg'] });
   engine.appendToken('a');
@@ -301,4 +317,40 @@ test('backspacing past a restored previous word re-empties the builder and re-en
 
   engine.appendToken('g'); // the correct starting letter should now be accepted
   assert.deepEqual(engine.getSnapshot().tokens.map((t) => t.letter), ['g']);
+});
+
+test('lastValidationSummary does not linger after a later word is rejected', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg'] });
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  assert.equal(engine.getSnapshot().lastValidationSummary, 'Accepted by the mock dictionary.');
+
+  // "gdc" is a legal adjacency-valid continuation (required start 'g') but
+  // was never added to acceptedWords, so validateWord rejects it. Before
+  // the fix, the summary from "adg" stayed on screen next to the brand
+  // new "not found in the dictionary" message for a completely different
+  // word — a genuine bug report, not a hypothetical.
+  typeWord(engine, 'gdc');
+  await engine.submitWord();
+
+  assert.equal(engine.getSnapshot().lastValidationSummary, '', 'a rejected word must not leave the previous word\'s summary on screen');
+});
+
+test('lastValidationSummary clears on every early-return path, not just rejection', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg'] });
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  assert.equal(engine.getSnapshot().lastValidationSummary, 'Accepted by the mock dictionary.');
+
+  // Builder is auto-seeded with 'g' after the accept; back it out to empty
+  // so this submit attempt hits the "Add some letters first" early return,
+  // not the normal accept/reject path, and still clears the stale summary.
+  await engine.removeLastToken(); // lone seeded 'g' -> backs into 'adg': tokens=[a,d,g]
+  await engine.removeLastToken(); // pop -> [a,d]
+  await engine.removeLastToken(); // pop -> [a]
+  await engine.removeLastToken(); // pop -> []
+  assert.deepEqual(engine.getSnapshot().tokens, []);
+
+  await engine.submitWord();
+  assert.equal(engine.getSnapshot().lastValidationSummary, '');
 });

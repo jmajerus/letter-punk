@@ -264,18 +264,17 @@ test('findCompanionWord finds a word starting with the seed\'s last letter that 
   const { validator } = createValidator({ [PRIMARY_URL]: [VALID_COMPANION_A], [FALLBACK_URL]: [] });
 
   const result = await validator.findCompanionWord(COMPANION_SEED);
-  assert.equal(result.companionWord, VALID_COMPANION_A);
-  assert.equal(result.candidateCount, 1);
+  assert.deepEqual(result.candidates, [VALID_COMPANION_A]);
 });
 
 test('findCompanionWord searches across both dictionary sources', async () => {
   const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [VALID_COMPANION_A] });
 
   const result = await validator.findCompanionWord(COMPANION_SEED);
-  assert.equal(result.companionWord, VALID_COMPANION_A);
+  assert.deepEqual(result.candidates, [VALID_COMPANION_A]);
 });
 
-test('findCompanionWord never returns a blocklisted candidate', async () => {
+test('findCompanionWord never includes a blocklisted candidate', async () => {
   const fetchImpl = async (url) => {
     if (url === PRIMARY_URL) {
       return { ok: true, status: 200, text: async () => JSON.stringify([VALID_COMPANION_A, VALID_COMPANION_B]) };
@@ -290,13 +289,26 @@ test('findCompanionWord never returns a blocklisted candidate', async () => {
   };
   const validator = createDictionaryValidator({ sources: SOURCES, fetchImpl, ptrieFactory: fakePTrieFactory });
 
-  // Run several times since selection is random among candidates — the
-  // blocked word must never come back, not just usually.
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const result = await validator.findCompanionWord(COMPANION_SEED);
-    assert.equal(result.companionWord, VALID_COMPANION_B, 'the blocklisted candidate must never be selected');
-  }
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.deepEqual(result.candidates, [VALID_COMPANION_B], 'the blocklisted candidate must never appear');
+});
+
+test('findCompanionWord sorts candidates shortest to longest', async () => {
+  // Same 10 unique letters as VALID_COMPANION_A, with a repeated 'l' — a
+  // valid, longer candidate for the same seed.
+  const longer = 'gbcefhijkll';
+  const { validator } = createValidator({
+    [PRIMARY_URL]: [longer, VALID_COMPANION_A, VALID_COMPANION_B],
+    [FALLBACK_URL]: [],
+  });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.equal(result.candidates.length, 3);
+  assert.equal(result.candidates.at(-1), longer, 'the longest candidate should sort last');
+  assert.ok(
+    result.candidates.every((word, index, all) => index === 0 || word.length >= all[index - 1].length),
+    'candidates must be in non-decreasing length order',
+  );
 });
 
 test('findCompanionWord rejects seeds shorter than 3 letters', async () => {

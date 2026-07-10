@@ -14,6 +14,8 @@ This runs `node --test`, which auto-discovers every file under `test/`.
 
 - `test/gameLogic.test.js` — gameplay rules engine (`public/modules/gameLogic.js`)
 - `test/dictionaryValidator.test.js` — dictionary loading and validation (`public/modules/dictionaryValidator.js`)
+- `test/buildLogic.test.js` — chain-break detection (`public/modules/buildLogic.js`), partial coverage — see "Not covered yet"
+- `test/shareLink.test.js` — shareable-link encode/decode (`public/modules/shareLink.js`)
 - `public/modules/package.json` and `test/package.json` — each set `{"type": "module"}`, scoped only to their own directory. This lets Node resolve the existing `import`/`export` syntax in `public/modules/*.js` correctly without changing the root `package.json`, which must stay CommonJS for `scripts/generate-daily-puzzles.js` and `public/util/compile-dict.js` (both use `require`).
 
 ## Why these two modules first
@@ -33,20 +35,32 @@ One exception: `dictionaryValidator.js`'s API-fallback path reads `window.locati
 - Both "undo" controls end-to-end:
   - `removeLastToken` (single-character delete): nothing-to-undo, direct back-up on an already-empty builder, back-up from a locked lone starter, and generic mid-word pop
   - `clearTokens` (delete-word): already-clear, direct found-word removal on an empty builder, wiping an in-progress first word, the post-acceptance reset-to-starter, and the second-press remove-found-word
-- Full-board solve, including the canonical-character-count comparison messages
+- Full-board solve, including all three canonical-character-count comparison messages (beat, matched, and — as of the symmetric-scoring update described in [docs/canonical-solution-rating.md](canonical-solution-rating.md) — exceeded)
 
 **`dictionaryValidator.js`** (`createDictionaryValidator`):
 - Primary-only match, stacked (both dictionaries) match, and reachable-but-absent
 - Per-word result caching vs. `clearCache()` (dictionary fetches are cached independently and are not re-fetched by `clearCache()`)
 - API fallback when no local dictionary is reachable
+- `findCompanionWord` returns its full valid-candidate list sorted shortest to longest (not a single random pick — callers, e.g. `pickBalancedCompanion` in `public/app.js`, choose from it), excluding blocklisted words
 - `getValidationSourceLabel` and `summarizeValidationSources` helpers
+
+**`buildLogic.js`** (partial — see "Not covered yet"):
+- `findChainBreaks`: reports every word in a sequence that doesn't start with the previous word's last letter
+
+**`shareLink.js`** (`encodeShareHash`/`decodeShareHash`):
+- Exact-string encoding for a known example, round-trips for bare boards, canonical-only, progress-only, and mixed (partial-completion) links
+- Progress words are stored as plain text; canonical words stay obfuscated even when the puzzle is fully completed (so a receiving session can keep rating a player's final submission after they delete and retry words)
+- Malformed progress or canonical segments are dropped independently of one another rather than invalidating the whole link
+- Board and word validation errors (wrong letter count, out-of-board letters)
 
 The multi-word backspace path is worth calling out: after accepting two words, deleting back through the second word's letters resets an internal `starterLocked` flag, so continued deletes fully empty the builder while the *first* word's required starting letter is still active — typing the wrong letter at that point correctly triggers "This word must start with X." That interaction isn't obvious from reading `appendToken` or `removeLastToken` in isolation; `test/gameLogic.test.js` traces it step by step so a future refactor can't silently break it.
 
 ## Not covered yet
 
 - `boardRenderer.js` — SVG/DOM rendering; would need a DOM environment (e.g. `jsdom`) to test meaningfully, which is a bigger tooling addition than the pure-logic modules above.
-- `puzzleFetcher.js`, `buildLogic.js`, `historyManager.js`, `analyticsClient.js` — not yet covered. `buildLogic.js` in particular is a good next candidate: it's pure (no DOM/network) like the two modules above.
+- `buildLogic.js` beyond `findChainBreaks` — `wordsFromSolutionInput` and `generateBoardFromSolutionWords` (the letter-to-side layout solver) are untested. The layout solver is a good next candidate: it's pure and has real edge cases (infeasible adjacency graphs should fail cleanly, not throw).
+- `puzzleFetcher.js`, `historyManager.js`, `analyticsClient.js` — not yet covered.
+- `app.js` — no direct test coverage at all; anything that only lives there (`pickBalancedCompanion`'s median-outward search, `copyShareLink`, share-link hydration, modal wiring) is verified manually via headless-Chrome runs during development, not by the automated suite.
 
 ## Adding a new test
 

@@ -325,6 +325,18 @@ export function createGameEngine(options) {
   }
 
   async function submitWord() {
+    // Cleared unconditionally at the start of every attempt, not just
+    // patched onto the rejection path: every early return below (empty
+    // builder, invalid adjacency, too short, wrong starting letter,
+    // duplicate, dictionary unavailable) shares the same bug — none of
+    // them touched this, so a stale "Accepted by ..." from a previous
+    // successful word stayed on screen next to a brand new rejection
+    // message for a completely different word.
+    if (state.lastValidationSummary) {
+      state.lastValidationSummary = '';
+      emitStateChange();
+    }
+
     if (state.tokens.length === 0) {
       emitMessage('Add some letters first.', 'error');
       return;
@@ -417,6 +429,18 @@ export function createGameEngine(options) {
       ) {
         emitMessage(
           `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Nice work: you matched the canonical character count!`,
+          'success',
+        );
+        return;
+      }
+
+      if (
+        Number.isFinite(canonicalCharacterCount)
+        && canonicalCharacterCount > 0
+        && playerCharacterCount > canonicalCharacterCount
+      ) {
+        emitMessage(
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Ambitious: that's longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
           'success',
         );
         return;

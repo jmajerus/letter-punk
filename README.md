@@ -26,6 +26,8 @@ Each rebuild also writes `public/util/dictionary-source-report.json` (full uniqu
 
 For a reusable implementation write-up aimed at other game developers, see [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md).
 
+For the design reasoning behind rating a solve against a "canonical" solution — and why that scoring deliberately avoids computing the objectively best possible answer — see [Canonical Solution Rating: Designing a Score That Doesn't Fight Your Own Mechanic](docs/canonical-solution-rating.md).
+
 Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
 
 Run locally with:
@@ -95,6 +97,8 @@ Repo structure:
 - `test/` Node built-in test runner suite — see `docs/testing.md` for current coverage
 - `docs/ai-edit-map.md` AI agent routing guide and prompt templates
 - `docs/testing.md` test coverage summary and how to add new tests
+- `docs/dual-dictionary-validation.md` reusable write-up on the stacked dictionary pattern
+- `docs/canonical-solution-rating.md` design reasoning behind the canonical-solution scoring system
 - `README.md` project and deployment notes
 - `Letter-Boxed-Game-Logic-Copyright.md` concept notes
 
@@ -164,8 +168,9 @@ Current feature set:
 - Compact puzzle navigation controls: previous (`<`), next (`>`), and return-to-home (`Today's Puzzle`).
 - Play-ahead and archive traversal across catalog entries.
 - "Yesterday/Previous" modal showing canonical solution words for the prior catalog puzzle.
-- Custom board tools: paste/parse board text, or generate a board from two solution words. A single word is treated as a seed and paired with a randomly-selected, non-blocked companion word found by searching the live packed dictionaries. Non-blocking warnings flag words the dictionary doesn't recognize or a word pair that isn't actually chainable in normal play; blocked words are always rejected outright. Solution words that aren't real dictionary entries (proper nouns, another game's vocabulary) are still guaranteed solvable once applied, via a per-board session override that never overrides a word already valid on its own.
-- Shareable puzzle links: "Copy Share Link" / "Copy Solved Link" in the board-setup dialog encode the active board (and, for the solved variant, a replay of its solution) into a compact URL fragment. Solution words are never written as plain text — each letter is stored as its board position, obfuscated by a shift keyed to the word's own length — so a recipient's address bar doesn't hand them the answer before they've opened the link.
+- Custom board tools: paste/parse board text, or generate a board from two solution words. A single word is treated as a seed; a companion is picked from the full set of valid dictionary candidates by starting at the median length and walking outward until one actually produces a valid board layout (see [docs/canonical-solution-rating.md](docs/canonical-solution-rating.md)), rather than a purely random or shortest-possible pick. Non-blocking warnings flag words the dictionary doesn't recognize or a word pair that isn't actually chainable in normal play; blocked words are always rejected outright. Solution words that aren't real dictionary entries (proper nouns, another game's vocabulary) are still guaranteed solvable once applied, via a per-board session override that never overrides a word already valid on its own.
+- Canonical character-count rating: solving a board compares the player's total character count against a reference solution and reports beating, matching, *or* exceeding it — a longer, more double-letter-heavy solve is treated as its own kind of accomplishment, not a lesser one. Works for daily puzzles, custom boards, and shared links alike.
+- Shareable puzzle links: "Copy Share Link" (a fresh, unplayed board) / "Copy Progress Link" (wherever the sharer's own play currently stands — none, partial, or complete) in the board-setup dialog encode the active board into a compact URL fragment. Words already played are stored as plain text since they're immediately visible once the link opens; the canonical reference solution, when known, stays obfuscated — each letter stored as its board position, shifted by the word's own length — so a partially-shared puzzle doesn't spoil the unplayed remainder, and the reference solution survives so a recipient can freely retry and still be rated against it.
 - Route history rendering with recency fading so active routes stay emphasized while retaining additive context.
 - Reduced-motion setting that preserves readability while limiting animation.
 - Keyboard/focus-aware modal behavior with focus trapping and escape-to-close support.

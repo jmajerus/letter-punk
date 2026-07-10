@@ -64,7 +64,7 @@ const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
 const solutionWordsInput = document.getElementById('solutionWordsInput');
 const generateBoardButton = document.getElementById('generateBoardBtn');
 const copyShareLinkButton = document.getElementById('copyShareLinkBtn');
-const copySolvedLinkButton = document.getElementById('copySolvedLinkBtn');
+const copyProgressLinkButton = document.getElementById('copyProgressLinkBtn');
 const boardInputMessageElement = document.getElementById('boardInputMessage');
 
 const BOARD_INPUTS = {
@@ -194,15 +194,19 @@ const renderer = createBoardRenderer({
   },
 });
 
+// The known reference solution for the currently-applied board, if any.
 // Persists across "Set Board" modal opens/closes as long as the same puzzle
 // stays loaded — cleared only when puzzleFetcher actually loads a different
-// board (see the applyBoard callback below), not on every modal open.
-let persistedSolutionWordsText = '';
+// board (see the applyBoard callback below), not on every modal open. Feeds
+// three things: the solution-words input field, session dictionary
+// overrides, and the canonical character-count comparison, so a player can
+// freely delete/redo words and still be rated against it.
+let canonicalWords = [];
 
 const puzzleFetcher = createPuzzleFetcher({
   puzzlesUrl: '/api/puzzles',
   applyBoard(nextBoard) {
-    persistedSolutionWordsText = '';
+    canonicalWords = [];
     dictionaryValidator.clearSessionOverrides();
     gameEngine.applyBoardDefinition(nextBoard);
   },
@@ -222,7 +226,7 @@ function fillBoardInputsFromCurrentBoard() {
   }
 
   if (solutionWordsInput) {
-    solutionWordsInput.value = persistedSolutionWordsText;
+    solutionWordsInput.value = canonicalWords.join(' ');
   }
 }
 
@@ -243,7 +247,29 @@ function getPreviousSolutionUiLabels() {
   return puzzleFetcher.getNavigationState().previousLabels;
 }
 
+function sumWordLengths(words) {
+  let total = 0;
+  for (const word of words) {
+    const normalized = String(word || '').trim();
+    if (!normalized) {
+      continue;
+    }
+
+    total += normalized.length;
+  }
+
+  return total > 0 ? total : null;
+}
+
 function getActiveCanonicalCharacterCount() {
+  // Prefer the in-memory canonical words for the active session (set by
+  // custom-board generation or by loading a shared link) over the catalog
+  // lookup below — it reflects the board actually in play, including
+  // shared-link puzzles that a catalog lookup knows nothing about.
+  if (canonicalWords.length > 0) {
+    return sumWordLengths(canonicalWords);
+  }
+
   const puzzleState = puzzleFetcher.getState();
   if (puzzleState.puzzleSource !== 'catalog' || puzzleState.activePuzzleIndex < 0) {
     return null;
@@ -254,17 +280,7 @@ function getActiveCanonicalCharacterCount() {
     return null;
   }
 
-  let total = 0;
-  for (const word of entry.canonicalSolution) {
-    const normalized = String(word || '').trim();
-    if (!normalized) {
-      continue;
-    }
-
-    total += normalized.length;
-  }
-
-  return total > 0 ? total : null;
+  return sumWordLengths(entry.canonicalSolution);
 }
 
 function updatePuzzleNavigation() {
@@ -495,8 +511,7 @@ async function applyBoardFromInputs() {
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
 
-  const solutionWords = persistedSolutionWordsText ? persistedSolutionWordsText.split(/\s+/).filter(Boolean) : [];
-  const overrideWords = await applySolutionWordOverrides(solutionWords);
+  const overrideWords = await applySolutionWordOverrides(canonicalWords);
 
   trackPuzzleLoad('custom', '');
   closeBoardModal();
@@ -505,6 +520,42 @@ async function applyBoardFromInputs() {
       ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Forge away.`
       : 'Applied custom board. Forge away.',
   );
+}
+
+// A candidate list sorted shortest-to-longest gives us "the middle of the
+// pack" for free at the median index. Starting there and walking outward
+// (rather than trying candidates in sorted order) means we typically land
+// on a typically-sized companion within a handful of attempts, without
+// having to search for a true shortest or longest — generateBoardFromSolutionWords
+// is the only thing that actually knows whether a candidate's letters fit
+// some valid 4-side layout, so this has to try real layouts, not just
+// letter-set math.
+const MAX_COMPANION_LAYOUT_ATTEMPTS = 25;
+
+function medianOutwardOrder(length) {
+  const medianIndex = Math.floor(length / 2);
+  const order = [medianIndex];
+  for (let offset = 1; order.length < length; offset += 1) {
+    if (medianIndex - offset >= 0) {
+      order.push(medianIndex - offset);
+    }
+    if (medianIndex + offset < length) {
+      order.push(medianIndex + offset);
+    }
+  }
+  return order;
+}
+
+function pickBalancedCompanion(seedUpper, candidates) {
+  const order = medianOutwardOrder(candidates.length).slice(0, MAX_COMPANION_LAYOUT_ATTEMPTS);
+  for (const index of order) {
+    const companion = candidates[index];
+    if (!generateBoardFromSolutionWords([seedUpper, companion.toUpperCase()]).error) {
+      return companion;
+    }
+  }
+
+  return null;
 }
 
 async function generateBoardFromWordsInput() {
@@ -522,13 +573,19 @@ async function generateBoardFromWordsInput() {
     }
 
     setBoardInputMessage(`Finding a companion word for ${seed}…`, '');
-    const companion = await dictionaryValidator.findCompanionWord(seed);
-    if (companion.error) {
-      setBoardInputMessage(companion.error, 'error');
+    const companionResult = await dictionaryValidator.findCompanionWord(seed);
+    if (companionResult.error) {
+      setBoardInputMessage(companionResult.error, 'error');
       return;
     }
 
-    words = [seed, companion.companionWord.toUpperCase()];
+    const companion = pickBalancedCompanion(seed.toUpperCase(), companionResult.candidates);
+    if (!companion) {
+      setBoardInputMessage(`Found ${companionResult.candidates.length} companion candidates for ${seed}, but none produce a valid board layout. Try a different seed word.`, 'error');
+      return;
+    }
+
+    words = [seed, companion.toUpperCase()];
     if (solutionWordsInput) {
       solutionWordsInput.value = words.join(' ');
     }
@@ -564,9 +621,9 @@ async function generateBoardFromWordsInput() {
     left: generated.board[3].letters.join(''),
   });
 
-  // Persists in the input field across modal opens/closes until a different
-  // puzzle is actually loaded (see the puzzleFetcher applyBoard callback).
-  persistedSolutionWordsText = words.join(' ');
+  // Persists across modal opens/closes until a different puzzle is
+  // actually loaded (see the puzzleFetcher applyBoard callback).
+  canonicalWords = words;
 
   // Non-blocking, like the dictionary-recognition check below: the board's
   // letter layout is still valid either way, but a chain break means these
@@ -605,14 +662,28 @@ async function generateBoardFromWordsInput() {
   setBoardInputMessage('Generated a valid board from solution words. Review and Apply Board.', 'success');
 }
 
-async function copyShareLink({ solved }) {
+// includeProgress=false always shares a fresh board (any progress the
+// sharer has personally made is deliberately left out), useful for handing
+// someone an untouched challenge even after you've already played it
+// yourself. includeProgress=true shares exactly where the sharer's own
+// play currently stands — no words, a partial solve, or a full one — so a
+// friend can pick up and finish it, or just see the result. Either way the
+// known canonical words (if any) are still included, hidden, so the
+// receiving session can keep rating a final submission even after the
+// player deletes and reattempts words.
+async function copyShareLink({ includeProgress }) {
   const board = gameEngine.getBoard();
-  const words = persistedSolutionWordsText ? persistedSolutionWordsText.split(/\s+/).filter(Boolean) : [];
-  const effectiveSolved = solved && words.length > 0;
+  const snapshot = gameEngine.getSnapshot();
+
+  const progressWords = includeProgress
+    // foundWords is newest-first; reverse to the order they were actually
+    // found in, so a replay on the receiving end plays out the same way.
+    ? [...snapshot.foundWords].reverse().map((entry) => entry.word.toUpperCase())
+    : [];
 
   let hash;
   try {
-    hash = encodeShareHash({ board, words, solved: effectiveSolved });
+    hash = encodeShareHash({ board, progressWords, canonicalWords });
   } catch {
     setBoardInputMessage('Could not build a share link for this board.', 'error');
     return;
@@ -627,11 +698,12 @@ async function copyShareLink({ solved }) {
 
   try {
     await navigator.clipboard.writeText(url);
-    if (solved && !effectiveSolved) {
-      setBoardInputMessage('This board has no known solution words to share as solved, so an unsolved link was copied instead.', 'success');
-      return;
-    }
-    setBoardInputMessage(effectiveSolved ? 'Copied a solved share link to your clipboard.' : 'Copied a share link to your clipboard.', 'success');
+    setBoardInputMessage(
+      includeProgress && progressWords.length > 0
+        ? 'Copied a link with your current progress to your clipboard.'
+        : 'Copied a share link to your clipboard.',
+      'success',
+    );
   } catch {
     setBoardInputMessage(`Could not copy automatically. Copy this link manually: ${url}`, 'error');
   }
@@ -722,8 +794,8 @@ function wireEvents() {
   pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
   generateBoardButton?.addEventListener('click', generateBoardFromWordsInput);
-  copyShareLinkButton?.addEventListener('click', () => copyShareLink({ solved: false }));
-  copySolvedLinkButton?.addEventListener('click', () => copyShareLink({ solved: true }));
+  copyShareLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: false }));
+  copyProgressLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: true }));
 
   helpModal?.addEventListener('click', (event) => {
     if (event.target === helpModal) {
@@ -831,10 +903,13 @@ function wireEvents() {
   });
 }
 
-// Replays a solved link's words through the real engine, exactly the way a
-// player would type them, so the resulting state (found words, used
-// letters, pipe routes) is indistinguishable from an actual solve.
-async function replaySolvedWords(words) {
+// Replays a shared link's already-played words through the real engine,
+// exactly the way a player would type them, so the resulting state (found
+// words, used letters, pipe routes) is indistinguishable from having
+// actually played them. Works for any amount of progress: zero words is a
+// no-op, a partial list leaves the puzzle mid-solve, a complete list lands
+// on a full solve — whatever state naturally falls out of replaying them.
+async function replayProgressWords(words) {
   for (const word of words) {
     // After the first word, the engine auto-seeds the builder with the
     // required next starting letter — only append what's left to type.
@@ -849,22 +924,36 @@ async function replaySolvedWords(words) {
   }
 }
 
-async function hydrateSharedPuzzle(words, solved) {
-  await applySolutionWordOverrides(words);
+async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
+  // Adopt the link's canonical words as this session's own — this keeps
+  // the character-count comparison working, and means re-sharing this same
+  // puzzle later (or reopening Set Board) carries the reference solution
+  // forward too.
+  canonicalWords = canonicalWordsFromLink;
 
-  if (solved && words.length > 0) {
-    await replaySolvedWords(words);
+  // Register both lists as session overrides: whatever the recipient does
+  // next — continuing with more of their own words, or backtracking to try
+  // the canonical pair instead — both stay guaranteed-accepted.
+  const knownWords = [...new Set([...progressWords, ...canonicalWordsFromLink])];
+  await applySolutionWordOverrides(knownWords);
+  await replayProgressWords(progressWords);
+
+  const snapshot = gameEngine.getSnapshot();
+  const isComplete = snapshot.foundWords.length > 0 && snapshot.usedLetters.size === gameEngine.getBoardSize();
+
+  if (isComplete) {
     setMessage('Loaded a shared, completed puzzle.', 'success');
-    return;
+  } else if (progressWords.length > 0) {
+    setMessage('Loaded a shared puzzle in progress. Pick up where they left off!', 'success');
+  } else {
+    setMessage('Loaded a shared puzzle. Forge away.', 'success');
   }
-
-  setMessage('Loaded a shared puzzle. Forge away.', 'success');
 }
 
 // Synchronous on purpose: the board itself must be applied immediately (and
 // puzzleFetcher told not to load today's puzzle over it) before any async
-// work starts. The word-override/solved-replay part continues in the
-// background via hydrateSharedPuzzle.
+// work starts. The override/replay part continues in the background via
+// hydrateSharedPuzzle.
 function tryLoadSharedPuzzleFromHash() {
   const decoded = decodeShareHash(window.location.hash);
   if (!decoded) {
@@ -873,7 +962,7 @@ function tryLoadSharedPuzzleFromHash() {
 
   gameEngine.applyBoardDefinition(decoded.board);
   puzzleFetcher.markCustomBoard();
-  hydrateSharedPuzzle(decoded.words, decoded.solved);
+  hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
 
   return true;
 }

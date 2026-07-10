@@ -10,16 +10,22 @@ const BOARD = [
   { side: 3, name: 'left', letters: ['O', 'T', 'S'] },
 ];
 
-test('encodeShareHash produces the documented exact encoding for a known example', () => {
+test('encodeShareHash produces the documented exact encoding for a known canonical word', () => {
   // AARDVARK -> raw indices [3,3,0,4,1,3,0,6], shifted by length 8 mod 12
   // -> [11,11,8,0,9,11,8,2] -> base36 "bb809b82".
-  const hash = encodeShareHash({ board: BOARD, words: ['AARDVARK'] });
-  assert.equal(hash, 'p=RVIADEKLMOTS~bb809b82~0');
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
+  assert.equal(hash, 'p=RVIADEKLMOTS~~bb809b82');
 });
 
-test('the encoded word segment does not contain the plaintext word', () => {
-  const hash = encodeShareHash({ board: BOARD, words: ['AARDVARK'] });
-  assert.ok(!hash.includes('AARDVARK'), 'plaintext solution word must not appear in the link');
+test('the canonical word segment does not contain the plaintext word', () => {
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
+  assert.ok(!hash.includes('AARDVARK'), 'canonical solution word must not appear in the link');
+});
+
+test('progress words are stored as plain text — they are already visible on the board once the link opens', () => {
+  const hash = encodeShareHash({ board: BOARD, progressWords: ['REDO', 'OAK'] });
+  assert.equal(hash, 'p=RVIADEKLMOTS~REDO.OAK~');
+  assert.ok(hash.includes('REDO') && hash.includes('OAK'), 'progress words are expected to be human-readable');
 });
 
 test('round-trips a bare board with no words', () => {
@@ -27,33 +33,69 @@ test('round-trips a bare board with no words', () => {
   const decoded = decodeShareHash(hash);
 
   assert.deepEqual(decoded.board, BOARD);
-  assert.deepEqual(decoded.words, []);
-  assert.equal(decoded.solved, false);
+  assert.deepEqual(decoded.progressWords, []);
+  assert.deepEqual(decoded.canonicalWords, []);
 });
 
-test('round-trips a board with multiple solution words', () => {
-  const hash = encodeShareHash({ board: BOARD, words: ['AARDVARK', 'KILOMETRES'] });
+test('round-trips a board with only canonical (hidden) words', () => {
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK', 'KILOMETRES'] });
   const decoded = decodeShareHash(hash);
 
   assert.deepEqual(decoded.board, BOARD);
-  assert.deepEqual(decoded.words, ['AARDVARK', 'KILOMETRES']);
-  assert.equal(decoded.solved, false);
+  assert.deepEqual(decoded.progressWords, []);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK', 'KILOMETRES']);
 });
 
-test('round-trips a solved puzzle', () => {
-  const hash = encodeShareHash({ board: BOARD, words: ['AARDVARK', 'KILOMETRES'], solved: true });
+test('round-trips a board with only progress (played) words', () => {
+  const hash = encodeShareHash({ board: BOARD, progressWords: ['REDO', 'OAK', 'KILT', 'SAME'] });
   const decoded = decodeShareHash(hash);
 
-  assert.equal(decoded.solved, true);
+  assert.deepEqual(decoded.progressWords, ['REDO', 'OAK', 'KILT', 'SAME']);
+  assert.deepEqual(decoded.canonicalWords, []);
 });
 
-test('solved is forced to false when there are no words to replay', () => {
-  const hash = encodeShareHash({ board: BOARD, words: [], solved: true });
-  assert.equal(hash, 'p=RVIADEKLMOTS~~0');
+test('round-trips a partially completed puzzle: progress words plain, canonical words still hidden', () => {
+  // The player found one word of a two-word canonical solution; the
+  // canonical pair stays encoded so the recipient isn't spoiled.
+  const hash = encodeShareHash({ board: BOARD, progressWords: ['AARDVARK'], canonicalWords: ['AARDVARK', 'KILOMETRES'] });
+  const decoded = decodeShareHash(hash);
+
+  assert.deepEqual(decoded.progressWords, ['AARDVARK']);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK', 'KILOMETRES']);
+  assert.ok(!hash.includes('KILOMETRES'), 'the unplayed canonical word must not leak in plain text');
+});
+
+test('a fully completed puzzle keeps the canonical words encoded alongside the plaintext progress words', () => {
+  // Even though the puzzle is done, the canonical pair is retained
+  // (redundantly) so the receiving session can keep rating a player's
+  // final submission after they delete and reattempt words.
+  const hash = encodeShareHash({ board: BOARD, progressWords: ['AARDVARK', 'KILOMETRES'], canonicalWords: ['AARDVARK', 'KILOMETRES'] });
+  const decoded = decodeShareHash(hash);
+
+  assert.deepEqual(decoded.progressWords, ['AARDVARK', 'KILOMETRES']);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK', 'KILOMETRES']);
+  assert.ok(hash.includes('AARDVARK') && hash.includes('KILOMETRES'), 'progress segment should be human-readable');
+});
+
+test('decodeShareHash drops progress words if one contains a non-board character, independent of canonical words', () => {
+  const hash = 'p=RVIADEKLMOTS~AARDVARK.KIL0METRES~bb809b82';
+  const decoded = decodeShareHash(hash);
+
+  assert.deepEqual(decoded.board, BOARD);
+  assert.deepEqual(decoded.progressWords, []);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK']);
+});
+
+test('decodeShareHash drops canonical words if one code is malformed, independent of progress words', () => {
+  const hash = 'p=RVIADEKLMOTS~REDO.OAK~bb809bb2.!!invalid';
+  const decoded = decodeShareHash(hash);
+
+  assert.deepEqual(decoded.progressWords, ['REDO', 'OAK']);
+  assert.deepEqual(decoded.canonicalWords, [], 'a malformed sibling code should not let a bad decode through partially');
 });
 
 test('decodeShareHash accepts the hash with or without a leading #', () => {
-  const hash = encodeShareHash({ board: BOARD, words: ['AARDVARK'] });
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
   assert.deepEqual(decodeShareHash(hash), decodeShareHash(`#${hash}`));
 });
 
@@ -70,16 +112,12 @@ test('decodeShareHash returns null for a board that is not exactly 12 unique let
   assert.equal(decodeShareHash('p=RVIADEKLM0TS'), null, 'contains a non-letter');
 });
 
-test('decodeShareHash keeps a valid board but drops all words if any word code is malformed', () => {
-  const hash = 'p=RVIADEKLMOTS~bb809bb2.!!invalid~0';
-  const decoded = decodeShareHash(hash);
-
-  assert.deepEqual(decoded.board, BOARD);
-  assert.deepEqual(decoded.words, [], 'a malformed sibling word should not let a bad decode through partially');
+test('encodeShareHash throws if a canonical word contains a letter not on the board', () => {
+  assert.throws(() => encodeShareHash({ board: BOARD, canonicalWords: ['ZEBRA'] }));
 });
 
-test('encodeShareHash throws if a solution word contains a letter not on the board', () => {
-  assert.throws(() => encodeShareHash({ board: BOARD, words: ['ZEBRA'] }));
+test('encodeShareHash throws if a progress word contains a letter not on the board', () => {
+  assert.throws(() => encodeShareHash({ board: BOARD, progressWords: ['ZEBRA'] }));
 });
 
 test('encodeShareHash throws if the board does not have exactly 12 unique letters', () => {
@@ -89,5 +127,5 @@ test('encodeShareHash throws if the board does not have exactly 12 unique letter
     { letters: ['K', 'L', 'M'] },
     { letters: ['O', 'T', 'R'] }, // duplicate R
   ];
-  assert.throws(() => encodeShareHash({ board: badBoard, words: [] }));
+  assert.throws(() => encodeShareHash({ board: badBoard }));
 });

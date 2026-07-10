@@ -271,14 +271,19 @@ export function createDictionaryValidator(options = {}) {
   }
 
   /**
-   * Finds a companion word for a single-word "seed": a word starting with
-   * the seed's last letter whose combined unique letters with the seed
-   * total exactly 12 (a full board), excluding blocked words. Mirrors
-   * scripts/generate-daily-puzzles.js's pickDeterministicCompanion, but
-   * picks randomly among valid candidates (this is an interactive one-off
-   * tool, not a reproducible daily puzzle) and enumerates candidates via
-   * the already-loaded packed dictionaries' prefix search rather than a
-   * separate plain-text word list fetch.
+   * Finds every companion candidate for a single-word "seed": dictionary
+   * words starting with the seed's last letter whose combined unique
+   * letters with the seed total exactly 12 (a full board), excluding
+   * blocked words. Mirrors scripts/generate-daily-puzzles.js's
+   * pickDeterministicCompanion's letter-union constraint, but enumerates
+   * candidates via the already-loaded packed dictionaries' prefix search
+   * rather than a separate plain-text word list fetch.
+   *
+   * Returned shortest to longest. This function has no way to know
+   * whether a candidate's own internal letter sequence can actually fit
+   * some valid 4-side board layout (that's generateBoardFromSolutionWords's
+   * job, and it can fail for a given pair) — callers should be prepared to
+   * try more than one candidate, not just the first.
    */
   async function findCompanionWord(seedWord) {
     const seed = String(seedWord || '').trim().toLowerCase();
@@ -305,18 +310,19 @@ export function createDictionaryValidator(options = {}) {
       }
     }
 
-    const candidates = [...candidateWords].filter((word) => (
-      word !== seed
-      && !blockedWords.has(word.toUpperCase())
-      && unionSize(seed, word) === 12
-    ));
+    const candidates = [...candidateWords]
+      .filter((word) => (
+        word !== seed
+        && !blockedWords.has(word.toUpperCase())
+        && unionSize(seed, word) === 12
+      ))
+      .sort((a, b) => a.length - b.length);
 
     if (candidates.length === 0) {
       return { error: `No companion word found for "${seed.toUpperCase()}".` };
     }
 
-    const companionWord = candidates[Math.floor(Math.random() * candidates.length)];
-    return { companionWord, candidateCount: candidates.length };
+    return { candidates };
   }
 
   return {
