@@ -105,6 +105,41 @@ test('validateWord fetches each packed dictionary at most once, regardless of wo
   assert.equal(calls.filter((url) => url === PRIMARY_URL).length, 1, 'the dictionary itself should only be fetched once and reused');
 });
 
+test('addSessionOverride makes validateWord accept a word absent from every dictionary', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  validator.addSessionOverride('zzzqx');
+  const result = await validator.validateWord('zzzqx');
+
+  assert.equal(result.isValid, true);
+  assert.equal(result.source, 'session-override');
+  assert.deepEqual(result.matchedSources, ['session-override']);
+});
+
+test('addSessionOverride takes precedence over an already-cached negative result', async () => {
+  // Reproduces the exact scenario this ordering exists for: a word gets
+  // checked (and cached as invalid) while previewing a generated board,
+  // then whitelisted once the board is actually applied.
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  const before = await validator.validateWord('zzzqx');
+  assert.equal(before.isValid, false, 'sanity check: not yet overridden');
+
+  validator.addSessionOverride('zzzqx');
+  const after = await validator.validateWord('zzzqx');
+  assert.equal(after.isValid, true, 'the override must win over the stale cached negative result');
+});
+
+test('clearSessionOverrides reverts a word back to normal dictionary validation', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  validator.addSessionOverride('zzzqx');
+  assert.equal((await validator.validateWord('zzzqx')).isValid, true);
+
+  validator.clearSessionOverrides();
+  assert.equal((await validator.validateWord('zzzqx')).isValid, false);
+});
+
 test('clearCache clears the per-word result cache without re-fetching the dictionary', async () => {
   const { validator, calls } = createValidator({
     [PRIMARY_URL]: ['cat'],
@@ -292,6 +327,7 @@ test('getValidationSourceLabel maps known source keys to display labels', () => 
   assert.equal(getValidationSourceLabel('primary-packed-dawg'), 'Primary');
   assert.equal(getValidationSourceLabel('fallback-packed-dawg'), 'Fallback');
   assert.equal(getValidationSourceLabel('fallback-api'), 'API');
+  assert.equal(getValidationSourceLabel('session-override'), 'Custom');
   assert.equal(getValidationSourceLabel('anything-else'), 'Unavailable');
 });
 

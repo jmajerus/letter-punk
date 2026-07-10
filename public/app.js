@@ -199,6 +199,7 @@ const puzzleFetcher = createPuzzleFetcher({
   puzzlesUrl: '/api/puzzles',
   applyBoard(nextBoard) {
     persistedSolutionWordsText = '';
+    dictionaryValidator.clearSessionOverrides();
     gameEngine.applyBoardDefinition(nextBoard);
   },
 });
@@ -451,7 +452,7 @@ function trapFocusInModal(modal, event) {
   }
 }
 
-function applyBoardFromInputs() {
+async function applyBoardFromInputs() {
   const values = {
     top: boardTopInput?.value,
     right: boardRightInput?.value,
@@ -467,9 +468,36 @@ function applyBoardFromInputs() {
 
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
+
+  // Whitelist the solution words this board was generated from — a proper
+  // noun or another game's word can define the board shape but still fail
+  // normal dictionary validation, which would make the puzzle unsolvable
+  // by its own intended solution. Scoped to this custom board only: reset
+  // on every apply, not just added to.
+  //
+  // Skip words that are already real dictionary words: validateWord checks
+  // session overrides before the packed dictionaries, so overriding an
+  // already-valid word would silently swap its accepted-word badge from
+  // Primary/Fallback/Both to "Custom" for no reason.
+  dictionaryValidator.clearSessionOverrides();
+  const solutionWords = persistedSolutionWordsText ? persistedSolutionWordsText.split(/\s+/).filter(Boolean) : [];
+  const overrideWords = [];
+  for (const word of solutionWords) {
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await dictionaryValidator.validateWord(word.toLowerCase());
+    if (existing.isValid !== true) {
+      dictionaryValidator.addSessionOverride(word);
+      overrideWords.push(word);
+    }
+  }
+
   trackPuzzleLoad('custom', '');
   closeBoardModal();
-  setMessage('Applied custom board. Forge away.');
+  setMessage(
+    overrideWords.length > 0
+      ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Forge away.`
+      : 'Applied custom board. Forge away.',
+  );
 }
 
 async function generateBoardFromWordsInput() {

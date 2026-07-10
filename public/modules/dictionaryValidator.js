@@ -22,6 +22,10 @@ export function getValidationSourceLabel(sourceKey) {
     return 'API';
   }
 
+  if (sourceKey === 'session-override') {
+    return 'Custom';
+  }
+
   return 'Unavailable';
 }
 
@@ -65,6 +69,22 @@ export function createDictionaryValidator(options = {}) {
   const packedDictionaryPromises = new Map();
   const validationCache = new Map();
   let blocklistPromise = null;
+
+  // Words explicitly whitelisted for the currently-applied custom board
+  // (see app.js: solution words used to generate a board are added here
+  // when it's applied, so the puzzle stays solvable even if a word is a
+  // proper noun or otherwise absent from the packed dictionaries). Scoped
+  // to the caller's lifecycle via clearSessionOverrides — this module has
+  // no concept of "puzzle" on its own.
+  const sessionOverrides = new Set();
+
+  function addSessionOverride(word) {
+    sessionOverrides.add(String(word || '').trim().toLowerCase());
+  }
+
+  function clearSessionOverrides() {
+    sessionOverrides.clear();
+  }
 
   // Distinct from validateWord: a word can be "not found" (typo, proper
   // noun, vocabulary from another game — informational only) or explicitly
@@ -168,6 +188,14 @@ export function createDictionaryValidator(options = {}) {
   }
 
   async function validateWord(word) {
+    // Checked before the cache, not just the dictionaries: a word may have
+    // been cached as "not found" earlier in this same session (e.g. while
+    // previewing a generated board) and then added as a session override
+    // afterward — the override must win, not the stale cached result.
+    if (sessionOverrides.has(word)) {
+      return { isValid: true, source: 'session-override', matchedSources: ['session-override'] };
+    }
+
     if (validationCache.has(word)) {
       return validationCache.get(word);
     }
@@ -295,6 +323,8 @@ export function createDictionaryValidator(options = {}) {
     validateWord,
     isBlocked,
     findCompanionWord,
+    addSessionOverride,
+    clearSessionOverrides,
     clearCache() {
       validationCache.clear();
     },
