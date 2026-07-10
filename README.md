@@ -46,6 +46,14 @@ npm test
 
 See [docs/testing.md](docs/testing.md) for what's covered, what isn't, and the harness pattern to follow when adding new tests.
 
+`public/assets/pipe-manifold.svg` (the decorative pipe artwork below "Accepted words") is generated, not hand-drawn — it's captured from a real simulated playthrough so it always matches the live game's pipe styling. Regenerate it after changing pipe colors, stroke widths, or corridor geometry in `boardRenderer.js`/`styles.css`:
+
+```bash
+npm run build:pipe-art
+```
+
+Requires a local Chrome/Chromium install (pass `--chrome=/path/to/chrome` or set `CHROME_PATH` if it's not auto-detected). Optionally override the simulated board/word chain with `--board=RVI,ADE,KLM,OTS --words=AARDVARK,KILOMETRES`.
+
 Recommended dictionary layering:
 
 - `public/data/en_US.dic` plus `public/data/en_US.aff`: preferred broad base dictionary with real Hunspell affix expansion.

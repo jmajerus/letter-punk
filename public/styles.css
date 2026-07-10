@@ -141,7 +141,6 @@ h2 {
   display: grid;
   grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
   gap: 20px;
-  align-items: start;
 }
 
 .board-card,
@@ -674,20 +673,36 @@ button {
 
 .panel {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 18px;
+}
+
+.panel-art {
+  min-height: 0;
+  background-image: url("assets/pipe-manifold.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(85%, 320px) auto;
+  opacity: 0.22;
+  pointer-events: none;
 }
 
 .panel-card {
   padding: 18px;
 }
 
+.word-card {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .current-word {
   min-height: 78px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 5px;
   align-items: center;
-  padding: 14px;
+  padding: 10px 8px;
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(19, 15, 12, 0.88), rgba(36, 27, 21, 0.72));
   border: 1px solid rgba(255, 226, 167, 0.12);
@@ -703,12 +718,13 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
+  min-width: 34px;
   min-height: 44px;
-  padding: 10px 14px;
+  padding: 10px 7px;
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(227, 232, 236, 0.98), rgba(138, 149, 159, 0.96));
   color: #1d2329;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -778,6 +794,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: 12px;
 }
 
 .word-pill {
@@ -947,6 +964,10 @@ button {
 
   .panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-art {
+    display: none;
   }
 }
 
