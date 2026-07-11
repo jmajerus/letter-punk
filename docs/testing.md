@@ -36,6 +36,8 @@ One exception: `dictionaryValidator.js`'s API-fallback path reads `window.locati
   - `removeLastToken` (single-character delete): nothing-to-undo, direct back-up on an already-empty builder, back-up from a locked lone starter, and generic mid-word pop
   - `clearTokens` (delete-word): already-clear, direct found-word removal on an empty builder, wiping an in-progress first word, the post-acceptance reset-to-starter, and the second-press remove-found-word
 - Full-board solve, including all three canonical-character-count comparison messages (fewer characters, an exact match, and — as of the symmetric-scoring update described in [docs/canonical-solution-rating.md](canonical-solution-rating.md) — more characters)
+- `letterUsageCounts` in the snapshot: reuse across accepted words plus the word in progress, including the auto-reseeded starting-letter token after a word is accepted (drives the decorative per-tile `xN` badge in `boardRenderer.js`, which has no direct test coverage of its own — see "Not covered yet")
+- `runningCharacterCount` in the snapshot: a live tally of accepted-word letters plus the word in progress, including the auto-reseeded starter token (drives the "Accepted words" panel's live letter-count stat)
 
 **`dictionaryValidator.js`** (`createDictionaryValidator`):
 - Primary-only match, stacked (both dictionaries) match, and reachable-but-absent

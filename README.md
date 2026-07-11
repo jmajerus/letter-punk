@@ -2,83 +2,37 @@
 
 **Live App: [Play Letter Punk](https://letter-punk.jmajerus.workers.dev)**
 
-Open `public/index.html` directly in a browser, or serve the `public/` folder with any static file server if you prefer.
+## How to Play
 
-Install the one build-time dependency with `npm install` from the repo root.
+Letter Punk is a word-chain puzzle in the spirit of NYT's Letter Boxed, played on a 12-letter board arranged as 4 sides of 3 letters each.
 
-For Cloudflare Workers, the project is intentionally static-only, so the Worker can serve the built-in files without any server logic. The included `wrangler.toml` points Workers at the `public/` asset directory.
+**The basics**
+- Tap a letter to add it to the word you're building. Consecutive letters must come from different sides of the board — you can't chain two letters from the same side back to back.
+- Words need at least 3 letters, and are checked against a real dictionary as you go.
+- After your first word, every new word must start with the last letter of the previous word.
+- Use every letter on the board at least once to solve the puzzle. It can take as many words as you need — there's no word-count limit and no way to "lose."
 
-For Cloudflare Pages, you can deploy the same static files directly from the `public/` directory.
+**Double letters**
+Tap the same letter twice in a row to double it (e.g. the "ZZ" in "PUZZLE"). Classic Letter Boxed doesn't allow this; Letter Punk treats it as first-class play — a real, deliberate part of solving the puzzle, not a workaround.
 
-Dictionary validation uses locally packed game dictionaries. The compiler prefers `public/data/en_US.dic` with `public/data/en_US.aff` expansion, falls back to `public/data/scowl.txt` when present, and also builds a compatibility fallback from `public/data/3of6game.txt` when that source is distinct.
+**Undo controls**
+- **Undo Letter** removes one letter at a time, and can back up into a previously accepted word if the current one is already empty.
+- **Undo Word** clears the word you're building; press it again to remove the last accepted word.
 
-Project-specific additions can be placed in `public/data/dictionary-overrides.txt` and are merged during `npm run build:dictionary`.
+**Reading the board**
+- Unused letters appear as silver steel tanks; used letters switch to patina tanks with a checkmark badge, dashed border, and striped tag, so the state is clear without relying on color alone.
+- A small `xN` badge appears on a tile once you've used that letter N times so far, across both accepted words and the word you're building.
+- The board header shows a running letter count — the total across every accepted word plus your word in progress, i.e. what your final character count would be if you hit Enter right now.
 
-Project-specific removals can be placed in `public/data/dictionary-blocklist.txt` and are subtracted during `npm run build:dictionary`.
+**Solving and scoring**
+Once you've used every letter, Letter Punk compares your total character count to a reference solution and awards one of three titles: **Efficiency Engineer** (you used fewer characters), **Dead Reckoner** (you matched it exactly), or **Vocabulary Wrangler** (you used more, weaving in extra letters). All three are equally legitimate ways to play well — see [Canonical Solution Rating](docs/canonical-solution-rating.md) for the full reasoning.
 
-Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client. Rebuild the catalog from `puzzle-seeds.json` with `npm run build:puzzles` (add `:dry` to preview without writing). Generation enforces `public/data/dictionary-blocklist.txt` — a blocked word can never be auto-picked as a companion, and a manually-authored `solutionWords`/`companionWord` in the seed file that's blocked, or that isn't actually chainable in normal play (each word after the first must start with the previous word's last letter), fails the build rather than shipping a broken puzzle.
+**Boards and puzzles**
+- A new daily puzzle is available each day; use the `<`/`>` arrows or "Today's Puzzle" to navigate, and "Yesterday" to see the previous day's canonical solution.
+- "Set Board" lets you paste a board from classic Letter Boxed, or generate one from your own solution word(s) — type a single word as a seed and Letter Punk finds a companion automatically.
+- "Copy Share Link" / "Copy Progress Link" send a board to a friend as a URL — either a fresh challenge, or exactly where your own play currently stands, replaying pipe-by-pipe when they open it.
 
-Check whether a specific word is recognized, blocked, or overridden with `npm run check-word -- WORD [WORD...]` — it reads the same packed dictionaries and blocklist the live game uses, and warns if the packed dictionaries look older than their sources.
-
-Rebuild the packed dictionary with `npm run build:dictionary`.
-
-Each rebuild also writes `public/util/dictionary-source-report.json` (full unique-word lists) and `public/util/dictionary-source-report.md` (human-readable diff preview) so you can tune coverage deliberately.
-
-For a reusable implementation write-up aimed at other game developers, see [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md).
-
-For the design reasoning behind rating a solve against a "canonical" solution — and why that scoring deliberately avoids computing the objectively best possible answer — see [Canonical Solution Rating: Designing a Score That Doesn't Fight Your Own Mechanic](docs/canonical-solution-rating.md).
-
-Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
-
-Run locally with:
-
-```bash
-npx wrangler dev
-```
-
-Refresh the packed dictionary first if you change the source word list:
-
-```bash
-npm run build:dictionary
-```
-
-Run the test suite with:
-
-```bash
-npm test
-```
-
-See [docs/testing.md](docs/testing.md) for what's covered, what isn't, and the harness pattern to follow when adding new tests.
-
-`public/assets/pipe-manifold.svg` (the decorative pipe artwork below "Accepted words") is generated, not hand-drawn — it's captured from a real simulated playthrough so it always matches the live game's pipe styling. Regenerate it after changing pipe colors, stroke widths, or corridor geometry in `boardRenderer.js`/`styles.css`:
-
-```bash
-npm run build:pipe-art
-```
-
-Requires a local Chrome/Chromium install (pass `--chrome=/path/to/chrome` or set `CHROME_PATH` if it's not auto-detected). Optionally override the simulated board/word chain with `--board=RVI,ADE,KLM,OTS --words=AARDVARK,KILOMETRES`.
-
-Recommended dictionary layering:
-
-- `public/data/en_US.dic` plus `public/data/en_US.aff`: preferred broad base dictionary with real Hunspell affix expansion.
-- `public/data/scowl.txt`: plain-text backup base source if a Hunspell dictionary has not been added yet.
-- `public/data/3of6game.txt`: compatibility fallback that is packed separately and checked alongside the primary dictionary at runtime.
-- `public/data/dictionary-overrides.txt`: small allowlist for temporary or project-specific additions.
-- `public/data/dictionary-blocklist.txt`: denylist for words you decide are poor fits for gameplay. Subtracted from the packed dictionaries (`npm run build:dictionary`) *and* excluded from daily-puzzle companion-word selection (`npm run build:puzzles`) — one file, both build steps.
-
-Deploy with:
-
-```bash
-npx wrangler deploy
-```
-
-Deploy to Pages with:
-
-```bash
-npx wrangler pages deploy public
-```
-
-Why Letter Punk Exists:
+## Why Letter Punk Exists
 
 - Letter Punk leans into a Steampunk visual identity: brass and copper tones, riveted tanks, pipe-route overlays, pressure-valve motifs, and mechanical feedback cues that make the board feel like a working machine rather than a flat grid.
 - The project started from a design disagreement with traditional Letter Boxed constraints: excluding words with double letters removes a rich portion of everyday vocabulary for reasons that appear implementation-driven more than strategy-driven.
@@ -86,83 +40,14 @@ Why Letter Punk Exists:
 - The goal is to preserve the elegance of the original format while expanding expressive play and making room for a broader, more natural dictionary.
 - There's no word-count cap and no failure state: Delete Word/Delete Char can always back out of a dead end, so completing a well-formed board is generally achievable through persistence, not just cleverness — skill differentiates *how well* you solved it (see [docs/canonical-solution-rating.md](docs/canonical-solution-rating.md)), not *whether* you can. That said, "well-formed" is doing real work in that sentence: a board built from letters with poor vowel coverage can still be a genuinely hard exception, in the extreme leaving only one or two legal words that can even start from certain letters.
 
-Repo structure:
+## Current Feature Set
 
-- `public/` static site files served by Workers or Pages
-- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`
-- `public/app.js` app bootstrap and UI orchestration
-- `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from `puzzle-seeds.json`
-- `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
-- `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
-- `wrangler.toml` Cloudflare Worker config
-- `test/` Node built-in test runner suite — see `docs/testing.md` for current coverage
-- `docs/ai-edit-map.md` AI agent routing guide and prompt templates
-- `docs/testing.md` test coverage summary and how to add new tests
-- `docs/dual-dictionary-validation.md` reusable write-up on the stacked dictionary pattern
-- `docs/canonical-solution-rating.md` design reasoning behind the canonical-solution scoring system
-- `README.md` project and deployment notes
-- `Letter-Boxed-Game-Logic-Copyright.md` concept notes
-
----
-
-## Agent Request Snippets
-
-Copy-paste these when working with an AI coding agent. Keeping requests scoped to one file and one concern reduces context overhead and improves result quality.
-
-**Side or chaining rule change**
-```
-Target: public/modules/gameLogic.js
-Change: [describe the rule change]
-Constraints: no UI changes, no renames, no reformatting outside touched lines
-Output: minimal patch + one-sentence rationale
-```
-
-**SVG pipe or board visual change**
-```
-Target: public/modules/boardRenderer.js
-Change: [describe the visual change]
-Constraints: no gameplay logic changes
-Output: minimal patch + one-sentence rationale
-```
-
-**Dictionary loading or word validation change**
-```
-Target: public/modules/dictionaryValidator.js
-Change: [describe the validation change]
-Constraints: no UI or routing changes
-Output: minimal patch + one-sentence rationale
-```
-
-**Daily puzzle fetch or catalog navigation change**
-```
-Target: public/modules/puzzleFetcher.js
-Change: [describe the puzzle/navigation change]
-Constraints: no rendering or game-rule changes
-Output: minimal patch + one-sentence rationale
-```
-
-**Modal, settings, keyboard, or event wiring change**
-```
-Target: public/app.js
-Change: [describe the UI/event change]
-Constraints: no changes to module files
-Output: minimal patch + one-sentence rationale
-```
-
-**Dictionary word list rebuild**
-```
-Run: npm run build:dictionary
-Then verify: public/util/dictionary-source-report.md
-```
-
-**Multi-file changes** — list each file separately with its own constraint line, and confirm one file's output before starting the next to avoid cascading errors.
-
-Current feature set:
 - Steampunk-themed board and route visualization designed for high readability.
-- Letter-first input model with per-tile `x2` controls and repeated-tap support.
+- Letter-first input model: tap the same letter twice in a row to double it. A decorative per-tile `xN` badge tracks how many times each letter has actually been used so far (accepted words plus the word in progress) — informational only, not a control.
 - Word-chain gameplay rules (next word starts with previous word's final letter).
 - Stacked local packed dictionary validation so either the primary dictionary or the compatibility fallback can accept a word.
 - Accepted-word badges and a live builder indicator showing whether a word was accepted by the primary dictionary, fallback dictionary, or both.
+- A live running letter-count stat in the board header — the total across accepted words plus the word in progress, i.e. what the character count would be if Enter were pressed right now. Deliberately board-scoped rather than tucked into either side panel, since it's neither an "accepted words" stat nor a "current word" stat but the running total of both.
 - Provenance badge visibility toggle in Settings, defaulting to off for a cleaner play surface.
 - Dictionary override support through `public/data/dictionary-overrides.txt`.
 - Dated daily puzzle catalog in `public/data/daily-puzzles.json`.
@@ -171,8 +56,18 @@ Current feature set:
 - "Yesterday/Previous" modal showing canonical solution words for the prior catalog puzzle.
 - Custom board tools: paste/parse board text, or generate a board from two solution words. A single word is treated as a seed; a companion is picked from the full set of valid dictionary candidates by starting at the median length and walking outward until one actually produces a valid board layout (see [docs/canonical-solution-rating.md](docs/canonical-solution-rating.md)), rather than a purely random or shortest-possible pick. Non-blocking warnings flag words the dictionary doesn't recognize or a word pair that isn't actually chainable in normal play; blocked words are always rejected outright. Solution words that aren't real dictionary entries (proper nouns, another game's vocabulary) are still guaranteed solvable once applied, via a per-board session override that never overrides a word already valid on its own.
 - Canonical character-count rating: solving a board compares the player's total character count against a reference solution and awards one of three titles — Efficiency Engineer (fewer characters), Dead Reckoner (an exact match), or Vocabulary Wrangler (more characters) — treating all three as equally legitimate ways to be good at the game, not one "correct" direction with silence everywhere else. Works for daily puzzles, custom boards, and shared links alike.
-- Shareable puzzle links: "Copy Share Link" (a fresh, unplayed board) / "Copy Progress Link" (wherever the sharer's own play currently stands — none, partial, or complete) in the board-setup dialog encode the active board into a compact URL fragment. Words already played are stored as plain text since they're immediately visible once the link opens; the canonical reference solution, when known, stays obfuscated — each letter stored as its board position, shifted by the word's own length — so a partially-shared puzzle doesn't spoil the unplayed remainder, and the reference solution survives so a recipient can freely retry and still be rated against it.
+- Shareable puzzle links: "Copy Share Link" (a fresh, unplayed board) / "Copy Progress Link" (wherever the sharer's own play currently stands — none, partial, or complete) in the board-setup dialog encode the active board into a compact URL fragment. Words already played are stored as plain text since they're immediately visible once the link opens; the canonical reference solution, when known, stays obfuscated — each letter stored as its board position, shifted by the word's own length — so a partially-shared puzzle doesn't spoil the unplayed remainder, and the reference solution survives so a recipient can freely retry and still be rated against it. Any progress in the link replays pipe-by-pipe as the page loads, in the order it was actually played, rather than appearing all at once — governed by the same "Reduce motion effects" setting as the rest of the pipe animation.
 - Route history rendering with recency fading so active routes stay emphasized while retaining additive context.
 - Reduced-motion setting that preserves readability while limiting animation.
 - Keyboard/focus-aware modal behavior with focus trapping and escape-to-close support.
 - Accessibility helpers including skip link, ARIA live regions, and non-color letter-state cues.
+
+## Learn More
+
+- [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md) — a reusable implementation write-up aimed at other game developers.
+- [Canonical Solution Rating](docs/canonical-solution-rating.md) — the design reasoning behind rating a solve against a "canonical" solution, and why that scoring deliberately avoids computing the objectively best possible answer.
+- [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md) — concept/copyright notes.
+
+## Development
+
+For local setup, the dictionary/puzzle build pipeline, testing, and deployment, see [docs/development.md](docs/development.md) — most visitors just here to play won't need it.

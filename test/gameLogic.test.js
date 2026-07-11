@@ -294,6 +294,47 @@ test('solving with more characters than the canonical count still gets a positiv
   assert.match(lastMessage(events).text, /longer than the canonical 10-character solution/);
 });
 
+test('letterUsageCounts tracks reuse across accepted words and the word in progress', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg', 'gda'] });
+
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  typeWord(engine, 'gda'); // reuses a, d, g a second time each
+  await engine.submitWord();
+
+  // "gda" ends in 'a', so the engine immediately reseeds the builder with
+  // 'a' as the next required starting letter — that in-progress token
+  // counts too, which is why 'a' is already at 3, not 2, at this point.
+  let counts = engine.getSnapshot().letterUsageCounts;
+  assert.equal(counts.get('a'), 3, 'two accepted words plus the reseeded in-progress token');
+  assert.equal(counts.get('d'), 2);
+  assert.equal(counts.get('g'), 2);
+  assert.equal(counts.get('b'), undefined, 'an unused letter should not appear in the count map');
+
+  // Continue typing into the still-unsubmitted word — further reuse should
+  // count immediately, without needing to submit first.
+  engine.appendToken('d');
+  counts = engine.getSnapshot().letterUsageCounts;
+  assert.equal(counts.get('d'), 3, 'a letter typed but not yet submitted should still count');
+});
+
+test('runningCharacterCount tallies accepted words plus the word in progress, live', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg', 'gda'] });
+
+  assert.equal(engine.getSnapshot().runningCharacterCount, 0);
+
+  typeWord(engine, 'adg');
+  assert.equal(engine.getSnapshot().runningCharacterCount, 3, 'in-progress letters count before submitting');
+
+  await engine.submitWord();
+  // "gda" ends in 'a', so the builder is reseeded with 'a' — that counts too.
+  assert.equal(engine.getSnapshot().runningCharacterCount, 4);
+
+  typeWord(engine, 'gda');
+  await engine.submitWord();
+  assert.equal(engine.getSnapshot().runningCharacterCount, 7, 'adg(3) + gda(3) + reseeded starter(1)');
+});
+
 test('removeLastToken pops a letter, then backs up into the previous accepted word once empty', async () => {
   const { engine, events } = createHarness({ acceptedWords: ['adg'] });
   engine.appendToken('a');

@@ -1,0 +1,153 @@
+# Development
+
+Local setup, build pipeline, and deployment notes for working on Letter Punk. For how to play the game, see the main [README](../README.md).
+
+## Setup
+
+Install the one build-time dependency with `npm install` from the repo root.
+
+Open `public/index.html` directly in a browser, or serve the `public/` folder with any static file server, to run the game without deploying anywhere.
+
+Run locally with:
+
+```bash
+npx wrangler dev
+```
+
+## Deployment
+
+For Cloudflare Workers, the project is intentionally static-only, so the Worker can serve the built-in files without any server logic. The included `wrangler.toml` points Workers at the `public/` asset directory.
+
+For Cloudflare Pages, you can deploy the same static files directly from the `public/` directory.
+
+Note: for `wrangler deploy` (Workers static assets), SPA fallback is already handled by `not_found_handling = "single-page-application"` in `wrangler.toml`. No `_redirects` rule is needed for this Worker deploy path.
+
+Deploy with:
+
+```bash
+npx wrangler deploy
+```
+
+Deploy to Pages with:
+
+```bash
+npx wrangler pages deploy public
+```
+
+## Dictionary
+
+Dictionary validation uses locally packed game dictionaries. The compiler prefers `public/data/en_US.dic` with `public/data/en_US.aff` expansion, falls back to `public/data/scowl.txt` when present, and also builds a compatibility fallback from `public/data/3of6game.txt` when that source is distinct.
+
+Project-specific additions can be placed in `public/data/dictionary-overrides.txt` and are merged during `npm run build:dictionary`.
+
+Project-specific removals can be placed in `public/data/dictionary-blocklist.txt` and are subtracted during `npm run build:dictionary`.
+
+Rebuild the packed dictionary with `npm run build:dictionary`. Each rebuild also writes `public/util/dictionary-source-report.json` (full unique-word lists) and `public/util/dictionary-source-report.md` (human-readable diff preview) so you can tune coverage deliberately.
+
+Check whether a specific word is recognized, blocked, or overridden with `npm run check-word -- WORD [WORD...]` — it reads the same packed dictionaries and blocklist the live game uses, and warns if the packed dictionaries look older than their sources.
+
+Recommended dictionary layering:
+
+- `public/data/en_US.dic` plus `public/data/en_US.aff`: preferred broad base dictionary with real Hunspell affix expansion.
+- `public/data/scowl.txt`: plain-text backup base source if a Hunspell dictionary has not been added yet.
+- `public/data/3of6game.txt`: compatibility fallback that is packed separately and checked alongside the primary dictionary at runtime.
+- `public/data/dictionary-overrides.txt`: small allowlist for temporary or project-specific additions.
+- `public/data/dictionary-blocklist.txt`: denylist for words you decide are poor fits for gameplay. Subtracted from the packed dictionaries (`npm run build:dictionary`) *and* excluded from daily-puzzle companion-word selection (`npm run build:puzzles`) — one file, both build steps.
+
+For the reasoning behind the dual-dictionary approach itself, see [Dual Dictionary Validation for Word-Chain Games](dual-dictionary-validation.md).
+
+## Daily puzzles
+
+Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client. Rebuild the catalog from `puzzle-seeds.json` with `npm run build:puzzles` (add `:dry` to preview without writing). Generation enforces `public/data/dictionary-blocklist.txt` — a blocked word can never be auto-picked as a companion, and a manually-authored `solutionWords`/`companionWord` in the seed file that's blocked, or that isn't actually chainable in normal play (each word after the first must start with the previous word's last letter), fails the build rather than shipping a broken puzzle.
+
+## Pipe artwork
+
+`public/assets/pipe-manifold.svg` (the decorative pipe artwork below "Accepted words") is generated, not hand-drawn — it's captured from a real simulated playthrough so it always matches the live game's pipe styling. Regenerate it after changing pipe colors, stroke widths, or corridor geometry in `boardRenderer.js`/`styles.css`:
+
+```bash
+npm run build:pipe-art
+```
+
+Requires a local Chrome/Chromium install (pass `--chrome=/path/to/chrome` or set `CHROME_PATH` if it's not auto-detected). Optionally override the simulated board/word chain with `--board=RVI,ADE,KLM,OTS --words=AARDVARK,KILOMETRES`.
+
+## Testing
+
+Run the test suite with:
+
+```bash
+npm test
+```
+
+See [testing.md](testing.md) for what's covered, what isn't, and the harness pattern to follow when adding new tests.
+
+## Repo structure
+
+- `public/` static site files served by Workers or Pages
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`
+- `public/app.js` app bootstrap and UI orchestration
+- `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from `puzzle-seeds.json`
+- `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
+- `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
+- `wrangler.toml` Cloudflare Worker config
+- `test/` Node built-in test runner suite — see `testing.md` for current coverage
+- `docs/ai-edit-map.md` AI agent routing guide and prompt templates
+- `docs/testing.md` test coverage summary and how to add new tests
+- `docs/dual-dictionary-validation.md` reusable write-up on the stacked dictionary pattern
+- `docs/canonical-solution-rating.md` design reasoning behind the canonical-solution scoring system
+- `docs/development.md` this file
+- `README.md` project overview and how to play
+- `Letter-Boxed-Game-Logic-Copyright.md` concept notes
+
+---
+
+## Agent Request Snippets
+
+Copy-paste these when working with an AI coding agent. Keeping requests scoped to one file and one concern reduces context overhead and improves result quality.
+
+**Side or chaining rule change**
+```
+Target: public/modules/gameLogic.js
+Change: [describe the rule change]
+Constraints: no UI changes, no renames, no reformatting outside touched lines
+Output: minimal patch + one-sentence rationale
+```
+
+**SVG pipe or board visual change**
+```
+Target: public/modules/boardRenderer.js
+Change: [describe the visual change]
+Constraints: no gameplay logic changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Dictionary loading or word validation change**
+```
+Target: public/modules/dictionaryValidator.js
+Change: [describe the validation change]
+Constraints: no UI or routing changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Daily puzzle fetch or catalog navigation change**
+```
+Target: public/modules/puzzleFetcher.js
+Change: [describe the puzzle/navigation change]
+Constraints: no rendering or game-rule changes
+Output: minimal patch + one-sentence rationale
+```
+
+**Modal, settings, keyboard, or event wiring change**
+```
+Target: public/app.js
+Change: [describe the UI/event change]
+Constraints: no changes to module files
+Output: minimal patch + one-sentence rationale
+```
+
+**Dictionary word list rebuild**
+```
+Run: npm run build:dictionary
+Then verify: public/util/dictionary-source-report.md
+```
+
+**Multi-file changes** — list each file separately with its own constraint line, and confirm one file's output before starting the next to avoid cascading errors.

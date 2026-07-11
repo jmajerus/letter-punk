@@ -26,6 +26,7 @@ const currentWordElement = document.getElementById('currentWord');
 const messageElement = document.getElementById('message');
 const dictionarySourceIndicatorElement = document.getElementById('dictionarySourceIndicator');
 const foundWordsElement = document.getElementById('foundWords');
+const letterCountStatElement = document.getElementById('letterCountStat');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
@@ -189,8 +190,8 @@ const renderer = createBoardRenderer({
   boardElement,
   boardLinksElement,
   isReducedMotionEnabled,
-  onTileSelect(letter, doubled) {
-    gameEngine.appendToken(letter, doubled);
+  onTileSelect(letter) {
+    gameEngine.appendToken(letter);
   },
 });
 
@@ -241,6 +242,15 @@ function renderValidationSourceIndicator(snapshot) {
   }
 
   dictionarySourceIndicatorElement.textContent = snapshot.lastValidationSummary;
+}
+
+function renderLetterCountStat(snapshot) {
+  if (!letterCountStatElement) {
+    return;
+  }
+
+  const count = snapshot.runningCharacterCount;
+  letterCountStatElement.textContent = `${count} letter${count === 1 ? '' : 's'} placed so far`;
 }
 
 function getPreviousSolutionUiLabels() {
@@ -330,7 +340,8 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   renderer.renderCurrentWord(currentWordElement, snapshot.tokens);
   renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, isProvenanceBadgesEnabled());
   renderValidationSourceIndicator(snapshot);
-  renderer.renderLetterUsage(snapshot.prospectiveUsedLetters, snapshot.currentTokenLetters);
+  renderLetterCountStat(snapshot);
+  renderer.renderLetterUsage(snapshot.prospectiveUsedLetters, snapshot.currentTokenLetters, snapshot.letterUsageCounts);
   renderer.renderBoardLinks(snapshot.tokens, snapshot.foundWords, gameEngine.tokensFromWord);
   updatePuzzleNavigation();
 }
@@ -903,13 +914,32 @@ function wireEvents() {
   });
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+// Slightly longer than the 170ms line-draw transition in boardRenderer.js's
+// animatePathDraw, so each pipe segment visibly finishes drawing before the
+// next one starts, rather than being replaced mid-animation.
+const PIPE_REPLAY_STEP_MS = 220;
+
 // Replays a shared link's already-played words through the real engine,
 // exactly the way a player would type them, so the resulting state (found
 // words, used letters, pipe routes) is indistinguishable from having
 // actually played them. Works for any amount of progress: zero words is a
 // no-op, a partial list leaves the puzzle mid-solve, a complete list lands
 // on a full solve — whatever state naturally falls out of replaying them.
+//
+// Paced one token at a time (when motion isn't reduced) so the recipient
+// sees the pipes draw in the same order the sender actually played them,
+// instead of the whole route appearing at once — appendToken alone doesn't
+// animate anything by itself; without a pause between calls, every
+// intermediate frame gets overwritten before the browser ever paints it.
 async function replayProgressWords(words) {
+  const animated = !isReducedMotionEnabled();
+
   for (const word of words) {
     // After the first word, the engine auto-seeds the builder with the
     // required next starting letter — only append what's left to type.
@@ -918,9 +948,17 @@ async function replayProgressWords(words) {
     const remaining = lower.startsWith(already) ? lower.slice(already.length) : lower;
     for (const letter of remaining) {
       gameEngine.appendToken(letter);
+      if (animated) {
+        // eslint-disable-next-line no-await-in-loop
+        await wait(PIPE_REPLAY_STEP_MS);
+      }
     }
     // eslint-disable-next-line no-await-in-loop
     await gameEngine.submitWord();
+    if (animated) {
+      // eslint-disable-next-line no-await-in-loop
+      await wait(PIPE_REPLAY_STEP_MS);
+    }
   }
 }
 

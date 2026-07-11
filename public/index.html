@@ -6,7 +6,7 @@
     <title>Letter Punk</title>
     <meta
       name="description"
-      content="A steampunk letter puzzle prototype with friendly double-letter x2 controls."
+      content="A steampunk letter puzzle prototype with friendly double-letter support."
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
     <link rel="stylesheet" href="styles.css" />
@@ -48,6 +48,7 @@
               <p class="section-label">Steam board</p>
               <h2>Forge a word</h2>
               <p id="dailyPuzzleStatus" class="puzzle-status" aria-live="polite"></p>
+              <p id="letterCountStat" class="letter-count-stat" aria-live="polite"></p>
             </div>
             <div class="board-tools">
               <div class="board-tool-buttons">
@@ -91,7 +92,7 @@
             <input id="reducedMotionToggle" class="settings-checkbox" type="checkbox" />
             <label for="reducedMotionToggle">Reduce motion effects</label>
           </div>
-          <p class="help-copy">Turns off animated pipe pulses and line-draw effects.</p>
+          <p class="help-copy">Turns off animated pipe pulses and line-draw effects, including the pipe-by-pipe replay when opening a shared puzzle link.</p>
         </div>
         <div class="settings-option">
           <div class="settings-toggle-row">
@@ -114,19 +115,17 @@
         </div>
         <p class="help-copy">Friendly, familiar, and a little freer than classic Letter Boxed.</p>
         <ul class="help-list">
-          <li>Tap a letter once for one token.</li>
-          <li>Tap the same letter twice for a doubled token, or use x2.</li>
-          <li>Consecutive tokens still need to come from different sides.</li>
-          <li>After the first word, the next word must begin with the previous word's final letter.</li>
-          <li>Submit words with 3+ letters.</li>
-          <li>Delete Char removes one letter at a time and can back up into previous accepted words.</li>
-          <li>Delete Word clears your current word; press it repeatedly to remove previous accepted words.</li>
-          <li>Use Set Board to copy daily Letter Boxed letters and compare solve paths.</li>
-          <li>Using every letter solves the board. If you can do better, Delete Char can retract your last accepted word.</li>
-          <li>Unused letters appear as silver steel tanks.</li>
-          <li>Used letters switch to patina tanks and add a check badge, dashed border, and striped tag for non-color clarity.</li>
-          <li>Words are validated locally against a packed game dictionary.</li>
+          <li>Tap a letter to add it. Consecutive letters must come from different sides of the board.</li>
+          <li>Tap the same letter twice in a row to double it — double letters are welcome here.</li>
+          <li>Each new word must start with the last letter of the previous word.</li>
+          <li>Words need 3+ letters and must be real dictionary words.</li>
+          <li>Use every letter on the board to solve it. There's no word limit, so take your time.</li>
+          <li>Undo Letter and Undo Word fix mistakes as you go.</li>
         </ul>
+        <p class="help-copy">
+          Full rules, scoring details, and the story behind Letter Punk:
+          <a href="https://github.com/jmajerus/letter-punk" target="_blank" rel="noopener noreferrer">github.com/jmajerus/letter-punk</a>.
+        </p>
         <div class="help-actions">
           <button id="gotItBtn" class="primary" type="button">Got it</button>
         </div>

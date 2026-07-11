@@ -178,6 +178,33 @@ export function createGameEngine(options) {
     return currentTokenLetters;
   }
 
+  // How many times each letter has appeared so far, across every accepted
+  // word plus the word currently being built — not just whether a letter
+  // has been used, but how many times. Drives the tile usage-count badge.
+  function getLetterUsageCounts() {
+    const counts = new Map();
+    const increment = (letter) => counts.set(letter, (counts.get(letter) || 0) + 1);
+
+    for (const entry of state.foundWords) {
+      for (const letter of entry.word) {
+        increment(letter);
+      }
+    }
+    for (const token of state.tokens) {
+      increment(token.letter);
+    }
+
+    return counts;
+  }
+
+  // Total letters typed so far: every accepted word plus the word
+  // currently under construction — a live running count, not just the
+  // final tally shown once the board is solved.
+  function getRunningCharacterCount() {
+    const acceptedTotal = state.foundWords.reduce((total, entry) => total + entry.length, 0);
+    return acceptedTotal + state.tokens.length;
+  }
+
   function getSnapshot() {
     return {
       board,
@@ -188,6 +215,8 @@ export function createGameEngine(options) {
       lastValidationSummary: state.lastValidationSummary,
       prospectiveUsedLetters: getProspectiveUsedLetters(),
       currentTokenLetters: getCurrentTokenLetters(),
+      letterUsageCounts: getLetterUsageCounts(),
+      runningCharacterCount: getRunningCharacterCount(),
     };
   }
 

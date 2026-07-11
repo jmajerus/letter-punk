@@ -375,7 +375,6 @@ body.reduce-motion .board-pipe-arrow-live {
 }
 
 body.reduce-motion .tile-letter,
-body.reduce-motion .tile-x2,
 body.reduce-motion button {
   transition: none;
 }
@@ -555,14 +554,7 @@ button:hover {
   filter: brightness(1.08);
 }
 
-.tile-x2:hover {
-  outline: none;
-  transform: translateY(-1px);
-  filter: brightness(1.04);
-}
-
 .tile-letter:focus-visible,
-.tile-x2:focus-visible,
 button:focus-visible,
 .board-input:focus-visible,
 .help-close:focus-visible {
@@ -572,12 +564,11 @@ button:focus-visible,
 }
 
 .tile-letter:active,
-.tile-x2:active,
 button:active {
   transform: translateY(1px) scale(0.98);
 }
 
-.tile-x2,
+.tile-usage-badge,
 .token-multiplier {
   position: absolute;
   border-radius: 999px;
@@ -587,21 +578,31 @@ button:active {
     linear-gradient(180deg, #d9b067 0%, #9a5b32 100%);
   color: #2d160d;
   font-weight: 700;
-  display: grid;
   place-items: center;
   box-shadow:
     0 8px 12px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
-.tile-x2 {
+.token-multiplier {
+  display: grid;
+}
+
+/* Decorative reuse-count badge, not a control — hidden until a letter has
+   actually been used 2+ times (accepted words plus the word in progress). */
+.tile-usage-badge {
+  display: none;
   right: -7px;
   bottom: -7px;
   width: 26px;
   height: 26px;
   font-size: 0.62rem;
   opacity: 0.82;
-  cursor: pointer;
+  pointer-events: none;
+}
+
+.tile-usage-badge.tile-usage-badge-visible {
+  display: grid;
 }
 
 .controls {
@@ -772,6 +773,12 @@ button {
   display: none;
 }
 
+.letter-count-stat {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .helper-text {
   margin: 0;
   color: var(--muted);
@@ -890,6 +897,15 @@ button {
 .help-copy {
   margin: 0 0 10px;
   color: var(--muted);
+}
+
+.help-copy a {
+  color: var(--brass);
+}
+
+.help-copy a:hover,
+.help-copy a:focus-visible {
+  color: var(--ember);
 }
 
 .help-list {
@@ -1035,7 +1051,7 @@ button {
     font-size: 1.6rem;
   }
 
-  .tile-x2 {
+  .tile-usage-badge {
     right: -6px;
     bottom: -6px;
     width: 26px;
@@ -1102,7 +1118,7 @@ button {
     border-radius: 3.5cqw;
   }
 
-  .tile-x2 {
+  .tile-usage-badge {
     width: 5cqw;
     height: 5cqw;
     font-size: 1.7cqw;

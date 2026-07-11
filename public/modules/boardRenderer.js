@@ -277,6 +277,7 @@ export function createBoardRenderer(options) {
   } = options;
 
   const letterButtons = new Map();
+  const usageBadges = new Map();
   const invalidTileFlashTimers = new WeakMap();
 
   function getTokenAnchor(token) {
@@ -579,6 +580,7 @@ export function createBoardRenderer(options) {
   function renderBoard(board) {
     boardElement.innerHTML = '';
     letterButtons.clear();
+    usageBadges.clear();
 
     for (const side of board) {
       const sideElement = document.createElement('div');
@@ -593,20 +595,18 @@ export function createBoardRenderer(options) {
         letterButton.className = 'tile-letter';
         letterButton.textContent = letter;
         letterButton.setAttribute('aria-label', `Add ${letter}`);
-        letterButton.addEventListener('click', () => onTileSelect(letter, false));
+        letterButton.addEventListener('click', () => onTileSelect(letter));
         letterButtons.set(letter.toLowerCase(), letterButton);
 
-        const badgeButton = document.createElement('button');
-        badgeButton.type = 'button';
-        badgeButton.className = 'tile-x2';
-        badgeButton.textContent = 'x2';
-        badgeButton.setAttribute('aria-label', `Add ${letter} twice`);
-        badgeButton.addEventListener('click', (event) => {
-          event.stopPropagation();
-          onTileSelect(letter, true);
-        });
+        // Decorative only: shows how many times this letter has been used
+        // so far (accepted words plus the word in progress), not a control.
+        // Tapping the same letter twice in a row still doubles it.
+        const usageBadge = document.createElement('span');
+        usageBadge.className = 'tile-usage-badge';
+        usageBadge.setAttribute('aria-hidden', 'true');
+        usageBadges.set(letter.toLowerCase(), usageBadge);
 
-        tile.append(letterButton, badgeButton);
+        tile.append(letterButton, usageBadge);
         sideElement.append(tile);
       }
 
@@ -688,10 +688,22 @@ export function createBoardRenderer(options) {
     }
   }
 
-  function renderLetterUsage(prospectiveUsedLetters, currentTokenLetters) {
+  function renderLetterUsage(prospectiveUsedLetters, currentTokenLetters, letterUsageCounts = new Map()) {
     for (const [letter, button] of letterButtons.entries()) {
       button.classList.toggle('used', prospectiveUsedLetters.has(letter));
       button.classList.toggle('active-letter', currentTokenLetters.has(letter));
+
+      const count = letterUsageCounts.get(letter) || 0;
+      button.setAttribute(
+        'aria-label',
+        count >= 2 ? `Add ${letter.toUpperCase()} (used ${count} times)` : `Add ${letter.toUpperCase()}`,
+      );
+
+      const badge = usageBadges.get(letter);
+      if (badge) {
+        badge.textContent = count >= 2 ? `x${count}` : '';
+        badge.classList.toggle('tile-usage-badge-visible', count >= 2);
+      }
     }
   }
 
