@@ -7,13 +7,13 @@
 Letter Punk is a word-chain puzzle in the spirit of NYT's Letter Boxed, played on a 12-letter board arranged as 4 sides of 3 letters each.
 
 **The basics**
-- Tap a letter to add it to the word you're building. Consecutive letters must come from different sides of the board — you can't chain two letters from the same side back to back.
+- Tap a letter to add it to the word you're building, or type it on your keyboard — both do exactly the same thing. Consecutive letters must come from different sides of the board — you can't chain two letters from the same side back to back. Keyboard entry needs a board with no repeated letters to stay unambiguous, which every board the app can produce or accept already guarantees (generated boards, daily puzzles, shared links, and the manual "Set Board" form all reject duplicates); it's included as a genuine alternative input method, not a fallback, for players who find tapping tiles difficult.
 - Words need at least 3 letters, and are checked locally against two combined dictionaries as you type — nothing is ever sent to a server. Turn on "Show dictionary provenance badges" in Settings to see which dictionary (or both) accepted each word; see [Dual Dictionary Validation](docs/dual-dictionary-validation.md) for how that works under the hood.
 - After your first word, every new word must start with the last letter of the previous word.
 - Use every letter on the board at least once to solve the puzzle. It can take as many words as you need — there's no word-count limit and no way to "lose."
 
 **Double letters**
-Tap the same letter twice in a row to double it (e.g. the "ZZ" in "PUZZLE"). Classic Letter Boxed doesn't allow this; Letter Punk treats it as first-class play — a real, deliberate part of solving the puzzle, not a workaround.
+Tap — or type — the same letter twice in a row to double it (e.g. the "ZZ" in "PUZZLE"). Classic Letter Boxed doesn't allow this; Letter Punk treats it as first-class play — a real, deliberate part of solving the puzzle, not a workaround.
 
 **Undo controls**
 - **Undo Letter** removes one letter at a time, and can back up into a previously accepted word if the current one is already empty.
@@ -44,6 +44,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 
 - Steampunk-themed board and route visualization designed for high readability.
 - Letter-first input model: tap the same letter twice in a row to double it. A decorative per-tile `xN` badge tracks how many times each letter has actually been used so far (accepted words plus the word in progress) — informational only, not a control.
+- Physical-keyboard letter entry as a genuine alternative to tapping tiles, not just a convenience: typing a letter calls the exact same engine path a tile click does, so doubling and off-board rejection behave identically either way. Guarded by a board-size check (`getBoardSize() === 12`) since keyboard entry is only unambiguous when no letter repeats on the board — true of every board the app can currently produce or accept, but checked defensively rather than assumed, since a duplicate would make the same physical key map to two different tiles.
 - Word-chain gameplay rules (next word starts with previous word's final letter).
 - Stacked local packed dictionary validation so either the primary dictionary or the compatibility fallback can accept a word.
 - Accepted-word badges and a live builder indicator showing whether a word was accepted by the primary dictionary, fallback dictionary, or both.

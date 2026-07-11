@@ -969,6 +969,29 @@ function wireEvents() {
         gameEngine.removeLastToken();
       }
     }
+
+    // Alternate entry mode: typing a letter does the same thing as tapping
+    // its tile — appendToken doesn't care how a letter arrived, so
+    // doubling (press the same key twice in a row) and off-board rejection
+    // both come for free from the exact same engine path tile clicks use.
+    // Ignore modifier combos (Ctrl/Cmd/Alt+letter) so browser/OS shortcuts
+    // still work normally.
+    if (/^[a-zA-Z]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+
+      // Defensive only: every board-application path already guarantees
+      // 12 unique letters (manual apply, shared links, generation, the
+      // random default board), so this should be unreachable — but a
+      // duplicate letter would make keyboard entry genuinely ambiguous
+      // (lettersToSide is keyed by letter, not tile position), so fail
+      // with a clear message rather than silently picking the wrong side.
+      if (gameEngine.getBoardSize() !== 12) {
+        setMessage('Keyboard letter input needs a board with no repeated letters — use the on-screen tiles for this board.', 'error');
+        return;
+      }
+
+      gameEngine.appendToken(event.key.toLowerCase());
+    }
   });
 
   window.addEventListener('resize', () => {
