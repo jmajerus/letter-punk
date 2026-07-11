@@ -84,6 +84,7 @@ Why Letter Punk Exists:
 - The project started from a design disagreement with traditional Letter Boxed constraints: excluding words with double letters removes a rich portion of everyday vocabulary for reasons that appear implementation-driven more than strategy-driven.
 - Letter Punk keeps the core chaining puzzle structure, but treats double-letter words as first-class play so puzzle decisions come from word choice and path planning, not from an artificial vocabulary cutoff.
 - The goal is to preserve the elegance of the original format while expanding expressive play and making room for a broader, more natural dictionary.
+- There's no word-count cap and no failure state: Delete Word/Delete Char can always back out of a dead end, so completing a well-formed board is generally achievable through persistence, not just cleverness — skill differentiates *how well* you solved it (see [docs/canonical-solution-rating.md](docs/canonical-solution-rating.md)), not *whether* you can. That said, "well-formed" is doing real work in that sentence: a board built from letters with poor vowel coverage can still be a genuinely hard exception, in the extreme leaving only one or two legal words that can even start from certain letters.
 
 Repo structure:
 
