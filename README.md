@@ -8,7 +8,7 @@ Letter Punk is a word-chain puzzle in the spirit of NYT's Letter Boxed, played o
 
 **The basics**
 - Tap a letter to add it to the word you're building. Consecutive letters must come from different sides of the board — you can't chain two letters from the same side back to back.
-- Words need at least 3 letters, and are checked against a real dictionary as you go.
+- Words need at least 3 letters, and are checked locally against two combined dictionaries as you type — nothing is ever sent to a server. Turn on "Show dictionary provenance badges" in Settings to see which dictionary (or both) accepted each word; see [Dual Dictionary Validation](docs/dual-dictionary-validation.md) for how that works under the hood.
 - After your first word, every new word must start with the last letter of the previous word.
 - Use every letter on the board at least once to solve the puzzle. It can take as many words as you need — there's no word-count limit and no way to "lose."
 
@@ -64,7 +64,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 
 ## Learn More
 
-- [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md) — a reusable implementation write-up aimed at other game developers.
+- [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md) — how word validation and the dictionary provenance badges actually work, and a reusable implementation write-up aimed at other game developers.
 - [Canonical Solution Rating](docs/canonical-solution-rating.md) — the design reasoning behind rating a solve against a "canonical" solution, and why that scoring deliberately avoids computing the objectively best possible answer.
 - [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md) — concept/copyright notes.
 

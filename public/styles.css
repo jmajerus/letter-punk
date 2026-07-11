@@ -238,6 +238,65 @@ h2 {
   transform: rotate(17deg);
 }
 
+/* Hidden easter-egg anchor: puffs of steam rise from here, centered on the
+   gear ornament above (::after is a 160x160 box at right:8px/bottom:-4px,
+   so its center sits at right:88px/bottom:76px) when triggered. A real
+   element rather than a pseudo-element specifically so JS can
+   append/remove puff children from it. */
+.steam-vent-anchor {
+  position: absolute;
+  right: 88px;
+  bottom: 76px;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.steam-puff {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%,
+      rgba(255, 255, 255, 0.9),
+      rgba(210, 218, 224, 0.55) 45%,
+      rgba(180, 190, 198, 0.15) 75%,
+      transparent 100%);
+  opacity: 0;
+  animation: steam-puff-rise 1.6s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes steam-puff-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+
+  15% {
+    opacity: 0.9;
+    transform: translate(calc(var(--puff-drift-x, 10px) * 0.2), -14px) scale(0.9);
+  }
+
+  55% {
+    opacity: 0.75;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--puff-drift-x, 10px), -92px) scale(1.9);
+  }
+}
+
+body.reduce-motion .steam-puff {
+  animation: none;
+  opacity: 0;
+}
+
 .board-frame {
   width: min(100%, 680px);
   aspect-ratio: 1;
@@ -679,13 +738,30 @@ button {
 }
 
 .panel-art {
+  position: relative;
   min-height: 0;
-  background-image: url("assets/pipe-manifold.svg");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: min(85%, 320px) auto;
-  opacity: 0.22;
   pointer-events: none;
+}
+
+/* The pipe-manifold artwork is fetched and injected inline (rather than a
+   CSS background-image) specifically so the easter-egg ball bearing can
+   travel along its actual path data in the same coordinate space —
+   guaranteeing alignment instead of trying to replicate background-size
+   math in a separate overlay. */
+.panel-art svg {
+  display: block;
+  width: min(85%, 320px);
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.panel-art .pipe-manifold-art {
+  opacity: 0.22;
+}
+
+.panel-art-ball-bearing {
+  opacity: 0;
 }
 
 .panel-card {

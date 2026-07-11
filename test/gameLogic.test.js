@@ -262,6 +262,28 @@ test('solving the full board reports solved:true and the correct message when wo
   assert.match(lastMessage(events).text, /matched the canonical character count/);
 });
 
+test('justCompleted is true only for the word that first completes the board, not for further words that keep it complete', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil', 'lad'] });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  assert.equal(events.wordResults.at(-1).justCompleted, false, 'board not yet fully covered');
+
+  typeWord(engine, 'jbehk');
+  await engine.submitWord();
+  assert.equal(events.wordResults.at(-1).justCompleted, false, 'still not fully covered');
+
+  typeWord(engine, 'kcfil');
+  await engine.submitWord();
+  assert.equal(events.wordResults.at(-1).solved, true);
+  assert.equal(events.wordResults.at(-1).justCompleted, true, 'this word first completes the board');
+
+  typeWord(engine, 'lad');
+  await engine.submitWord();
+  assert.equal(events.wordResults.at(-1).solved, true, 'board is still fully covered');
+  assert.equal(events.wordResults.at(-1).justCompleted, false, 'but it was already complete before this word');
+});
+
 test('after solving, typing a letter of a further word and undoing it deletes just that letter, not the completing word', async () => {
   const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
 

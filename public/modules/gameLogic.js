@@ -418,17 +418,26 @@ export function createGameEngine(options) {
       validationDetail: validationSummary.detail,
     });
 
+    const wasAlreadyComplete = state.usedLetters.size === lettersToSide.size;
     for (const token of state.tokens) {
       state.usedLetters.add(token.letter);
     }
 
     const solved = state.usedLetters.size === lettersToSide.size;
+    // Distinct from `solved`, which stays true for every word submitted
+    // afterward while the board remains fully covered (that's what keeps
+    // auto-seed off across continued play). `justCompleted` is only true
+    // for the one word that pushes the board from not-yet-complete to
+    // complete — the right signal for a one-time celebration, as opposed
+    // to something that would fire again on every further word.
+    const justCompleted = solved && !wasAlreadyComplete;
     emitWordResult({
       outcome: 'accepted',
       validationSource: validation.source || '',
       wordLength: length,
       word,
       solved,
+      justCompleted,
     });
 
     if (solved) {

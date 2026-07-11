@@ -15,6 +15,8 @@ import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
 import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
 import { recordFinishedGame } from './modules/historyManager.js';
 import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
+import { createPipeEasterEgg } from './modules/pipeEasterEgg.js';
+import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
 
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
@@ -27,6 +29,8 @@ const messageElement = document.getElementById('message');
 const dictionarySourceIndicatorElement = document.getElementById('dictionarySourceIndicator');
 const foundWordsElement = document.getElementById('foundWords');
 const letterCountStatElement = document.getElementById('letterCountStat');
+const panelArtElement = document.getElementById('panelArt');
+const steamVentAnchorElement = document.getElementById('steamVentAnchor');
 const submitButton = document.getElementById('submitBtn');
 const undoButton = document.getElementById('undoBtn');
 const clearButton = document.getElementById('clearBtn');
@@ -193,6 +197,25 @@ const renderer = createBoardRenderer({
   onTileSelect(letter) {
     gameEngine.appendToken(letter);
   },
+});
+
+// Hidden, repeatable easter egg — a ball bearing travels through the
+// decorative pipe artwork when \ or | is pressed (see wireEvents). Kept off
+// the alphabet deliberately: letter keys are reserved for a possible future
+// keyboard-driven alternate entry mode, so this can never collide with it.
+const pipeEasterEgg = createPipeEasterEgg({
+  containerElement: panelArtElement,
+  artworkUrl: '/assets/pipe-manifold.svg',
+  isReducedMotionEnabled,
+});
+
+// A second, separately-hidden easter egg — steam puffs rising from the
+// board's corner gear ornament, triggered by ` or ~ (see wireEvents). Kept
+// on a different physical key from the ball bearing's \ / | so the two
+// remain independently discoverable.
+const steamVentEasterEgg = createSteamVentEasterEgg({
+  anchorElement: steamVentAnchorElement,
+  isReducedMotionEnabled,
 });
 
 // The known reference solution for the currently-applied board, if any.
@@ -874,6 +897,30 @@ function wireEvents() {
   }
 
   window.addEventListener('keydown', (event) => {
+    // Hidden easter egg trigger, checked first and independent of modal
+    // state: a single unshifted-or-shifted press of the same physical key
+    // (\ or |), skipped only while actually focused in a text field so it
+    // can never interfere with pasting board text or typing solution words.
+    if (event.key === '\\' || event.key === '|') {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+        event.preventDefault();
+        pipeEasterEgg.play();
+        return;
+      }
+    }
+
+    // Second, separately-hidden easter egg: steam puffs from the board's
+    // corner gear ornament, same text-field guard as above.
+    if (event.key === '`' || event.key === '~') {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+        event.preventDefault();
+        steamVentEasterEgg.play();
+        return;
+      }
+    }
+
     const activeModal = getActiveModal();
     if (activeModal) {
       trapFocusInModal(activeModal, event);
@@ -1033,7 +1080,9 @@ function initializeGame() {
     onInvalidLetter(letter) {
       renderer.flashInvalidTile(letter);
     },
-    onWordResult({ outcome, validationSource, wordLength, word, solved }) {
+    onWordResult({
+      outcome, validationSource, wordLength, word, solved, justCompleted,
+    }) {
       const pState = puzzleFetcher.getState();
       const puzzleId = pState.puzzleSource === 'catalog'
         ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
@@ -1048,17 +1097,25 @@ function initializeGame() {
           completedPuzzleIds.add(puzzleId);
         }
       }
+
+      // Only the word that first completes the board — not every further
+      // word submitted afterward while it stays complete, which would turn
+      // a celebratory moment into repeated noise during continued play.
+      if (justCompleted) {
+        pipeEasterEgg.play();
+      }
     },
   });
 
   renderUi();
 
   wireEvents();
+  pipeEasterEgg.init();
 
   syncMotionPreferenceToUi();
   syncProvenanceBadgesPreferenceToUi();
 
-  setMessage('Double letters are welcome here: tap a letter twice or use x2.');
+  setMessage('Double letters are welcome here: tap the same letter twice in a row.');
 
   const sharedPuzzleLoaded = tryLoadSharedPuzzleFromHash();
 
