@@ -416,7 +416,7 @@ export function createGameEngine(options) {
         && playerCharacterCount < canonicalCharacterCount
       ) {
         emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Incredible: you beat the canonical ${canonicalCharacterCount}-character solution!`,
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Efficiency Engineer: you came in under the canonical ${canonicalCharacterCount}-character solution!`,
           'success',
         );
         return;
@@ -428,7 +428,7 @@ export function createGameEngine(options) {
         && playerCharacterCount === canonicalCharacterCount
       ) {
         emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Nice work: you matched the canonical character count!`,
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Dead Reckoner: you matched the canonical character count exactly!`,
           'success',
         );
         return;
@@ -440,7 +440,7 @@ export function createGameEngine(options) {
         && playerCharacterCount > canonicalCharacterCount
       ) {
         emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Ambitious: that's longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
+          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Vocabulary Wrangler: that's longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
           'success',
         );
         return;

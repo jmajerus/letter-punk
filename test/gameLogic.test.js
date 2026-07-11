@@ -262,6 +262,22 @@ test('solving the full board reports solved:true and the correct message when wo
   assert.match(lastMessage(events).text, /matched the canonical character count/);
 });
 
+test('solving with fewer characters than the canonical count is acknowledged too', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getCanonicalCharacterCount: () => 20, // more than the actual 14 characters played
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const finalResult = events.wordResults.at(-1);
+  assert.equal(finalResult.solved, true);
+  assert.match(lastMessage(events).text, /came in under the canonical 20-character solution/);
+});
+
 test('solving with more characters than the canonical count still gets a positive message, not silence', async () => {
   const { engine, events } = createHarness({
     acceptedWords: ['adgj', 'jbehk', 'kcfil'],

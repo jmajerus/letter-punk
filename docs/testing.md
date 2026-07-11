@@ -35,7 +35,7 @@ One exception: `dictionaryValidator.js`'s API-fallback path reads `window.locati
 - Both "undo" controls end-to-end:
   - `removeLastToken` (single-character delete): nothing-to-undo, direct back-up on an already-empty builder, back-up from a locked lone starter, and generic mid-word pop
   - `clearTokens` (delete-word): already-clear, direct found-word removal on an empty builder, wiping an in-progress first word, the post-acceptance reset-to-starter, and the second-press remove-found-word
-- Full-board solve, including all three canonical-character-count comparison messages (beat, matched, and — as of the symmetric-scoring update described in [docs/canonical-solution-rating.md](canonical-solution-rating.md) — exceeded)
+- Full-board solve, including all three canonical-character-count comparison messages (fewer characters, an exact match, and — as of the symmetric-scoring update described in [docs/canonical-solution-rating.md](canonical-solution-rating.md) — more characters)
 
 **`dictionaryValidator.js`** (`createDictionaryValidator`):
 - Primary-only match, stacked (both dictionaries) match, and reachable-but-absent
