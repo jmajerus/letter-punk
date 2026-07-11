@@ -262,6 +262,47 @@ test('solving the full board reports solved:true and the correct message when wo
   assert.match(lastMessage(events).text, /matched the canonical character count/);
 });
 
+test('after solving, typing a letter of a further word and undoing it deletes just that letter, not the completing word', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+  assert.deepEqual(engine.getSnapshot().tokens, [], 'the solved branch leaves the builder genuinely empty, not reseeded');
+  assert.equal(engine.getSnapshot().foundWords.length, 3);
+
+  // "kcfil" ends in 'l' — required starting letter for a further word.
+  engine.appendToken('l');
+  assert.equal(engine.getSnapshot().tokens.length, 1);
+
+  await engine.removeLastToken();
+
+  const snapshot = engine.getSnapshot();
+  assert.deepEqual(snapshot.tokens, [], 'the freshly-typed letter should just be deleted');
+  assert.equal(snapshot.foundWords.length, 3, 'the completing word must not be un-accepted by this undo');
+});
+
+test('auto-seed stays off for every further word, not just the one that first completed the board', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil', 'lad'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  // Board is already fully covered. Submitting a further word ("lad") still
+  // recomputes usedLetters.size === lettersToSide.size fresh — it doesn't
+  // matter that this isn't the *first* time that became true — so this
+  // submission takes the same solved branch again.
+  typeWord(engine, 'lad');
+  await engine.submitWord();
+
+  const snapshot = engine.getSnapshot();
+  assert.deepEqual(snapshot.tokens, [], 'still no auto-reseed after a second completing word');
+  assert.equal(snapshot.foundWords.length, 4);
+});
+
 test('solving with fewer characters than the canonical count is acknowledged too', async () => {
   const { engine, events } = createHarness({
     acceptedWords: ['adgj', 'jbehk', 'kcfil'],

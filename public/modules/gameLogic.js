@@ -433,6 +433,13 @@ export function createGameEngine(options) {
 
     if (solved) {
       state.tokens = [];
+      // Unlike a normal word acceptance, nothing gets auto-reseeded here —
+      // the builder is genuinely empty, not holding a system-provided
+      // starting letter. If the player types a further word themselves,
+      // that first letter is theirs, not a locked seed, so Undo Letter
+      // should delete it directly rather than backing into the word that
+      // just completed the board.
+      state.starterLocked = false;
       emitStateChange();
       const playerCharacterCount = state.foundWords.reduce((total, entry) => total + entry.length, 0);
       const canonicalCharacterCount = Number(

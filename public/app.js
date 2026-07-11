@@ -250,7 +250,22 @@ function renderLetterCountStat(snapshot) {
   }
 
   const count = snapshot.runningCharacterCount;
-  letterCountStatElement.textContent = `${count} letter${count === 1 ? '' : 's'} placed so far`;
+  const label = count === 1 ? 'letter' : 'letters';
+
+  // The word that completes the board takes submitWord()'s "solved" branch,
+  // which explicitly sets tokens=[] and returns before the normal
+  // auto-reseed runs — so the builder is genuinely, literally empty right
+  // after solving, not holding a seeded starting letter the way it would
+  // after any other word. Typing even one letter of a further word moves
+  // tokens.length to 1, correctly reverting to the live tally; undoing back
+  // to a true empty builder (whether by deleting that letter or backing out
+  // further) correctly shows completion again.
+  const atWordBoundary = snapshot.tokens.length === 0;
+  const isComplete = atWordBoundary && snapshot.usedLetters.size === gameEngine.getBoardSize();
+
+  letterCountStatElement.textContent = isComplete
+    ? `Puzzle completed using ${count} ${label}`
+    : `${count} ${label} placed so far`;
 }
 
 function getPreviousSolutionUiLabels() {
