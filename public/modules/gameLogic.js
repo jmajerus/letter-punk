@@ -455,48 +455,45 @@ export function createGameEngine(options) {
         typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
       );
 
-      if (
-        Number.isFinite(canonicalCharacterCount)
-        && canonicalCharacterCount > 0
-        && playerCharacterCount < canonicalCharacterCount
-      ) {
-        emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Efficiency Engineer: you came in under the canonical ${canonicalCharacterCount}-character solution!`,
-          'success',
-        );
-        return;
-      }
+      if (Number.isFinite(canonicalCharacterCount) && canonicalCharacterCount > 0) {
+        const prefix = `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters.`;
+        const delta = playerCharacterCount - canonicalCharacterCount;
+        const absDelta = Math.abs(delta);
 
-      if (
-        Number.isFinite(canonicalCharacterCount)
-        && canonicalCharacterCount > 0
-        && playerCharacterCount === canonicalCharacterCount
-      ) {
-        emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Dead Reckoner: you matched the canonical character count exactly!`,
-          'success',
-        );
-        return;
-      }
+        // Dead Reckoner covers exact matches and near-misses (±1) alike:
+        // landing within a single character of the canonical count is
+        // still a remarkably narrow target to hit, and reporting the
+        // magnitude here — rather than gatekeeping whether it "counts" —
+        // lets the player judge for themselves how close it really was.
+        if (absDelta <= 1) {
+          const landing = absDelta === 0
+            ? 'you landed exactly on the canonical count!'
+            : 'you landed within one character of the canonical count!';
+          emitMessage(`${prefix} Dead Reckoner: ${landing}`, 'success');
+          return;
+        }
 
-      if (
-        Number.isFinite(canonicalCharacterCount)
-        && canonicalCharacterCount > 0
-        && playerCharacterCount > canonicalCharacterCount
-      ) {
+        if (delta < 0) {
+          emitMessage(
+            `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!`,
+            'success',
+          );
+          return;
+        }
+
         emitMessage(
-          `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Vocabulary Wrangler: that's longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
+          `${prefix} Vocabulary Wrangler: that's ${absDelta} characters longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
           'success',
         );
         return;
       }
 
       if (state.foundWords.length <= 2) {
-        emitMessage(`Solved in ${state.foundWords.length} words. Outstanding solve!`, 'success');
+        emitMessage(`Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Outstanding solve!`, 'success');
         return;
       }
 
-      emitMessage(`Solved in ${state.foundWords.length} words. Great solve.`, 'success');
+      emitMessage(`Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Great solve.`, 'success');
       return;
     }
 

@@ -259,7 +259,57 @@ test('solving the full board reports solved:true and the correct message when wo
   assert.equal(finalResult.outcome, 'accepted');
   assert.equal(finalResult.solved, true);
   assert.equal(engine.getSnapshot().usedLetters.size, 12);
-  assert.match(lastMessage(events).text, /matched the canonical character count/);
+  assert.match(lastMessage(events).text, /Dead Reckoner: you landed exactly on the canonical count!/);
+});
+
+test('landing one character over the canonical count counts as Dead Reckoner, not Vocabulary Wrangler', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getCanonicalCharacterCount: () => 13, // one fewer than the actual 14 characters played
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  assert.match(lastMessage(events).text, /Dead Reckoner: you landed within one character of the canonical count!/);
+});
+
+test('landing one character under the canonical count counts as Dead Reckoner, not Efficiency Engineer', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getCanonicalCharacterCount: () => 15, // one more than the actual 14 characters played
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  assert.match(lastMessage(events).text, /Dead Reckoner: you landed within one character of the canonical count!/);
+});
+
+test('solving with no canonical reference at all still reports the character count, not just word count', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehkcfil'] });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'jbehkcfil');
+  await engine.submitWord();
+
+  assert.match(lastMessage(events).text, /Solved in 2 words and 13 characters\. Outstanding solve!/);
+});
+
+test('solving in more than 2 words with no canonical reference still reports the character count', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  assert.match(lastMessage(events).text, /Solved in 3 words and 14 characters\. Great solve\./);
 });
 
 test('justCompleted is true only for the word that first completes the board, not for further words that keep it complete', async () => {
@@ -338,7 +388,7 @@ test('solving with fewer characters than the canonical count is acknowledged too
 
   const finalResult = events.wordResults.at(-1);
   assert.equal(finalResult.solved, true);
-  assert.match(lastMessage(events).text, /came in under the canonical 20-character solution/);
+  assert.match(lastMessage(events).text, /Efficiency Engineer: you came in 6 characters under the canonical 20-character solution!/);
 });
 
 test('solving with more characters than the canonical count still gets a positive message, not silence', async () => {
@@ -354,7 +404,7 @@ test('solving with more characters than the canonical count still gets a positiv
 
   const finalResult = events.wordResults.at(-1);
   assert.equal(finalResult.solved, true);
-  assert.match(lastMessage(events).text, /longer than the canonical 10-character solution/);
+  assert.match(lastMessage(events).text, /Vocabulary Wrangler: that's 4 characters longer than the canonical 10-character solution/);
 });
 
 test('letterUsageCounts tracks reuse across accepted words and the word in progress', async () => {

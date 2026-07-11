@@ -38,23 +38,30 @@ The fix adds a third branch, but the more important shift is treating all three 
 
 ```js
 // public/modules/gameLogic.js
-if (playerCharacterCount < canonicalCharacterCount) {
-  // "Efficiency Engineer: you came in under the canonical N-character solution!"
-} else if (playerCharacterCount === canonicalCharacterCount) {
-  // "Dead Reckoner: you matched the canonical character count exactly!"
-} else if (playerCharacterCount > canonicalCharacterCount) {
-  // "Vocabulary Wrangler: that's longer than the canonical N-character
-  //  solution — nice work weaving in extra letters!"
+const delta = playerCharacterCount - canonicalCharacterCount;
+const absDelta = Math.abs(delta);
+
+if (absDelta <= 1) {
+  // "Dead Reckoner: you landed exactly on the canonical count!"
+  // "Dead Reckoner: you landed within one character of the canonical count!"
+} else if (delta < 0) {
+  // "Efficiency Engineer: you came in N characters under the canonical
+  //  M-character solution!"
+} else {
+  // "Vocabulary Wrangler: that's N characters longer than the canonical
+  //  M-character solution — nice work weaving in extra letters!"
 }
 ```
 
-- **Efficiency Engineer — shorter.** Finding the tightest possible path through the board.
-- **Vocabulary Wrangler — longer.** Deliberately weaving in extra letters and repeats: the double-letter mechanic put to full use.
-- **Dead Reckoner — exact match.** Reading the puzzle well enough to land squarely on the reference count on a genuine first attempt. (Dead reckoning is the navigational technique of calculating a position from careful judgment rather than direct measurement — a fitting name for landing on a target you can't see.)
+- **Efficiency Engineer — 2+ characters under.** Finding a tighter path through the board than the reference.
+- **Vocabulary Wrangler — 2+ characters over.** Deliberately weaving in extra letters and repeats: the double-letter mechanic put to full use.
+- **Dead Reckoner — within one character, either direction.** Reading the puzzle well enough to land on or almost exactly on the reference count on a genuine first attempt. (Dead reckoning is the navigational technique of calculating a position from careful judgment rather than direct measurement — a fitting name for landing on a target you can't see.) Widened from an exact-match-only window to ±1 for a specific reason: a board's true achievable minimum isn't always knowable (see "The Trap" above), so a canonical count that's itself a hair off from the tightest possible reading of the puzzle shouldn't be the difference between "precise" and "not." Off-by-one is still an extraordinarily narrow target to hit in the same solution space discussed below.
+
+Both Efficiency Engineer and Vocabulary Wrangler now report the actual gap (`absDelta`) rather than just the direction. The earlier wording — "you came in under" with no number — quietly treated a 1-character gap and a 20-character gap as the same achievement, which understates the more dramatic case and overstates the marginal one. Reporting the real number sidesteps a harder question entirely: whether a given gap size "counts" as a real accomplishment is left to the player, not decided by the message. That's the same stance as the trust paragraph below — the system reports facts, not verdicts.
 
 These three names are a first pass, not a settled choice — worth revisiting once there's been more time to sit with them.
 
-The exact-match case is worth calling out specifically, because it's easy to file it away as a rounding-error tie rather than a real achievement. Coming in under or exceeding the canonical count is an open target — many different word combinations satisfy "fewer than N" or "more than N." Landing on exactly N, via a word choice that isn't just the reference solution replayed after seeing it (e.g. via "Yesterday"), is a single point in a much larger space. It's likely rare for an individual player to hit it in a given playthrough, which is exactly why it earns its own message instead of folding invisibly into a generic "you solved it."
+The near-exact case is worth calling out specifically, because it's easy to file it away as a rounding-error tie rather than a real achievement. Coming in 2+ under or over the canonical count is an open target — many different word combinations satisfy "well under N" or "well over N." Landing within one character of N, via a word choice that isn't just the reference solution replayed after seeing it (e.g. via "Yesterday"), is one of only three points (N-1, N, N+1) in a much larger space. It's likely rare for an individual player to hit that narrow a window in a given playthrough, which is exactly why it earns its own message instead of folding invisibly into a generic "you solved it."
 
 Worth separating that from a second, broader kind of rarity: the *whole three-way scoring shape* is uncommon, independent of how often any one outcome actually occurs in play. Most games pick a single axis — fewest moves, highest score, fastest time — and treat every other result as simply "didn't optimize," full stop. Rewarding efficiency, elaborateness, and precision as three equally legitimate outcomes, rather than one correct direction with silence everywhere else, is the less common design choice.
 
@@ -64,16 +71,19 @@ One honest caveat: the game can't tell — and doesn't try to tell — whether a
 
 ## Picking a Reference Without an Exhaustive Search
 
-For custom boards built from a single seed word, Letter Punk still needs *some* reference word pair. The approach: reuse the dictionary search that already exists for finding a companion word (`dictionaryValidator.findCompanionWord`), sort its full candidate list shortest-to-longest, and start from the **middle of the pack** — a typically-sized companion, deliberately not the shortest or longest extreme.
+For custom boards built from a single seed word, Letter Punk still needs *some* reference word pair. The approach: reuse the dictionary search that already exists for finding a companion word (`dictionaryValidator.findCompanionWord`), sort its full candidate list shortest-to-longest, and start from a **fixed percentile of the pack** — a typically-sized companion, deliberately not the shortest or longest extreme.
 
-The one wrinkle: a board's 4-sides-of-3 letter layout isn't computed until *after* a companion is chosen, and not every valid word pair can actually be laid out on a real board (`generateBoardFromSolutionWords` can fail for a given pair). So the median pick isn't final until it's been verified against a real layout attempt. `pickBalancedCompanion` (`public/app.js`) walks outward from the median index, trying each candidate against the actual board-layout solver, and stops at the first one that produces a valid board — capped at a fixed number of attempts so the search stays bounded no matter how large the candidate pool is:
+That percentile started life as the literal median (50th percentile) and was later tuned down to the 25th, based on measurement rather than a guess: across a sample of seed words, the median companion averaged ~17 total characters versus ~13.6 for the shortest available candidate for the same seeds. That gap traces to a real property of the underlying data, not a quirk of any one seed — raw dictionaries are dominated by long, obscure derived words (verb participles, `-ology`/`-ation`/`-ity` nominalizations), so the *statistical* median of "every word that fits" runs longer than what a well-read person would *actually* reach for. The 25th percentile brings the average down to ~15.9 while still avoiding the shortest-possible-word degenerate case described above — a real fix, not just a smaller version of the same problem, since it directly counters a measured skew rather than arbitrarily trusting the midpoint of an unfiltered distribution.
+
+The one wrinkle: a board's 4-sides-of-3 letter layout isn't computed until *after* a companion is chosen, and not every valid word pair can actually be laid out on a real board (`generateBoardFromSolutionWords` can fail for a given pair). So the percentile pick isn't final until it's been verified against a real layout attempt. `pickBalancedCompanion` (`public/app.js`) walks outward from the target index, trying each candidate against the actual board-layout solver, and stops at the first one that produces a valid board — capped at a fixed number of attempts so the search stays bounded no matter how large the candidate pool is:
 
 ```js
 // public/app.js
+const COMPANION_TARGET_PERCENTILE = 0.25;
 const MAX_COMPANION_LAYOUT_ATTEMPTS = 25;
 
 function pickBalancedCompanion(seedUpper, candidates) {
-  const order = medianOutwardOrder(candidates.length).slice(0, MAX_COMPANION_LAYOUT_ATTEMPTS);
+  const order = percentileOutwardOrder(candidates.length, COMPANION_TARGET_PERCENTILE).slice(0, MAX_COMPANION_LAYOUT_ATTEMPTS);
   for (const index of order) {
     const companion = candidates[index];
     if (!generateBoardFromSolutionWords([seedUpper, companion.toUpperCase()]).error) {
@@ -94,22 +104,24 @@ Seed: **GEAR**
 
 `findCompanionWord` returns 105 valid candidates for this seed — dictionary words starting with R (GEAR's last letter) that combine with GEAR's own letters to total exactly 12 unique letters. Sorted shortest to longest, the pool ranges from REDUCTIONS (10 characters) to RESPONSIBILITIES (16 characters). Neither extreme is ever seriously considered.
 
-Starting from the middle of that 105-candidate list (index 52), the very first candidate tried — REDEVELOPMENT (13 characters) — already produces a valid board layout, so the search stops immediately:
+Starting from the 25th percentile of that 105-candidate list (index 26), the very first candidate tried — REPRODUCTION (12 characters) — already produces a valid board layout, so the search stops immediately:
 
 | Side | Letters |
 | --- | --- |
-| Top | EOT |
-| Right | ALP |
-| Bottom | RMN |
-| Left | GDV |
+| Top | EOU |
+| Right | RDC |
+| Bottom | APT |
+| Left | GIN |
 
-GEAR + REDEVELOPMENT: 4 + 13 = **17 characters**, the canonical reference for this board. Any completed solve on it is then rated against that number:
+GEAR + REPRODUCTION: 4 + 12 = **16 characters**, the canonical reference for this board — shorter than the 17-character result the same seed produced under the old median-based pick (GEAR + REDEVELOPMENT), consistent with the measured effect of moving from the 50th to the 25th percentile. Any completed solve on it is then rated against that number:
 
 | Player's solve | Characters | Title |
 | --- | --- | --- |
-| a tighter chain | fewer than 17 | Efficiency Engineer |
-| GEAR + REDEVELOPMENT itself, or any other pair totaling 17 | exactly 17 | Dead Reckoner |
-| a longer, double-letter-heavy chain | more than 17 | Vocabulary Wrangler |
+| a tighter chain | 14 or fewer | Efficiency Engineer |
+| a chain one character short | 15 | Dead Reckoner ("within one character") |
+| GEAR + REPRODUCTION itself, or any other pair totaling 16 | exactly 16 | Dead Reckoner ("exactly on the canonical count") |
+| a chain one character over | 17 | Dead Reckoner ("within one character") |
+| a longer, double-letter-heavy chain | 18 or more | Vocabulary Wrangler |
 
 ## Reading, Not Computing
 

@@ -309,26 +309,36 @@ function sumWordLengths(words) {
   return total > 0 ? total : null;
 }
 
-function getActiveCanonicalCharacterCount() {
-  // Prefer the in-memory canonical words for the active session (set by
-  // custom-board generation or by loading a shared link) over the catalog
-  // lookup below — it reflects the board actually in play, including
-  // shared-link puzzles that a catalog lookup knows nothing about.
+// The known reference solution for whatever's actually in play, from
+// whichever source has one: the in-memory canonicalWords (set by custom
+// board generation or by loading a shared link) or, for catalog/daily
+// puzzles — which never touch canonicalWords, since normal puzzle
+// navigation has no reason to — the catalog entry's own canonicalSolution.
+// Both getActiveCanonicalCharacterCount and copyShareLink need this same
+// answer: the character-count comparison and the words actually written
+// into a share link must agree on what "canonical" means for the active
+// puzzle, or sharing a daily puzzle silently drops its reference solution.
+function getActiveCanonicalWords() {
   if (canonicalWords.length > 0) {
-    return sumWordLengths(canonicalWords);
+    return canonicalWords;
   }
 
   const puzzleState = puzzleFetcher.getState();
   if (puzzleState.puzzleSource !== 'catalog' || puzzleState.activePuzzleIndex < 0) {
-    return null;
+    return [];
   }
 
   const entry = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex];
   if (!Array.isArray(entry?.canonicalSolution) || entry.canonicalSolution.length === 0) {
-    return null;
+    return [];
   }
 
-  return sumWordLengths(entry.canonicalSolution);
+  return entry.canonicalSolution;
+}
+
+function getActiveCanonicalCharacterCount() {
+  const words = getActiveCanonicalWords();
+  return words.length > 0 ? sumWordLengths(words) : null;
 }
 
 function updatePuzzleNavigation() {
@@ -571,32 +581,42 @@ async function applyBoardFromInputs() {
   );
 }
 
-// A candidate list sorted shortest-to-longest gives us "the middle of the
-// pack" for free at the median index. Starting there and walking outward
+// A candidate list sorted shortest-to-longest gives us any percentile for
+// free by index. The raw dictionary's length distribution is dominated by
+// long, obscure derived words (verb participles, -ology/-ation/-ity
+// nominalizations), so the 50th percentile (the literal median) runs
+// noticeably longer than what a well-read person would typically reach
+// for — measured empirically across a sample of seed words, the median
+// companion averaged ~17 total characters versus ~13.6 for the shortest
+// available. Targeting the 25th percentile instead trims that down
+// (~15.9 average in the same sample) while still avoiding the
+// shortest-possible-word degenerate case discussed in
+// docs/canonical-solution-rating.md. Starting there and walking outward
 // (rather than trying candidates in sorted order) means we typically land
-// on a typically-sized companion within a handful of attempts, without
-// having to search for a true shortest or longest — generateBoardFromSolutionWords
-// is the only thing that actually knows whether a candidate's letters fit
-// some valid 4-side layout, so this has to try real layouts, not just
+// on a companion near that target within a handful of attempts, without
+// having to search exhaustively — generateBoardFromSolutionWords is the
+// only thing that actually knows whether a candidate's letters fit some
+// valid 4-side layout, so this has to try real layouts, not just
 // letter-set math.
+const COMPANION_TARGET_PERCENTILE = 0.25;
 const MAX_COMPANION_LAYOUT_ATTEMPTS = 25;
 
-function medianOutwardOrder(length) {
-  const medianIndex = Math.floor(length / 2);
-  const order = [medianIndex];
+function percentileOutwardOrder(length, percentile) {
+  const targetIndex = Math.min(length - 1, Math.floor(length * percentile));
+  const order = [targetIndex];
   for (let offset = 1; order.length < length; offset += 1) {
-    if (medianIndex - offset >= 0) {
-      order.push(medianIndex - offset);
+    if (targetIndex - offset >= 0) {
+      order.push(targetIndex - offset);
     }
-    if (medianIndex + offset < length) {
-      order.push(medianIndex + offset);
+    if (targetIndex + offset < length) {
+      order.push(targetIndex + offset);
     }
   }
   return order;
 }
 
 function pickBalancedCompanion(seedUpper, candidates) {
-  const order = medianOutwardOrder(candidates.length).slice(0, MAX_COMPANION_LAYOUT_ATTEMPTS);
+  const order = percentileOutwardOrder(candidates.length, COMPANION_TARGET_PERCENTILE).slice(0, MAX_COMPANION_LAYOUT_ATTEMPTS);
   for (const index of order) {
     const companion = candidates[index];
     if (!generateBoardFromSolutionWords([seedUpper, companion.toUpperCase()]).error) {
@@ -732,7 +752,7 @@ async function copyShareLink({ includeProgress }) {
 
   let hash;
   try {
-    hash = encodeShareHash({ board, progressWords, canonicalWords });
+    hash = encodeShareHash({ board, progressWords, canonicalWords: getActiveCanonicalWords() });
   } catch {
     setBoardInputMessage('Could not build a share link for this board.', 'error');
     return;
