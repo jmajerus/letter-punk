@@ -601,6 +601,25 @@ function getActiveModal() {
   return null;
 }
 
+// Closes whatever modal is currently open, if any -- used when the attract
+// loop reclaims the screen (see startArcadeMode). A modal left open over
+// the loop would both visually block the "this station is free" signal
+// the loop exists to send, and stay fully interactive underneath it, since
+// arcade mode's pointer-events lockout only covers the board and its own
+// controls, not modals.
+function closeActiveModalIfAny() {
+  const activeModal = getActiveModal();
+  if (activeModal === boardModal) {
+    closeBoardModal();
+  } else if (activeModal === settingsModal) {
+    closeSettingsModal();
+  } else if (activeModal === yesterdayModal) {
+    closeYesterdayModal();
+  } else if (activeModal === helpModal) {
+    closeHelpModal();
+  }
+}
+
 function trapFocusInModal(modal, event) {
   if (!modal || event.key !== 'Tab') {
     return;
@@ -1366,6 +1385,12 @@ async function startArcadeMode(board, progressWords, canonicalWordsFromLink) {
   cancelIdleTimers();
   arcadeModeActive = true;
   document.body.classList.add('arcade-mode');
+  // A modal left open (Settings, Set Board, etc.) from before the idle
+  // timer fired would otherwise sit on top of the loop, fully interactive
+  // and blocking the very "station is free" signal the loop exists to
+  // send — see closeActiveModalIfAny. Harmless no-op on the very first,
+  // URL-triggered call, since nothing's open yet at page load.
+  closeActiveModalIfAny();
 
   // Self-sufficient on purpose: the very first call (from
   // tryLoadSharedPuzzleFromHash) already has the arcade board applied by

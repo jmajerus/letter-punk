@@ -121,9 +121,11 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 - `docs/testing.md` test coverage summary and how to add new tests
 - `docs/dual-dictionary-validation.md` reusable write-up on the stacked dictionary pattern
 - `docs/canonical-solution-rating.md` design reasoning behind the canonical-solution scoring system
+- `docs/design-philosophy.md` short, general-audience essay on the project's approach to winning; dedicated to the public domain (CC0)
 - `docs/development.md` this file
+- `docs/archive/` superseded documents kept for reference, not linked from day-to-day docs
 - `README.md` project overview and how to play
-- `Letter-Boxed-Game-Logic-Copyright.md` concept notes
+- `Letter-Boxed-Game-Logic-Copyright.md` copyright/licensing notes
 
 ---
 

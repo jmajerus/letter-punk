@@ -68,6 +68,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 
 - [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md) — how word validation and the dictionary provenance badges actually work, and a reusable implementation write-up aimed at other game developers.
 - [Canonical Solution Rating](docs/canonical-solution-rating.md) — the design reasoning behind rating a solve against a "canonical" solution, and why that scoring deliberately avoids computing the objectively best possible answer.
+- [More Than One Way to Win](docs/design-philosophy.md) — a short, general-audience essay on the design ideas behind this project's approach to winning, written for anyone building anything, not just games. Dedicated to the public domain (CC0) — free to use, no permission needed.
 - [Roadmap & Future Concepts](docs/roadmap.md) — potential board-configuration and rule variants, a wildcard-letter idea, and a full concept brief for a separate pictograph-based spin-off. Nothing here is a commitment.
 - [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md) — concept/copyright notes.
 
