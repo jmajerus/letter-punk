@@ -106,6 +106,34 @@ let freeChainPreference = readPreference(FREE_CHAIN_STORAGE_KEY);
 // shared link) clear it. Toggling the Settings checkbox itself is the one
 // and only way to make a change stick beyond the current puzzle.
 let freeChainSessionOverride = null;
+// Set right before eagerly playing the completion celebration (steam vent
+// plus an abbreviated ball-bearing pass — see playSolvedReplay) for a
+// shared link that's already known to fully solve the board. Lets the real
+// justCompleted trigger inside onWordResult, which still fires normally
+// when the replay's final word is actually submitted, skip re-playing
+// (and visually restarting) an animation that's already mid-flight.
+let suppressNextCompletionCelebration = false;
+// True for the whole lifetime of an attract-mode demo loop (see
+// startArcadeMode/stopArcadeMode) — checked by the keydown handler (any key
+// stops the loop), by onWordResult (suppresses analytics for repeated demo
+// solves), and threaded through as an isCancelled callback so an in-flight
+// replay can bail within one step instead of running to completion.
+let arcadeModeActive = false;
+// The board/words an `&arcade=1` link decoded to, kept around for the
+// whole page lifetime (not cleared by stopArcadeMode) so the idle-restart
+// timer below can start the exact same demo back up later. null for any
+// session that never opened an arcade link — that's what keeps the idle
+// restart from ever affecting a normal, non-kiosk visit.
+let arcadeSourceBoard = null;
+let arcadeSourceProgressWords = null;
+let arcadeSourceCanonicalWords = null;
+let idleArcadeRestartTimerId = null;
+// A real, in-progress game the idle-restart timer displaced to bring the
+// attract loop back — kept recoverable for a while rather than discarded
+// the instant the demo takes over the screen (see captureGameForLaterRestore
+// / SAVED_GAME_DISCARD_MS). null whenever there's nothing worth restoring.
+let savedGameSnapshot = null;
+let savedGameDiscardTimerId = null;
 let messageTimer = null;
 let lastRenderedBoardSignature = '';
 const completedPuzzleIds = new Set();
@@ -995,7 +1023,26 @@ function wireEvents() {
     });
   }
 
+  // Idle-restart tracking for arcade/kiosk sessions — deliberately separate
+  // from the keydown handler below rather than folded into it, since this
+  // one thing (note that something happened) has to run unconditionally,
+  // before any modal/easter-egg/game-logic branching decides whether to
+  // return early. no-ops outside a kiosk session — see noteUserActivity.
+  window.addEventListener('keydown', noteUserActivity, { capture: true });
+  window.addEventListener('pointerdown', noteUserActivity, { capture: true });
+
   window.addEventListener('keydown', (event) => {
+    // Checked before anything else, including the easter eggs below: in
+    // arcade/kiosk attract mode, the very first keypress of any kind is
+    // "stop the demo," full stop — it must not also trigger an easter egg,
+    // append a letter, or do anything else the same keystroke would
+    // normally do.
+    if (arcadeModeActive) {
+      event.preventDefault();
+      stopArcadeMode();
+      return;
+    }
+
     // Hidden easter egg trigger, checked first and independent of modal
     // state: a single unshifted-or-shifted press of the same physical key
     // (\ or |), skipped only while actually focused in a text field so it
@@ -1109,6 +1156,40 @@ function wait(ms) {
 // next one starts, rather than being replaced mid-animation.
 const PIPE_REPLAY_STEP_MS = 220;
 
+// A shared link's hash can carry a second, independent flag alongside the
+// puzzle payload: `#p=<payload>&arcade=1`. Parsed as its own top-level
+// segment (split on '&') rather than folded into the payload string itself,
+// since the payload's own characters (base36 digits, letters, '.', '~')
+// never include '&' or '=' — splitting first keeps the two concerns from
+// ever colliding, so decodeShareHash never has to know arcade mode exists.
+function getShareHashSegments() {
+  return String(window.location.hash || '').replace(/^#/, '').split('&').filter(Boolean);
+}
+
+function getSharePuzzlePayload() {
+  return getShareHashSegments().find((part) => part.startsWith('p=')) || '';
+}
+
+// Kiosk/attract-mode flag — see docs/development.md for the intended setup.
+// Accepts a bare `arcade` or `arcade=1` (any value); only its presence
+// matters.
+function isArcadeModeRequested() {
+  return getShareHashSegments().some((part) => part === 'arcade' || part.startsWith('arcade='));
+}
+
+// Optional per-deployment tuning, e.g. `&arcade=1&idleWarnSec=90`. A
+// senior center and a fast-paced arcade want very different idle
+// tolerances on the exact same codebase, so these are read from the link
+// rather than hard-coded — falls back to fallbackSeconds for a missing,
+// non-numeric, or non-positive value, so a malformed param can't produce
+// a broken (zero or negative) delay.
+function getShareHashSecondsParam(name, fallbackSeconds) {
+  const prefix = `${name}=`;
+  const match = getShareHashSegments().find((part) => part.startsWith(prefix));
+  const parsed = match ? Number(match.slice(prefix.length)) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackSeconds;
+}
+
 // Replays a shared link's already-played words through the real engine,
 // exactly the way a player would type them, so the resulting state (found
 // words, used letters, pipe routes) is indistinguishable from having
@@ -1121,22 +1202,43 @@ const PIPE_REPLAY_STEP_MS = 220;
 // instead of the whole route appearing at once — appendToken alone doesn't
 // animate anything by itself; without a pause between calls, every
 // intermediate frame gets overwritten before the browser ever paints it.
-async function replayProgressWords(words) {
+// isCancelled is optional and only used by the arcade attract loop (see
+// startArcadeMode) — a plain shared-link open never passes it, so it's
+// never cancelled and behaves exactly as before. Checked at word and
+// letter boundaries, not mid-`wait()`, so a cancellation takes effect
+// within one PIPE_REPLAY_STEP_MS rather than instantly — plenty responsive
+// for "press any key to stop a demo loop" without needing to interrupt an
+// in-flight timer.
+async function replayProgressWords(words, { isCancelled } = {}) {
   const animated = !isReducedMotionEnabled();
+  const cancelled = () => typeof isCancelled === 'function' && isCancelled();
 
   for (const word of words) {
+    if (cancelled()) {
+      return;
+    }
+
     // After the first word, the engine auto-seeds the builder with the
     // required next starting letter — only append what's left to type.
     const already = gameEngine.getSnapshot().tokens.map((token) => token.letter).join('');
     const lower = word.toLowerCase();
     const remaining = lower.startsWith(already) ? lower.slice(already.length) : lower;
     for (const letter of remaining) {
+      if (cancelled()) {
+        return;
+      }
+
       gameEngine.appendToken(letter);
       if (animated) {
         // eslint-disable-next-line no-await-in-loop
         await wait(PIPE_REPLAY_STEP_MS);
       }
     }
+
+    if (cancelled()) {
+      return;
+    }
+
     // eslint-disable-next-line no-await-in-loop
     await gameEngine.submitWord();
     if (animated) {
@@ -1146,7 +1248,39 @@ async function replayProgressWords(words) {
   }
 }
 
-async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
+// A shared link's progress words are known upfront, before any replay
+// happens, so whether they'll fully solve the board is knowable
+// immediately too -- unlike live play, where the outcome genuinely isn't
+// known until the final word is actually submitted. Starting the
+// completion celebration now, concurrently with the pipe-by-pipe replay
+// drawing the board on the right, means it overlaps the replay instead of
+// running back-to-back after it, at the cost of starting before the board
+// is visibly finished drawing. Extracted so the arcade attract loop
+// (startArcadeMode) can replay the exact same demo on every cycle, not
+// just the first.
+async function playSolvedReplay(progressWords, { isCancelled } = {}) {
+  const boardLetterCount = gameEngine.getBoardSize();
+  const willCompleteBoard = progressWords.length > 0
+    && new Set(progressWords.join('').toLowerCase()).size === boardLetterCount;
+
+  if (willCompleteBoard) {
+    suppressNextCompletionCelebration = true;
+    steamVentEasterEgg.play();
+    pipeEasterEgg.play({ abbreviated: true });
+  }
+
+  await replayProgressWords(progressWords, { isCancelled });
+  // Safety net: the flag above is normally cleared by the real
+  // justCompleted trigger firing during the replay's final submitWord, but
+  // clear it unconditionally here too in case that word was somehow
+  // rejected, or the replay was cancelled partway through, so a stuck flag
+  // can never silently swallow a real completion celebration later.
+  suppressNextCompletionCelebration = false;
+}
+
+async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink, { isCancelled } = {}) {
+  const cancelled = () => typeof isCancelled === 'function' && isCancelled();
+
   // Adopt the link's canonical words as this session's own — this keeps
   // the character-count comparison working, and means re-sharing this same
   // puzzle later (or reopening Set Board) carries the reference solution
@@ -1158,6 +1292,12 @@ async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
   // the canonical pair instead — both stay guaranteed-accepted.
   const knownWords = [...new Set([...progressWords, ...canonicalWordsFromLink])];
   await applySolutionWordOverrides(knownWords);
+  if (cancelled()) {
+    // Arcade mode was stopped (see stopArcadeMode) while this was still in
+    // flight — bail before touching anything visible, so a delayed
+    // continuation can't clobber whatever the player is looking at now.
+    return;
+  }
 
   // A progress link can only contain a chain-broken sequence if it was
   // actually played in Free Chain mode: normal-mode submitWord() rejects a
@@ -1173,7 +1313,10 @@ async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
     setFreeChainSessionOverride(true);
   }
 
-  await replayProgressWords(progressWords);
+  await playSolvedReplay(progressWords, { isCancelled });
+  if (cancelled()) {
+    return;
+  }
 
   const snapshot = gameEngine.getSnapshot();
   const isComplete = snapshot.foundWords.length > 0 && snapshot.usedLetters.size === gameEngine.getBoardSize();
@@ -1190,12 +1333,347 @@ async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
   }
 }
 
+// How long the completed demo sits on screen, fully solved, before the
+// attract loop clears it and replays from scratch.
+const ARCADE_LOOP_PAUSE_MS = 2600;
+
+// Polls every 50ms rather than resolving on a single timer, so it can
+// return early the moment arcadeModeActive flips false instead of always
+// waiting out the full pause — keeps "press any key to stop" feeling
+// responsive during the loop's idle/admire phase, not just mid-replay
+// (which replayProgressWords' own isCancelled check already covers).
+function interruptibleWait(ms) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + ms;
+    const tick = () => {
+      if (!arcadeModeActive || Date.now() >= deadline) {
+        resolve();
+        return;
+      }
+      window.setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+
+// Attract-mode loop for kiosk-style deployments: replays the same shared,
+// already-solved puzzle over and over, pausing briefly on the completed
+// board between cycles, until stopArcadeMode is called (wired to any
+// keydown — see wireEvents). Not gated on the words actually covering the
+// whole board; an incomplete progress list still loops the partial demo
+// coherently, it just never shows a "solved" moment.
+async function startArcadeMode(board, progressWords, canonicalWordsFromLink) {
+  cancelIdleTimers();
+  arcadeModeActive = true;
+  document.body.classList.add('arcade-mode');
+
+  // Self-sufficient on purpose: the very first call (from
+  // tryLoadSharedPuzzleFromHash) already has the arcade board applied by
+  // its caller, but every later call (from scheduleIdleArcadeRestart,
+  // re-entering after a real play session goes idle) does not -- whatever
+  // board the player was actually looking at is still active at this
+  // point. Re-applying here unconditionally is cheap and makes this
+  // function correct regardless of who calls it, rather than depending on
+  // caller discipline.
+  clearFreeChainSessionOverride();
+  gameEngine.applyBoardDefinition(board);
+  puzzleFetcher.markCustomBoard();
+
+  // steamVentEasterEgg now fires as part of the completion celebration
+  // itself (see playSolvedReplay, called inside hydrateSharedPuzzle and
+  // again below on every subsequent cycle) — no separate "end of cycle"
+  // trigger needed here anymore.
+  await hydrateSharedPuzzle(progressWords, canonicalWordsFromLink, {
+    isCancelled: () => !arcadeModeActive,
+  });
+
+  while (arcadeModeActive) {
+    // eslint-disable-next-line no-await-in-loop
+    await interruptibleWait(ARCADE_LOOP_PAUSE_MS);
+    if (!arcadeModeActive) {
+      break;
+    }
+
+    gameEngine.applyBoardDefinition(board);
+    // eslint-disable-next-line no-await-in-loop
+    await playSolvedReplay(progressWords, { isCancelled: () => !arcadeModeActive });
+  }
+}
+
+// How long a real kiosk visitor can go without touching a key or the board
+// before the attract loop reclaims the screen — like a physical arcade
+// cabinet dropping back into demo mode after a game ends and nobody steps
+// up next. Only ever armed for a session that actually opened an
+// `&arcade=1` link (see arcadeSourceBoard) — a normal visit never starts
+// this timer, so an idle browser tab elsewhere never does this. Defaults
+// lean toward a slower-paced venue (e.g. a senior center) rather than a
+// fast one (e.g. a video/pinball arcade) — override per deployment with
+// `&idleWarnSec=`/`&idleResetSec=` on the arcade link itself (see
+// getShareHashSecondsParam and where these are set in
+// tryLoadSharedPuzzleFromHash) rather than editing these defaults.
+const DEFAULT_ARCADE_WARNING_SECONDS = 60;
+const DEFAULT_ARCADE_IDLE_RESTART_SECONDS = 90;
+let ARCADE_WARNING_MS = DEFAULT_ARCADE_WARNING_SECONDS * 1000;
+let ARCADE_IDLE_RESTART_MS = DEFAULT_ARCADE_IDLE_RESTART_SECONDS * 1000;
+
+function cancelIdleArcadeRestart() {
+  if (idleArcadeRestartTimerId !== null) {
+    window.clearTimeout(idleArcadeRestartTimerId);
+    idleArcadeRestartTimerId = null;
+  }
+}
+
+// The full attract loop is the signal that tells a passing prospective
+// player "this station is free" -- showing it while someone's still
+// there, just thinking or momentarily stepped aside, sends the wrong
+// signal to everyone else nearby, not just an inconvenience to the
+// current player. So there's a shorter warning first: once
+// ARCADE_WARNING_MS of inactivity passes (well before the full
+// ARCADE_IDLE_RESTART_MS reset), the ball-bearing pipe animation starts
+// repeating on the left pane, alongside a ticking "Game will reset in N
+// seconds" message, as a cue aimed at whoever's actually in front of it —
+// the board and their progress stay completely untouched, and nothing
+// about it is visible to someone glancing over from a distance the way
+// the full loop is.
+// A little longer than the bearing's own ~4s runtime (TRAVEL_DURATION_MS +
+// FADE_OUT_MS in pipeEasterEgg.js) so each repeat reads as a distinct
+// blip-blip-blip warning rather than one continuous animation.
+const ARCADE_WARNING_REPEAT_MS = 4200;
+
+// How often the "Game will reset in N seconds" message updates -- once a
+// second, so it reads as a genuine countdown rather than jumping in
+// multi-second increments the way the (separately-timed) bearing repeat
+// does.
+const ARCADE_WARNING_MESSAGE_TICK_MS = 1000;
+
+let idleWarningTimerId = null;
+let idleWarningRepeatIntervalId = null;
+let idleWarningMessageIntervalId = null;
+
+function cancelIdleWarning() {
+  if (idleWarningTimerId !== null) {
+    window.clearTimeout(idleWarningTimerId);
+    idleWarningTimerId = null;
+  }
+  if (idleWarningRepeatIntervalId !== null) {
+    window.clearInterval(idleWarningRepeatIntervalId);
+    idleWarningRepeatIntervalId = null;
+  }
+  if (idleWarningMessageIntervalId !== null) {
+    window.clearInterval(idleWarningMessageIntervalId);
+    idleWarningMessageIntervalId = null;
+    // The countdown was actually showing (this branch only runs if it
+    // was) -- clear it immediately rather than leaving it on screen for
+    // up to 4 more seconds via setMessage's own auto-clear, since real
+    // activity just happened and whatever the player does next deserves
+    // a clean message area.
+    setMessage('');
+  }
+}
+
+function scheduleIdleWarning() {
+  if (!arcadeSourceBoard) {
+    return;
+  }
+
+  cancelIdleWarning();
+  idleWarningTimerId = window.setTimeout(() => {
+    idleWarningTimerId = null;
+    if (arcadeModeActive) {
+      return;
+    }
+
+    // Computed from wall-clock time rather than counted down in fixed
+    // steps, so it can't drift the way accumulating many small timer
+    // errors together would -- same pattern interruptibleWait already
+    // uses elsewhere in this file.
+    const resetDeadline = Date.now() + (ARCADE_IDLE_RESTART_MS - ARCADE_WARNING_MS);
+    const announceCountdown = () => {
+      const remainingSeconds = Math.max(0, Math.round((resetDeadline - Date.now()) / 1000));
+      const plural = remainingSeconds === 1 ? '' : 's';
+      setMessage(`Game will reset in ${remainingSeconds} second${plural} due to inactivity.`, 'error');
+    };
+
+    pipeEasterEgg.play();
+    announceCountdown();
+    idleWarningRepeatIntervalId = window.setInterval(() => {
+      pipeEasterEgg.play();
+    }, ARCADE_WARNING_REPEAT_MS);
+    idleWarningMessageIntervalId = window.setInterval(announceCountdown, ARCADE_WARNING_MESSAGE_TICK_MS);
+  }, ARCADE_WARNING_MS);
+}
+
+// Arms both idle timers together -- the warning and the full attract-loop
+// restart are really one continuous countdown with two checkpoints on it,
+// not two independent clocks, so every place that used to just call
+// scheduleIdleArcadeRestart now calls this instead.
+function armIdleTimers() {
+  scheduleIdleWarning();
+  scheduleIdleArcadeRestart();
+}
+
+function cancelIdleTimers() {
+  cancelIdleWarning();
+  cancelIdleArcadeRestart();
+}
+
+// How long a game the idle-restart timer displaced stays recoverable
+// before it's permanently forgotten — deliberately much longer than
+// ARCADE_IDLE_RESTART_MS itself. The attract loop can start drawing in a
+// new visitor quickly without that meaning someone who only stepped away
+// for a few minutes comes back to find their progress gone: the loop
+// reclaiming the screen and the game actually being discarded are two
+// separate clocks, running in the background independently of how many
+// demo cycles play in between.
+const SAVED_GAME_DISCARD_MS = 15 * 60 * 1000;
+
+function cancelSavedGameDiscard() {
+  if (savedGameDiscardTimerId !== null) {
+    window.clearTimeout(savedGameDiscardTimerId);
+    savedGameDiscardTimerId = null;
+  }
+}
+
+// Snapshots enough of the current game to faithfully replay it back later
+// via the same word-by-word mechanism already used for shared-link
+// replay/restore (see restoreSavedGame) — no separate persistence format
+// needed. Skips saving entirely when there's nothing to lose (a fresh,
+// untouched board), so an idle kiosk sitting on its own default puzzle
+// doesn't accumulate a pointless snapshot.
+function captureGameForLaterRestore() {
+  const snapshot = gameEngine.getSnapshot();
+  const foundWords = [...snapshot.foundWords].reverse().map((entry) => entry.word.toUpperCase());
+  const inProgressLetters = snapshot.tokens.map((token) => token.letter).join('').toUpperCase();
+
+  if (foundWords.length === 0 && inProgressLetters.length === 0) {
+    return;
+  }
+
+  savedGameSnapshot = {
+    board: gameEngine.getBoard(),
+    foundWords,
+    inProgressLetters,
+    canonicalWords: getActiveCanonicalWords(),
+    freeChainMode: isFreeChainModeEnabled(),
+  };
+
+  cancelSavedGameDiscard();
+  savedGameDiscardTimerId = window.setTimeout(() => {
+    savedGameSnapshot = null;
+    savedGameDiscardTimerId = null;
+  }, SAVED_GAME_DISCARD_MS);
+}
+
+// Rebuilds a saved game by replaying its found words and re-typing
+// whatever was mid-builder, the same way a shared progress link replays —
+// not a special restore mode, just the existing replay path pointed at a
+// locally-remembered snapshot instead of a decoded URL.
+async function restoreSavedGame(saved) {
+  clearFreeChainSessionOverride();
+  gameEngine.applyBoardDefinition(saved.board);
+  puzzleFetcher.markCustomBoard();
+  canonicalWords = saved.canonicalWords;
+
+  const knownWords = [...new Set([...saved.foundWords, ...saved.canonicalWords])];
+  await applySolutionWordOverrides(knownWords);
+
+  if (saved.freeChainMode) {
+    setFreeChainSessionOverride(true);
+  }
+
+  await replayProgressWords(saved.foundWords);
+  for (const letter of saved.inProgressLetters.toLowerCase()) {
+    gameEngine.appendToken(letter);
+  }
+
+  setMessage('Welcome back — picked up right where you left off.', 'success');
+}
+
+function scheduleIdleArcadeRestart() {
+  if (!arcadeSourceBoard) {
+    return;
+  }
+
+  cancelIdleArcadeRestart();
+  idleArcadeRestartTimerId = window.setTimeout(() => {
+    idleArcadeRestartTimerId = null;
+    if (!arcadeModeActive) {
+      captureGameForLaterRestore();
+      startArcadeMode(arcadeSourceBoard, arcadeSourceProgressWords, arcadeSourceCanonicalWords);
+    }
+  }, ARCADE_IDLE_RESTART_MS);
+}
+
+// A single, deliberately narrow "something happened" listener — not tied
+// to any particular control — pushes the idle deadline out on every real
+// keydown or pointerdown while a real game is in front of the player.
+// No-ops entirely outside a kiosk session (arcadeSourceBoard is null) or
+// while the attract loop is already running (its own logic owns the
+// screen at that point).
+function noteUserActivity() {
+  if (arcadeModeActive || !arcadeSourceBoard) {
+    return;
+  }
+
+  armIdleTimers();
+}
+
+// Ends the attract loop. If it was the idle-restart timer that started this
+// particular loop, there's a real game waiting to be recovered — see
+// captureGameForLaterRestore/SAVED_GAME_DISCARD_MS — and that takes
+// priority over handing back a fresh puzzle. Clears the hash either way, so
+// a page refresh doesn't restart the loop and "Copy Share Link" (if opened)
+// reflects the current board, not the old demo. Arms the idle-restart timer
+// on the way out, so the attract loop reclaims the screen again if this
+// real session goes quiet.
+async function stopArcadeMode() {
+  if (!arcadeModeActive) {
+    return;
+  }
+
+  arcadeModeActive = false;
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  document.body.classList.remove('arcade-mode');
+
+  if (savedGameSnapshot) {
+    const saved = savedGameSnapshot;
+    savedGameSnapshot = null;
+    cancelSavedGameDiscard();
+    await restoreSavedGame(saved);
+    armIdleTimers();
+    return;
+  }
+
+  const catalogLoaded = puzzleFetcher.getState().puzzleCatalog.length > 0;
+  if (catalogLoaded) {
+    // Reuses the exact same path the Today's Puzzle button uses, including
+    // its own tracking/messaging.
+    await playTodayPuzzle();
+    armIdleTimers();
+    return;
+  }
+
+  // Catalog hasn't finished loading yet (only possible very early in a
+  // kiosk's boot) -- clear the demo to a random board immediately rather
+  // than leaving it on screen, same fallback normal startup uses when the
+  // catalog turns out to be unavailable.
+  canonicalWords = [];
+  dictionaryValidator.clearSessionOverrides();
+  clearFreeChainSessionOverride();
+  puzzleFetcher.markRandomBoard();
+  gameEngine.applyBoardDefinition(buildBoard());
+  renderUi();
+  puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: true }).then(() => renderUi());
+  setMessage('Ready to play. Forge away.', 'success');
+  armIdleTimers();
+}
+
 // Synchronous on purpose: the board itself must be applied immediately (and
 // puzzleFetcher told not to load today's puzzle over it) before any async
 // work starts. The override/replay part continues in the background via
-// hydrateSharedPuzzle.
+// hydrateSharedPuzzle (or startArcadeMode, for a `&arcade=1` link).
 function tryLoadSharedPuzzleFromHash() {
-  const decoded = decodeShareHash(window.location.hash);
+  const decoded = decodeShareHash(getSharePuzzlePayload());
   if (!decoded) {
     return false;
   }
@@ -1203,7 +1681,28 @@ function tryLoadSharedPuzzleFromHash() {
   clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(decoded.board);
   puzzleFetcher.markCustomBoard();
-  hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
+
+  if (isArcadeModeRequested()) {
+    // Remembered for the rest of the page's lifetime (see
+    // scheduleIdleArcadeRestart) so the attract loop can start itself back
+    // up after a real play session goes idle, not just on first load.
+    arcadeSourceBoard = decoded.board;
+    arcadeSourceProgressWords = decoded.progressWords;
+    arcadeSourceCanonicalWords = decoded.canonicalWords;
+
+    // Per-deployment idle tuning -- see getShareHashSecondsParam. Guards
+    // against a misconfigured link (e.g. idleResetSec <= idleWarnSec)
+    // producing a warning window of zero or negative length by enforcing
+    // a minimum gap between the two.
+    ARCADE_WARNING_MS = getShareHashSecondsParam('idleWarnSec', DEFAULT_ARCADE_WARNING_SECONDS) * 1000;
+    const requestedResetSeconds = getShareHashSecondsParam('idleResetSec', DEFAULT_ARCADE_IDLE_RESTART_SECONDS);
+    const minResetMs = ARCADE_WARNING_MS + 15000;
+    ARCADE_IDLE_RESTART_MS = Math.max(requestedResetSeconds * 1000, minResetMs);
+
+    startArcadeMode(decoded.board, decoded.progressWords, decoded.canonicalWords);
+  } else {
+    hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
+  }
 
   return true;
 }
@@ -1229,22 +1728,43 @@ function initializeGame() {
       const puzzleId = pState.puzzleSource === 'catalog'
         ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
         : '';
-      trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
-      if (solved) {
-        const snapshot = gameEngine.getSnapshot();
-        trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId);
 
-        if (puzzleId && !completedPuzzleIds.has(puzzleId)) {
-          recordFinishedGame(puzzleId, true, snapshot.foundWords.length);
-          completedPuzzleIds.add(puzzleId);
+      // An arcade attract loop resubmits the same handful of words every
+      // few seconds, indefinitely — real analytics for a one-off shared
+      // link opened by an actual person are worth recording, but a kiosk
+      // looping unattended would otherwise flood Analytics Engine with
+      // thousands of duplicate "solve" events a day for a demo, not a play.
+      if (!arcadeModeActive) {
+        trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
+        if (solved) {
+          const snapshot = gameEngine.getSnapshot();
+          trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId);
+
+          if (puzzleId && !completedPuzzleIds.has(puzzleId)) {
+            recordFinishedGame(puzzleId, true, snapshot.foundWords.length);
+            completedPuzzleIds.add(puzzleId);
+          }
         }
       }
 
       // Only the word that first completes the board — not every further
       // word submitted afterward while it stays complete, which would turn
       // a celebratory moment into repeated noise during continued play.
+      // Steam vent is the primary celebration; the abbreviated ball-bearing
+      // pass is a secondary flourish, deliberately shorter and visually
+      // distinct from the full lap used for the hidden \/| easter egg and
+      // the arcade attract loop's idle-warning cue — see pipeEasterEgg.js.
       if (justCompleted) {
-        pipeEasterEgg.play();
+        if (suppressNextCompletionCelebration) {
+          // Already playing, started concurrently with the shared-link
+          // replay that's about to produce this exact justCompleted event
+          // — see hydrateSharedPuzzle/playSolvedReplay. Skip re-triggering
+          // so neither animation visibly restarts mid-flight.
+          suppressNextCompletionCelebration = false;
+        } else {
+          steamVentEasterEgg.play();
+          pipeEasterEgg.play({ abbreviated: true });
+        }
       }
     },
   });
@@ -1282,7 +1802,9 @@ function initializeGame() {
     renderUi();
   });
 
-  if (helpModal && !localStorage.getItem('brassbox-help-seen')) {
+  // Skipped in arcade mode: a kiosk's attract loop should just play, not
+  // sit blocked behind a "Welcome" dialog on its very first cycle.
+  if (helpModal && !arcadeModeActive && !localStorage.getItem('brassbox-help-seen')) {
     openHelpModal();
     localStorage.setItem('brassbox-help-seen', '1');
   }

@@ -299,7 +299,7 @@ test('solving with no canonical reference at all still reports the character cou
   typeWord(engine, 'jbehkcfil');
   await engine.submitWord();
 
-  assert.match(lastMessage(events).text, /Solved in 2 words and 13 characters\. Outstanding solve!/);
+  assert.match(lastMessage(events).text, /Solved in 2 words using 13 characters\. Outstanding solve!/);
 });
 
 test('solving in more than 2 words with no canonical reference still reports the character count', async () => {
@@ -310,7 +310,7 @@ test('solving in more than 2 words with no canonical reference still reports the
     await engine.submitWord();
   }
 
-  assert.match(lastMessage(events).text, /Solved in 3 words and 14 characters\. Great solve\./);
+  assert.match(lastMessage(events).text, /Solved in 3 words using 14 characters\. Great solve\./);
 });
 
 test('justCompleted is true only for the word that first completes the board, not for further words that keep it complete', async () => {

@@ -465,7 +465,7 @@ export function createGameEngine(options) {
       );
 
       if (Number.isFinite(canonicalCharacterCount) && canonicalCharacterCount > 0) {
-        const prefix = `Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters.`;
+        const prefix = `Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters.`;
         const delta = playerCharacterCount - canonicalCharacterCount;
         const absDelta = Math.abs(delta);
 
@@ -498,11 +498,11 @@ export function createGameEngine(options) {
       }
 
       if (state.foundWords.length <= 2) {
-        emitMessage(`Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Outstanding solve!`, 'success');
+        emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Outstanding solve!`, 'success');
         return;
       }
 
-      emitMessage(`Solved in ${state.foundWords.length} words and ${playerCharacterCount} characters. Great solve.`, 'success');
+      emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Great solve.`, 'success');
       return;
     }
 

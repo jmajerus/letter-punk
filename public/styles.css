@@ -874,6 +874,17 @@ button {
   display: none;
 }
 
+/* Kiosk/attract-mode: a stray tap or click during the demo loop shouldn't
+   be able to append a letter or press a control mid-replay — the loop
+   already fully resets on its next cycle, but disabling interaction here
+   avoids a visibly janky half-corrupted board in the meantime. Only
+   keyboard input is meant to end the loop (see stopArcadeMode in app.js). */
+body.arcade-mode #board,
+body.arcade-mode .controls,
+body.arcade-mode .board-tools {
+  pointer-events: none;
+}
+
 .helper-text {
   margin: 0;
   color: var(--muted);

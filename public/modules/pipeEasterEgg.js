@@ -21,6 +21,18 @@ const TRAVEL_DURATION_MS = 3600;
 const FRAME_MS = 16;
 const FADE_OUT_MS = 400;
 
+// A shorter, visually distinct pass used for puzzle-completion (see
+// app.js) — deliberately different from the full lap used for the hidden
+// \/| easter egg and the arcade attract loop's idle-warning cue, so the
+// same animation doesn't end up meaning "celebration" and "you're about to
+// lose this screen" at the same time. Travels only the final
+// ABBREVIATED_PATH_FRACTION of the route — a quick dart to the finish
+// rather than the full journey — over a shorter duration and a snappier
+// fade.
+const ABBREVIATED_TRAVEL_DURATION_MS = 1100;
+const ABBREVIATED_FADE_OUT_MS = 250;
+const ABBREVIATED_PATH_FRACTION = 0.4;
+
 export function createPipeEasterEgg({ containerElement, artworkUrl, isReducedMotionEnabled, fetchImpl = fetch }) {
   let svgElement = null;
   let travelPath = null;
@@ -124,7 +136,7 @@ export function createPipeEasterEgg({ containerElement, artworkUrl, isReducedMot
     }
   }
 
-  function play() {
+  function play({ abbreviated = false } = {}) {
     if (!ready || !travelPath || !marker) {
       return;
     }
@@ -139,7 +151,10 @@ export function createPipeEasterEgg({ containerElement, artworkUrl, isReducedMot
     }
 
     const totalLength = travelPath.getTotalLength();
-    const totalFrames = Math.max(1, Math.round(TRAVEL_DURATION_MS / FRAME_MS));
+    const startFraction = abbreviated ? 1 - ABBREVIATED_PATH_FRACTION : 0;
+    const travelDurationMs = abbreviated ? ABBREVIATED_TRAVEL_DURATION_MS : TRAVEL_DURATION_MS;
+    const fadeOutMs = abbreviated ? ABBREVIATED_FADE_OUT_MS : FADE_OUT_MS;
+    const totalFrames = Math.max(1, Math.round(travelDurationMs / FRAME_MS));
     let frame = 0;
 
     marker.style.transition = '';
@@ -154,7 +169,8 @@ export function createPipeEasterEgg({ containerElement, artworkUrl, isReducedMot
     intervalId = window.setInterval(() => {
       frame += 1;
       const progress = Math.min(frame / totalFrames, 1);
-      const point = travelPath.getPointAtLength(progress * totalLength);
+      const lengthAlongPath = (startFraction + progress * (1 - startFraction)) * totalLength;
+      const point = travelPath.getPointAtLength(lengthAlongPath);
       marker.setAttribute('cx', String(point.x));
       marker.setAttribute('cy', String(point.y));
 
@@ -164,7 +180,7 @@ export function createPipeEasterEgg({ containerElement, artworkUrl, isReducedMot
 
       window.clearInterval(intervalId);
       intervalId = null;
-      marker.style.transition = `opacity ${FADE_OUT_MS}ms ease-out`;
+      marker.style.transition = `opacity ${fadeOutMs}ms ease-out`;
       marker.style.opacity = '0';
     }, FRAME_MS);
   }
