@@ -28,4 +28,4 @@ A hard limit is sometimes defended as measuring something real: skill under pres
 
 None of these ideas cost much to build. What they cost is the assumption that a single scoreboard was ever the honest way to describe success in the first place. A harsh, one-track framing of winning doesn't stay contained to the system it was built for — it's a small piece of how people learn to think about effort, worth, and each other, and that has a way of traveling. Building systems that can say something genuine to more than one kind of person doing more than one kind of good work seems like a small, achievable way to push back on that, one system at a time.
 
-Use any of this. You don't need to ask, and you don't need to credit where it came from — that's the point.
+If any of this is useful to you, use it — and if it helps you build something a little more generous than it needed to be, that's the point.
