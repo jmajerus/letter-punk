@@ -12,12 +12,13 @@ const TEST_BOARD = [
   { side: 3, name: 'left', letters: ['J', 'K', 'L'] },
 ];
 
-function createHarness({ acceptedWords = [], getCanonicalCharacterCount } = {}) {
+function createHarness({ acceptedWords = [], getCanonicalCharacterCount, freeChainMode } = {}) {
   const accepted = new Set(acceptedWords);
   const events = { stateChanges: [], messages: [], invalidLetters: [], wordResults: [] };
 
   const engine = createGameEngine({
     initialBoard: TEST_BOARD,
+    freeChainMode,
     validateWord: async (word) => ({
       isValid: accepted.has(word),
       source: 'mock-source',
@@ -523,4 +524,77 @@ test('lastValidationSummary clears on every early-return path, not just rejectio
 
   await engine.submitWord();
   assert.equal(engine.getSnapshot().lastValidationSummary, '');
+});
+
+test('freeChainMode defaults to false and is reflected on isFreeChainMode() and the snapshot', () => {
+  const { engine } = createHarness({ acceptedWords: [] });
+  assert.equal(engine.isFreeChainMode(), false);
+  assert.equal(engine.getSnapshot().freeChainMode, false);
+});
+
+test('freeChainMode drops the required-starting-letter rule: no auto-seed and no rejection', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adg', 'jah'], freeChainMode: true });
+
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+
+  // Normal mode would auto-seed the builder with 'g' here (the required
+  // next starting letter); Free Chain mode leaves it genuinely empty.
+  assert.deepEqual(engine.getSnapshot().tokens, []);
+
+  // 'jah' does not start with 'g' -- in normal mode this would be rejected
+  // with "This word must start with G."
+  typeWord(engine, 'jah');
+  await engine.submitWord();
+
+  const finalResult = events.wordResults.at(-1);
+  assert.equal(finalResult.outcome, 'accepted');
+  assert.deepEqual(engine.getSnapshot().foundWords.map((entry) => entry.word), ['jah', 'adg']);
+});
+
+test('setFreeChainMode(true) mid-puzzle discards the in-progress word and drops the starting-letter requirement', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adg', 'jah'] });
+
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  assert.deepEqual(
+    engine.getSnapshot().tokens.map((t) => t.letter),
+    ['g'],
+    'auto-seeded with the required starting letter in normal mode',
+  );
+
+  engine.setFreeChainMode(true);
+  const snapshot = engine.getSnapshot();
+  assert.deepEqual(snapshot.tokens, [], 'switching modes resets the word-in-progress rather than leaving a stale seed');
+  assert.equal(snapshot.freeChainMode, true);
+
+  typeWord(engine, 'jah');
+  await engine.submitWord();
+  assert.equal(events.wordResults.at(-1).outcome, 'accepted');
+});
+
+test('setFreeChainMode(false) mid-puzzle re-seeds the builder with the required starting letter', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg'], freeChainMode: true });
+
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  assert.deepEqual(engine.getSnapshot().tokens, []);
+
+  engine.setFreeChainMode(false);
+  assert.deepEqual(
+    engine.getSnapshot().tokens.map((t) => t.letter),
+    ['g'],
+    "normal mode auto-seeds the next word with the previous word's last letter",
+  );
+  assert.equal(engine.getSnapshot().starterLocked, true);
+});
+
+test('setFreeChainMode is a no-op when the mode is not actually changing', () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adg'] });
+  typeWord(engine, 'ad');
+  const stateChangesBefore = events.stateChanges.length;
+
+  engine.setFreeChainMode(false); // already false -- must not reset the in-progress builder
+  assert.deepEqual(engine.getSnapshot().tokens.map((t) => t.letter), ['a', 'd']);
+  assert.equal(events.stateChanges.length, stateChangesBefore);
 });

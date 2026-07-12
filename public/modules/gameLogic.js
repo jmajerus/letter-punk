@@ -26,6 +26,7 @@ export function createGameEngine(options) {
   }
 
   let board = initialBoard;
+  let freeChainMode = Boolean(options.freeChainMode);
   const lettersToSide = new Map();
 
   const state = {
@@ -63,8 +64,15 @@ export function createGameEngine(options) {
     }
   }
 
+  // Free Chain mode drops the requirement that a new word start with the
+  // previous word's last letter. Every downstream behavior that cares about
+  // a required starting letter — appendToken's first-letter check,
+  // seedNextWord's auto-fill, and the "backspace past an empty builder backs
+  // into the previous word" undo path — reads from this single function, so
+  // returning null here when the mode is active is the whole implementation:
+  // no separate free-chain checks are needed anywhere else.
   function getRequiredStartingLetter() {
-    if (state.foundWords.length === 0) {
+    if (freeChainMode || state.foundWords.length === 0) {
       return null;
     }
 
@@ -217,6 +225,7 @@ export function createGameEngine(options) {
       currentTokenLetters: getCurrentTokenLetters(),
       letterUsageCounts: getLetterUsageCounts(),
       runningCharacterCount: getRunningCharacterCount(),
+      freeChainMode,
     };
   }
 
@@ -499,7 +508,33 @@ export function createGameEngine(options) {
 
     seedNextWord();
     emitStateChange();
-    emitMessage(`Accepted ${word.toUpperCase()}. Next word begins with ${state.tokens[0].letter.toUpperCase()}.`, 'success');
+    // Free Chain mode has nothing to seed — getRequiredStartingLetter()
+    // returns null, so seedNextWord() leaves the builder empty rather than
+    // pre-filling a next starting letter.
+    emitMessage(
+      state.tokens.length > 0
+        ? `Accepted ${word.toUpperCase()}. Next word begins with ${state.tokens[0].letter.toUpperCase()}.`
+        : `Accepted ${word.toUpperCase()}.`,
+      'success',
+    );
+  }
+
+  // Discards whatever's mid-typed in the word builder (not any already-
+  // accepted word) and re-seeds it under the new mode's rules — reusing
+  // seedNextWord means both directions (turning the requirement on or off)
+  // fall out of the same getRequiredStartingLetter() logic everything else
+  // already goes through. A no-op if the mode isn't actually changing, so
+  // toggling the Settings checkbox without changing its value never
+  // disturbs an in-progress word.
+  function setFreeChainMode(enabled) {
+    const next = Boolean(enabled);
+    if (next === freeChainMode) {
+      return;
+    }
+
+    freeChainMode = next;
+    seedNextWord();
+    emitStateChange();
   }
 
   refreshLettersToSide();
@@ -518,5 +553,9 @@ export function createGameEngine(options) {
     clearTokens,
     submitWord,
     tokensFromWord,
+    setFreeChainMode,
+    isFreeChainMode() {
+      return freeChainMode;
+    },
   };
 }

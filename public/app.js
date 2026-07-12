@@ -21,6 +21,7 @@ import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
 const PROVENANCE_BADGES_STORAGE_KEY = 'letter-punk.provenance-badges';
+const FREE_CHAIN_STORAGE_KEY = 'letter-punk.free-chain';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -47,6 +48,8 @@ const closeSettingsButton = document.getElementById('closeSettingsBtn');
 const saveSettingsButton = document.getElementById('saveSettingsBtn');
 const reducedMotionToggle = document.getElementById('reducedMotionToggle');
 const provenanceBadgesToggle = document.getElementById('provenanceBadgesToggle');
+const freeChainToggle = document.getElementById('freeChainToggle');
+const freeChainBadgeElement = document.getElementById('freeChainBadge');
 const helpModal = document.getElementById('helpModal');
 const yesterdayModal = document.getElementById('yesterdayModal');
 const yesterdayTitleElement = document.getElementById('yesterdayTitle');
@@ -94,6 +97,15 @@ function readPreference(storageKey) {
 
 let reducedMotionPreference = readPreference(REDUCED_MOTION_STORAGE_KEY);
 let provenanceBadgesPreference = readPreference(PROVENANCE_BADGES_STORAGE_KEY);
+let freeChainPreference = readPreference(FREE_CHAIN_STORAGE_KEY);
+// Session-only, in-memory: forces Free Chain mode on for the puzzle
+// currently loaded, without touching freeChainPreference (the persisted
+// Settings default). Only a shared link whose progress words don't actually
+// chain sets this — see hydrateSharedPuzzle — and only the three
+// board-application paths (catalog navigation, manual Set Board, a new
+// shared link) clear it. Toggling the Settings checkbox itself is the one
+// and only way to make a change stick beyond the current puzzle.
+let freeChainSessionOverride = null;
 let messageTimer = null;
 let lastRenderedBoardSignature = '';
 const completedPuzzleIds = new Set();
@@ -146,6 +158,52 @@ function syncProvenanceBadgesPreferenceToUi() {
   if (provenanceBadgesToggle) {
     provenanceBadgesToggle.checked = isProvenanceBadgesEnabled();
   }
+}
+
+// The session override (if any) always wins over the persisted default —
+// it exists specifically to reflect a shared link's actual played state,
+// which the persisted default can't know about.
+function isFreeChainModeEnabled() {
+  return freeChainSessionOverride !== null ? freeChainSessionOverride : freeChainPreference === 'on';
+}
+
+function syncFreeChainPreferenceToUi() {
+  if (freeChainToggle) {
+    freeChainToggle.checked = isFreeChainModeEnabled();
+  }
+}
+
+function applyFreeChainModeToEngine() {
+  gameEngine.setFreeChainMode(isFreeChainModeEnabled());
+  syncFreeChainPreferenceToUi();
+}
+
+// The only path that writes FREE_CHAIN_STORAGE_KEY — called solely from the
+// Settings checkbox handler. An explicit Settings change always wins over,
+// and clears, any temporary session override a shared link may have set,
+// since the player just told us directly what they want going forward.
+function setFreeChainPreference(enabled) {
+  freeChainPreference = setPreference(FREE_CHAIN_STORAGE_KEY, enabled);
+  freeChainSessionOverride = null;
+  applyFreeChainModeToEngine();
+}
+
+function setFreeChainSessionOverride(enabled) {
+  freeChainSessionOverride = enabled;
+  applyFreeChainModeToEngine();
+}
+
+// Scopes a session override to the puzzle that produced it: called at the
+// start of every path that loads a genuinely different board (catalog
+// navigation, manual Set Board, a new shared link) so a Free Chain override
+// from a previous shared link never leaks into an unrelated puzzle.
+function clearFreeChainSessionOverride() {
+  if (freeChainSessionOverride === null) {
+    return;
+  }
+
+  freeChainSessionOverride = null;
+  applyFreeChainModeToEngine();
 }
 
 function setMessage(text, kind = '') {
@@ -232,6 +290,7 @@ const puzzleFetcher = createPuzzleFetcher({
   applyBoard(nextBoard) {
     canonicalWords = [];
     dictionaryValidator.clearSessionOverrides();
+    clearFreeChainSessionOverride();
     gameEngine.applyBoardDefinition(nextBoard);
   },
 });
@@ -289,6 +348,17 @@ function renderLetterCountStat(snapshot) {
   letterCountStatElement.textContent = isComplete
     ? `Puzzle completed using ${count} ${label}`
     : `${count} ${label} placed so far`;
+}
+
+// Reads snapshot.freeChainMode — the engine's own state, not the app-level
+// preference/override variables directly — so the badge can never drift out
+// of sync with what the engine is actually enforcing.
+function renderFreeChainBadge(snapshot) {
+  if (!freeChainBadgeElement) {
+    return;
+  }
+
+  freeChainBadgeElement.hidden = !snapshot.freeChainMode;
 }
 
 function getPreviousSolutionUiLabels() {
@@ -389,6 +459,7 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, isProvenanceBadgesEnabled());
   renderValidationSourceIndicator(snapshot);
   renderLetterCountStat(snapshot);
+  renderFreeChainBadge(snapshot);
   renderer.renderLetterUsage(snapshot.prospectiveUsedLetters, snapshot.currentTokenLetters, snapshot.letterUsageCounts);
   renderer.renderBoardLinks(snapshot.tokens, snapshot.foundWords, gameEngine.tokensFromWord);
   updatePuzzleNavigation();
@@ -448,6 +519,7 @@ function openSettingsModal() {
 
   syncMotionPreferenceToUi();
   syncProvenanceBadgesPreferenceToUi();
+  syncFreeChainPreferenceToUi();
   settingsModal.hidden = false;
   provenanceBadgesToggle?.focus();
 }
@@ -567,6 +639,7 @@ async function applyBoardFromInputs() {
     return;
   }
 
+  clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
 
@@ -900,6 +973,12 @@ function wireEvents() {
     setMessage(`Dictionary provenance badges ${enabled ? 'enabled' : 'disabled'}.`, 'success');
   });
 
+  freeChainToggle?.addEventListener('change', () => {
+    const enabled = Boolean(freeChainToggle.checked);
+    setFreeChainPreference(enabled);
+    setMessage(`Free Chain mode ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+  });
+
   if (typeof SYSTEM_REDUCED_MOTION_QUERY.addEventListener === 'function') {
     SYSTEM_REDUCED_MOTION_QUERY.addEventListener('change', () => {
       if (reducedMotionPreference === null) {
@@ -1079,15 +1158,33 @@ async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink) {
   // the canonical pair instead — both stay guaranteed-accepted.
   const knownWords = [...new Set([...progressWords, ...canonicalWordsFromLink])];
   await applySolutionWordOverrides(knownWords);
+
+  // A progress link can only contain a chain-broken sequence if it was
+  // actually played in Free Chain mode: normal-mode submitWord() rejects a
+  // non-chaining word the moment it's typed, so a break here is proof of
+  // how it was played, not a guess. The engine needs the mode set before
+  // replay starts, or replaying these exact words would hit the same
+  // rejection. This is a temporary, puzzle-scoped override — it never
+  // touches the player's own Settings preference (see
+  // clearFreeChainSessionOverride, which reverts it the moment a different
+  // puzzle loads).
+  const requiresFreeChain = findChainBreaks(progressWords).length > 0;
+  if (requiresFreeChain) {
+    setFreeChainSessionOverride(true);
+  }
+
   await replayProgressWords(progressWords);
 
   const snapshot = gameEngine.getSnapshot();
   const isComplete = snapshot.foundWords.length > 0 && snapshot.usedLetters.size === gameEngine.getBoardSize();
+  const freeChainSuffix = requiresFreeChain
+    ? ' Free Chain mode turned on to match how it was played.'
+    : '';
 
   if (isComplete) {
-    setMessage('Loaded a shared, completed puzzle.', 'success');
+    setMessage(`Loaded a shared, completed puzzle.${freeChainSuffix}`, 'success');
   } else if (progressWords.length > 0) {
-    setMessage('Loaded a shared puzzle in progress. Pick up where they left off!', 'success');
+    setMessage(`Loaded a shared puzzle in progress. Pick up where they left off!${freeChainSuffix}`, 'success');
   } else {
     setMessage('Loaded a shared puzzle. Forge away.', 'success');
   }
@@ -1103,6 +1200,7 @@ function tryLoadSharedPuzzleFromHash() {
     return false;
   }
 
+  clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(decoded.board);
   puzzleFetcher.markCustomBoard();
   hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
@@ -1113,6 +1211,7 @@ function tryLoadSharedPuzzleFromHash() {
 function initializeGame() {
   gameEngine = createGameEngine({
     initialBoard: buildBoard(),
+    freeChainMode: isFreeChainModeEnabled(),
     validateWord: dictionaryValidator.validateWord,
     summarizeValidationSources,
     getCanonicalCharacterCount: getActiveCanonicalCharacterCount,

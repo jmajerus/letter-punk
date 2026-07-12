@@ -9,7 +9,7 @@ Letter Punk is a word-chain puzzle in the spirit of NYT's Letter Boxed, played o
 **The basics**
 - Tap a letter to add it to the word you're building, or type it on your keyboard — both do exactly the same thing. Consecutive letters must come from different sides of the board — you can't chain two letters from the same side back to back. Keyboard entry needs a board with no repeated letters to stay unambiguous, which every board the app can produce or accept already guarantees (generated boards, daily puzzles, shared links, and the manual "Set Board" form all reject duplicates); it's included as a genuine alternative input method, not a fallback, for players who find tapping tiles difficult.
 - Words need at least 3 letters, and are checked locally against two combined dictionaries as you type — nothing is ever sent to a server. Turn on "Show dictionary provenance badges" in Settings to see which dictionary (or both) accepted each word; see [Dual Dictionary Validation](docs/dual-dictionary-validation.md) for how that works under the hood.
-- After your first word, every new word must start with the last letter of the previous word.
+- After your first word, every new word must start with the last letter of the previous word — unless "Free Chain mode" is on in Settings, which drops that requirement so you can use any word in any order.
 - Use every letter on the board at least once to solve the puzzle. It can take as many words as you need — there's no word-count limit and no way to "lose."
 
 **Double letters**
@@ -30,7 +30,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 **Boards and puzzles**
 - A new daily puzzle is available each day; use the `<`/`>` arrows or "Today's Puzzle" to navigate, and "Yesterday" to see the previous day's canonical solution.
 - "Set Board" lets you paste a board from classic Letter Boxed, or generate one from your own solution word(s) — type a single word as a seed and Letter Punk finds a companion automatically.
-- "Copy Share Link" / "Copy Progress Link" send a board to a friend as a URL — either a fresh challenge, or exactly where your own play currently stands, replaying pipe-by-pipe when they open it.
+- "Copy Share Link" / "Copy Progress Link" send a board to a friend as a URL — either a fresh challenge, or exactly where your own play currently stands, replaying pipe-by-pipe when they open it. If your progress was played in Free Chain mode, the recipient's copy turns it on automatically to match, without changing their own Settings default.
 
 ## Why Letter Punk Exists
 
@@ -46,6 +46,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 - Letter-first input model: tap the same letter twice in a row to double it. A decorative per-tile `xN` badge tracks how many times each letter has actually been used so far (accepted words plus the word in progress) — informational only, not a control.
 - Physical-keyboard letter entry as a genuine alternative to tapping tiles, not just a convenience: typing a letter calls the exact same engine path a tile click does, so doubling and off-board rejection behave identically either way. Guarded by a board-size check (`getBoardSize() === 12`) since keyboard entry is only unambiguous when no letter repeats on the board — true of every board the app can currently produce or accept, but checked defensively rather than assumed, since a duplicate would make the same physical key map to two different tiles.
 - Word-chain gameplay rules (next word starts with previous word's final letter).
+- Free Chain mode: a Settings toggle that drops the starting-letter requirement between words entirely — no forced first letter, no auto-filled seed, just find words from the board's letters in any order. A "Free Chain" badge appears on the board header while it's active. Persisted as your own default only when you flip the toggle yourself; opening a shared puzzle link whose recorded progress wasn't chainable (proof it was played in Free Chain mode, since normal mode rejects a non-chaining word the moment it's typed) turns the mode on for that puzzle only, without touching your saved preference.
 - Stacked local packed dictionary validation so either the primary dictionary or the compatibility fallback can accept a word.
 - Accepted-word badges and a live builder indicator showing whether a word was accepted by the primary dictionary, fallback dictionary, or both.
 - A live running letter-count stat in the board header — the total across accepted words plus the word in progress, i.e. what the character count would be if Enter were pressed right now. Deliberately board-scoped rather than tucked into either side panel, since it's neither an "accepted words" stat nor a "current word" stat but the running total of both.
@@ -67,6 +68,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 
 - [Dual Dictionary Validation for Word-Chain Games](docs/dual-dictionary-validation.md) — how word validation and the dictionary provenance badges actually work, and a reusable implementation write-up aimed at other game developers.
 - [Canonical Solution Rating](docs/canonical-solution-rating.md) — the design reasoning behind rating a solve against a "canonical" solution, and why that scoring deliberately avoids computing the objectively best possible answer.
+- [Roadmap & Future Concepts](docs/roadmap.md) — potential board-configuration and rule variants, a wildcard-letter idea, and a full concept brief for a separate pictograph-based spin-off. Nothing here is a commitment.
 - [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md) — concept/copyright notes.
 
 ## Development
