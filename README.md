@@ -75,3 +75,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 ## Development
 
 For local setup, the dictionary/puzzle build pipeline, testing, and deployment, see [docs/development.md](docs/development.md) — most visitors just here to play won't need it.
+
+## License
+
+Letter Punk is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). In short: you're free to use, study, modify, and share this code for any noncommercial purpose — personal use, research, education, hobby projects, nonprofits — no permission needed. Commercial use requires a separate agreement with the licensor. There's no separate license for [docs/design-philosophy.md](docs/design-philosophy.md), which is dedicated to the public domain (CC0) on its own terms, independent of the code.

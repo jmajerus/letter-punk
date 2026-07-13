@@ -1,6 +1,7 @@
 {
   "name": "letter-punk",
   "version": "1.0.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "scripts": {
     "build:dictionary": "node public/util/compile-dict.js",
