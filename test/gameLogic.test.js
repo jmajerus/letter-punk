@@ -526,6 +526,24 @@ test('lastValidationSummary clears on every early-return path, not just rejectio
   assert.equal(engine.getSnapshot().lastValidationSummary, '');
 });
 
+test('lastValidationSummary clears as soon as the next word starts, not just once it is submitted', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg'] });
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  assert.equal(engine.getSnapshot().lastValidationSummary, 'Accepted by the mock dictionary.');
+
+  // Builder is auto-seeded with 'g'; typing the next letter (still short of
+  // a full word, no submit yet) is what a player actually does right after
+  // accepting a word -- the summary from "adg" shouldn't still be sitting
+  // there describing a word that's no longer the one being built.
+  engine.appendToken('j');
+  assert.equal(
+    engine.getSnapshot().lastValidationSummary,
+    '',
+    'starting to build the next word must clear the previous word\'s summary immediately, before any submit',
+  );
+});
+
 test('freeChainMode defaults to false and is reflected on isFreeChainMode() and the snapshot', () => {
   const { engine } = createHarness({ acceptedWords: [] });
   assert.equal(engine.isFreeChainMode(), false);

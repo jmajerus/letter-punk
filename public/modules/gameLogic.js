@@ -245,6 +245,18 @@ export function createGameEngine(options) {
   }
 
   function appendToken(letter, doubled) {
+    // Same bug class as submitWord's clear above, one step earlier: a word
+    // gets accepted, its "Accepted by ..." summary shows, then the player
+    // starts typing the *next* word letter by letter without submitting
+    // yet -- nothing had ever cleared the summary at that point, so it sat
+    // there next to a word it no longer described until the next full
+    // submit. Cleared here too so it goes as soon as a new attempt starts,
+    // not just once that attempt is finished.
+    if (state.lastValidationSummary) {
+      state.lastValidationSummary = '';
+      emitStateChange();
+    }
+
     const lower = letter.toLowerCase();
     const lastToken = state.tokens[state.tokens.length - 1];
     const requiredStartingLetter = getRequiredStartingLetter();
