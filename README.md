@@ -34,8 +34,8 @@ Once you've used every letter, Letter Punk compares your total character count t
 
 ## Why Letter Punk Exists
 
-- Letter Punk leans into a Steampunk visual identity: brass and copper tones, riveted tanks, pipe-route overlays, pressure-valve motifs, and mechanical feedback cues that make the board feel like a working machine rather than a flat grid.
-- The project started from a design disagreement with traditional Letter Boxed constraints: excluding words with double letters removes a rich portion of everyday vocabulary for reasons that appear implementation-driven more than strategy-driven.
+- Letter Punk leans into a Steampunk visual identity: steel and brass tones, riveted tanks, pipe-route overlays, pressure-valve motifs, and mechanical feedback cues that make the board feel like a working machine rather than a flat grid.
+- The project started with the observation that traditional Letter Boxed has a limitation: excluding words with double letters rules out a rich portion of everyday vocabulary.
 - Letter Punk keeps the core chaining puzzle structure, but treats double-letter words as first-class play so puzzle decisions come from word choice and path planning, not from an artificial vocabulary cutoff.
 - The goal is to preserve the elegance of the original format while expanding expressive play and making room for a broader, more natural dictionary.
 - There's no word-count cap and no failure state: Delete Word/Delete Char can always back out of a dead end, so completing a well-formed board is generally achievable through persistence, not just cleverness — skill differentiates *how well* you solved it (see [docs/canonical-solution-rating.md](docs/canonical-solution-rating.md)), not *whether* you can. That said, "well-formed" is doing real work in that sentence: a board built from letters with poor vowel coverage can still be a genuinely hard exception, in the extreme leaving only one or two legal words that can even start from certain letters.
