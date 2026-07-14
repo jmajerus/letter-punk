@@ -63,6 +63,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 - Reduced-motion setting that preserves readability while limiting animation.
 - Keyboard/focus-aware modal behavior with focus trapping and escape-to-close support.
 - Accessibility helpers including skip link, ARIA live regions, and non-color letter-state cues.
+- A small awareness card near the pipe artwork, on by default, linking to one real, current *educational* page or game — currently ICRC's Rules of War, WHO's page on fighting online misinformation, and two free games that build resistance to manipulation, "Bad Vaxx" (vaccine misinformation) and "Harmony Square" (political disinformation) — not a donation ask, swapped daily, dismissible, no sponsored content or borrowed logos, just a link to real work.
 
 ## Learn More
 
@@ -71,6 +72,7 @@ Once you've used every letter, Letter Punk compares your total character count t
 - [More Than One Way to Win](docs/design-philosophy.md) — a short, general-audience essay on the design ideas behind this project's approach to winning, written for anyone building anything, not just games. Dedicated to the public domain (CC0) — free to use, no permission needed.
 - [Roadmap & Future Concepts](docs/roadmap.md) — potential board-configuration and rule variants, a wildcard-letter idea, and a full concept brief for a separate pictograph-based spin-off. Nothing here is a commitment.
 - [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md) — concept/copyright notes.
+- [Acknowledgments](ACKNOWLEDGMENTS.md) — a note from the author on the AI collaboration behind this project.
 
 ## Development
 
@@ -79,3 +81,5 @@ For local setup, the dictionary/puzzle build pipeline, testing, and deployment, 
 ## License
 
 Letter Punk is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). In short: you're free to use, study, modify, and share this code for any noncommercial purpose — personal use, research, education, hobby projects, nonprofits — no permission needed. Commercial use requires a separate agreement with the licensor. There's no separate license for [docs/design-philosophy.md](docs/design-philosophy.md), which is dedicated to the public domain (CC0) on its own terms, independent of the code.
+
+This license covers Letter Punk's own code and expression only — it doesn't and can't extend to the underlying word-chaining game mechanic itself, which was never anyone's to own in the first place. See [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md#what-letter-punks-own-license-does-and-doesnt-cover) for the reasoning.

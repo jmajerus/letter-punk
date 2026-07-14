@@ -21,6 +21,14 @@ ACCOUNT_ID = "eec00739050a8a4cbf359a1dedb8cad3"
 # id = "<your-kv-namespace-id>"
 # preview_id = "<your-kv-preview-id>"
 
+# Optional hourly cache for the /api/psa-feed awareness banner (ICRC/WHO).
+# Without this binding, the route still works -- it just fetches the source
+# feeds live on every request instead of serving a cached copy.
+# [[kv_namespaces]]
+# binding = "PSA_CACHE"
+# id = "<your-kv-namespace-id>"
+# preview_id = "<your-kv-preview-id>"
+
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
 dataset = "letter_punk_events"

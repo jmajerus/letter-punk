@@ -61,6 +61,35 @@ A few things worth knowing if you're setting one up:
 - Only keyboard input stops the loop, per the current implementation — a touch-only kiosk display would need a physical or on-screen keyboard, or a follow-up change to also stop on tap/click.
 - Repeated demo solves don't get sent to Analytics Engine or local play history — only a genuine one-off shared-link open does — so an unattended kiosk running for hours doesn't flood real usage data with duplicate "solve" events for the same canned demo.
 
+## Awareness card (default)
+
+A small, static card (`public/modules/campaignCard.js`) sits in the lower-left of the pipe-artwork panel, linking to a single real, current *educational* page or game — deliberately not a donation/fundraising link, one deliberate link at a time, swapped daily. **Always on, deliberately with no Settings toggle** — the × dismisses it for the current visit only (in-memory, not persisted), so it's back the next time the page loads. The point is reaching players who wouldn't seek this content out themselves, including ones who are initially resistant to it; a permanent one-click opt-out the first time it appears would let exactly that audience close the door before it ever had a chance to reach them.
+
+Deliberately simple, and deliberately different from the hidden newsroom banner below:
+
+- No server, no KV, no live fetch — `CAMPAIGNS` in `campaignCard.js` is a small, hand-curated, hand-verified array bundled directly in the client. Rotation is `Math.floor(Date.now() / 86_400_000) % CAMPAIGNS.length` — a new one roughly once a day, computed client-side.
+- Each entry was verified directly before adding (real URL, fetched and confirmed genuine, not guessed), and each is chosen to be both evergreen (not tied to one dated event) *and* currently salient rather than a generic org-homepage link — currently ICRC's own ["Respect the Rules of War"](https://www.icrc.org/en/rulesofwar) education campaign, [WHO's own page on combating health misinformation online](https://www.who.int/teams/digital-health-and-innovation/digital-channels/combatting-misinformation-online), and two free games from Cambridge University's Social Decision-Making Lab that build resistance to manipulation by having players try the tactics themselves: ["Bad Vaxx"](https://inoculation.science/inoculation-games/bad-vaxx/) (vaccine misinformation) and ["Harmony Square"](https://inoculation.science/inoculation-games/harmony-square/) (political disinformation). The intent throughout is putting real knowledge (or a real skill-building game) in front of people who might not go looking for it themselves, not soliciting donations — the game entries are also a deliberate second content *category*: a link to another well-made educational game fits naturally alongside a word game in a way a generic campaign link wouldn't, and this specific audience (word-game players) is exactly who these games are trying to reach.
+- "Verified directly" caught a real dead end: a third same-source candidate, ["Bad News"](https://inoculation.science/inoculation-games/bad-news/), looked identical to the other two on its listing page (200 status, genuine-looking content) but its embedded game domain (`getbadnews.com`) now serves a mismatched TLS certificate and a generic hosting placeholder instead of the actual game — a plain URL-status check wouldn't have caught this; it only turned up by actually loading the embedded game in a browser and inspecting the iframe. Left out entirely rather than added and later found broken.
+- No organization logos or official imagery anywhere — brand-usage terms for that vary by org and are easy to get wrong even for goodwill placements. The card is drawn entirely in Letter Punk's own visual language; only the link itself goes to the real organization or game.
+- Lives in `.panel-art-wrap`, a sibling of `#panelArt` rather than a child of it — `#panelArt`'s own `innerHTML` gets fully replaced whenever the pipe-bearing easter egg (re)initializes, which would silently wipe out anything nested inside it.
+- Unlike the newsroom banner's "don't repeat once seen" behavior, this one doesn't track per-item seen state — with only a few entries rotating slowly, a returning player seeing the same handful of entries cycle is the intended, stable behavior, not noise to suppress.
+
+Adding another entry later means adding one item to `CAMPAIGNS` — verify the page or game is genuinely that organization's own (or, for a game, genuinely made by who it claims) and reasonably evergreen before adding it, the same diligence as the newsroom feeds below.
+
+## Awareness banner (newsroom headlines, hidden/experimental)
+
+A small rotating banner (`public/modules/psaBanner.js`) surfaces real, current items pulled directly from ICRC's and WHO's own public newsroom feeds — not sponsored content, not paraphrased, not attributed text we wrote ourselves. Each item links straight back to the source organization's own page, labeled "via ICRC" / "via WHO," never presented as a partnership or endorsement in either direction.
+
+**Not in Settings, not in the documented feature set** — visiting `#psaBanner=1` (bare or `#psaBanner=1&...`, same presence-only convention as `&arcade=1`) is the only way to see it; a normal visit never shows it and there's nothing in the UI hinting it exists. This was originally the default-on live-feed option before the awareness card above shipped; once the card started doing the same "put real knowledge in front of players" job with a steadier, more deliberate curation, the banner was kept around code-and-all as an experimental variant rather than deleted outright, but demoted out of the player-facing surface. `isPsaBannerRequested()` in `app.js` (next to `isArcadeModeRequested()`) is the gate.
+
+How it's wired:
+
+- `src/psaFeed.js` fetches each org's real feed server-side (ICRC is Atom, WHO is RSS 2.0), parses out title/link/summary/date with a small targeted extractor — no XML-parsing dependency, no third-party feed-conversion middleman. A browser-side fetch of these feeds directly would very likely be blocked by CORS, which is why this has to happen in the Worker, not the client.
+- Results are cached in KV for an hour when a `PSA_CACHE` namespace is bound in `wrangler.toml` (commented out by default, same optional pattern as `PUZZLES_KV`) — without it, the route still works, it just fetches both feeds live on every request.
+- The client (`psaBanner.js`) picks an item using the same hourly-rotation-plus-"skip anything already seen" approach as the arcade attract loop's completion celebration, tracked in `localStorage`. Once every currently-offered item has been seen, the banner just stays hidden rather than repeating one.
+
+Adding another source later means adding one entry to `FEED_SOURCES` in `src/psaFeed.js` and, if its feed shape isn't RSS 2.0 or Atom, one more small parser function — verify the feed is genuinely that organization's own (check for a `<link rel="alternate" type="application/rss+xml">` tag on their site, or a dedicated newsroom/press subdomain) before wiring it in; don't guess at a feed URL.
+
 ## Dictionary
 
 Dictionary validation uses locally packed game dictionaries. The compiler prefers `public/data/en_US.dic` with `public/data/en_US.aff` expansion, falls back to `public/data/scowl.txt` when present, and also builds a compatibility fallback from `public/data/3of6game.txt` when that source is distinct.
@@ -110,8 +139,11 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 ## Repo structure
 
 - `public/` static site files served by Workers or Pages
-- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`, `psaBanner.js`
 - `public/app.js` app bootstrap and UI orchestration
+- `src/worker.js` Cloudflare Worker entry point — routes `/api/*` and `/admin`, serves static assets otherwise
+- `src/admin.js` analytics dashboard behind `/admin`
+- `src/psaFeed.js` fetches/parses/caches the ICRC + WHO awareness-banner feeds — see "Awareness banner" below
 - `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from `puzzle-seeds.json`
 - `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
 - `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
@@ -125,7 +157,9 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 - `docs/development.md` this file
 - `docs/archive/` superseded documents kept for reference, not linked from day-to-day docs
 - `README.md` project overview and how to play
-- `Letter-Boxed-Game-Logic-Copyright.md` copyright/licensing notes
+- `LICENSE` PolyForm Noncommercial License 1.0.0 (verbatim), governing the code — see README's License section
+- `Letter-Boxed-Game-Logic-Copyright.md` summary of why this project doesn't infringe NYT's Letter Boxed copyright/trademark
+- `ACKNOWLEDGMENTS.md` a note from the author on the AI collaboration behind this project
 
 ---
 

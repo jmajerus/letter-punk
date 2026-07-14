@@ -17,6 +17,8 @@ import { recordFinishedGame } from './modules/historyManager.js';
 import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
 import { createPipeEasterEgg } from './modules/pipeEasterEgg.js';
 import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
+import { createPsaBanner } from './modules/psaBanner.js';
+import { createCampaignCard } from './modules/campaignCard.js';
 
 const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
@@ -50,6 +52,8 @@ const reducedMotionToggle = document.getElementById('reducedMotionToggle');
 const provenanceBadgesToggle = document.getElementById('provenanceBadgesToggle');
 const freeChainToggle = document.getElementById('freeChainToggle');
 const freeChainBadgeElement = document.getElementById('freeChainBadge');
+const psaBannerElement = document.getElementById('psaBanner');
+const campaignCardElement = document.getElementById('campaignCard');
 const helpModal = document.getElementById('helpModal');
 const yesterdayModal = document.getElementById('yesterdayModal');
 const yesterdayTitleElement = document.getElementById('yesterdayTitle');
@@ -302,6 +306,26 @@ const pipeEasterEgg = createPipeEasterEgg({
 const steamVentEasterEgg = createSteamVentEasterEgg({
   anchorElement: steamVentAnchorElement,
   isReducedMotionEnabled,
+});
+
+// Rotating awareness banner sourced from ICRC's and WHO's own newsroom
+// feeds (see src/psaFeed.js and docs/development.md). Hidden/experimental --
+// deliberately not in Settings or the documented feature set, only visible
+// via `#psaBanner=1` on the URL -- since the default campaign card above
+// already covers the intended goal of surfacing this kind of content.
+const psaBanner = createPsaBanner({
+  containerElement: psaBannerElement,
+  isEnabled: isPsaBannerRequested,
+});
+
+// Small, static, daily-rotating awareness card (see
+// public/modules/campaignCard.js) -- distinct from the opt-in live newsroom
+// banner above. Deliberately has no permanent off switch: dismissing it
+// with its x only hides it for the current visit, since the point is
+// reaching players who wouldn't seek this content out themselves, and a
+// one-click permanent opt-out would undercut that on first contact.
+const campaignCard = createCampaignCard({
+  containerElement: campaignCardElement,
 });
 
 // The known reference solution for the currently-applied board, if any.
@@ -1196,6 +1220,16 @@ function isArcadeModeRequested() {
   return getShareHashSegments().some((part) => part === 'arcade' || part.startsWith('arcade='));
 }
 
+// Hidden/experimental flag for the live newsroom-headlines banner (see
+// docs/development.md) -- deliberately not a Settings toggle. The default
+// awareness card already covers the "put real knowledge in front of
+// players" goal, so this stays link-gated rather than part of the
+// documented feature set: `#psaBanner=1`, same presence-only pattern as
+// isArcadeModeRequested above.
+function isPsaBannerRequested() {
+  return getShareHashSegments().some((part) => part === 'psaBanner' || part.startsWith('psaBanner='));
+}
+
 // Optional per-deployment tuning, e.g. `&arcade=1&idleWarnSec=90`. A
 // senior center and a fast-paced arcade want very different idle
 // tolerances on the exact same codebase, so these are read from the link
@@ -1798,6 +1832,8 @@ function initializeGame() {
 
   wireEvents();
   pipeEasterEgg.init();
+  psaBanner.init();
+  campaignCard.init();
 
   syncMotionPreferenceToUi();
   syncProvenanceBadgesPreferenceToUi();

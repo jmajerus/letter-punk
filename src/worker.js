@@ -1,4 +1,5 @@
 import { handleAdmin } from './admin.js';
+import { getPsaFeedItems } from './psaFeed.js';
 
 /**
  * Worker entry point.
@@ -153,7 +154,7 @@ function buildDataPoint(event, data) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Admin dashboard — must come before asset fallback.
@@ -164,6 +165,20 @@ export default {
     // Year-scoped daily puzzle catalog (KV-backed, with static fallback).
     if (request.method === 'GET' && (url.pathname === '/api/puzzles' || url.pathname.startsWith('/api/puzzles/'))) {
       return handleYearPuzzleRequest(request, env, url);
+    }
+
+    // Awareness banner: normalized ICRC/WHO newsroom items, KV-cached
+    // hourly when PSA_CACHE is bound (falls back to a live fetch on every
+    // request otherwise — slower, but never broken).
+    if (request.method === 'GET' && url.pathname === '/api/psa-feed') {
+      const items = await getPsaFeedItems(env, ctx);
+      return new Response(JSON.stringify(items), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+        },
+      });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/event') {

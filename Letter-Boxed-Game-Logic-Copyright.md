@@ -18,6 +18,10 @@ Letter Punk is inspired by NYT's Letter Boxed but is an original project: its ow
 
 Letter Punk keeps the same core chaining rule as Letter Boxed (each letter must come from a different side of the board than the one before it), but adds double-letter support: tap a letter twice in a row to double it, which makes previously-impossible words like *LOOK* or *BEEKEEPER* playable. That's a deliberate design choice, not a workaround — see the "Why Letter Punk Exists" section of the [README](README.md) for the full reasoning. As far as this project's own research turned up, no other Letter-Boxed-style game implements this specific mechanic.
 
+## What Letter Punk's own license does (and doesn't) cover
+
+The same principle that let Letter Punk exist also limits what its own license can claim. The [PolyForm Noncommercial License](LICENSE) covers this project's specific code, wording, and visual design — not the underlying word-chaining mechanic or the double-letter idea, neither of which was ever anyone's to own. Someone is free to build their own independent word-chain game from scratch, noncommercial or commercial, without copying Letter Punk's actual expression. For a noncommercial version, that's simply welcome, no conflict there.
+
 ## Not legal advice
 
 This summary reflects informal research (an AI-assisted web search, not a lawyer), done to sanity-check the project's direction before building it — not a legal opinion. If Letter Punk is ever published or monetized at meaningful scale, an actual conversation with an intellectual-property attorney is the appropriate next step, not this document.

@@ -27,29 +27,33 @@ const SOURCE_GLYPH_CODES = {
  * title. Drawn with currentColor so it always matches the badge's own
  * text color, rather than a platform emoji that wouldn't.
  */
+// Geometry is scaled up ~1.35x from its original 20x24 viewBox so the
+// 2-character code can render at the site's 14px accessibility floor
+// (see the font-size floor note in styles.css) without the text crowding
+// the book-cover shape.
 function createDictionaryGlyph(code) {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 20 24');
-  svg.setAttribute('width', '21');
-  svg.setAttribute('height', '25');
+  svg.setAttribute('viewBox', '0 0 27 32');
+  svg.setAttribute('width', '28');
+  svg.setAttribute('height', '34');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('class', 'word-pill-source-glyph');
 
   const cover = document.createElementNS(SVG_NS, 'rect');
-  cover.setAttribute('x', '1');
-  cover.setAttribute('y', '1');
-  cover.setAttribute('width', '18');
-  cover.setAttribute('height', '22');
-  cover.setAttribute('rx', '2.5');
+  cover.setAttribute('x', '1.3');
+  cover.setAttribute('y', '1.3');
+  cover.setAttribute('width', '24');
+  cover.setAttribute('height', '30');
+  cover.setAttribute('rx', '3.4');
   cover.setAttribute('class', 'word-pill-source-glyph-cover');
 
   const spine = document.createElementNS(SVG_NS, 'path');
-  spine.setAttribute('d', 'M3.5 1h-0.5a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h0.5z');
+  spine.setAttribute('d', 'M4.7 1.3h-0.7a2.7 2.7 0 0 0-2.7 2.7v24.3a2.7 2.7 0 0 0 2.7 2.7h0.7z');
   spine.setAttribute('class', 'word-pill-source-glyph-spine');
 
   const text = document.createElementNS(SVG_NS, 'text');
-  text.setAttribute('x', '12');
-  text.setAttribute('y', '16');
+  text.setAttribute('x', '16');
+  text.setAttribute('y', '21.5');
   text.setAttribute('text-anchor', 'middle');
   text.setAttribute('class', 'word-pill-source-glyph-text');
   text.textContent = code;
