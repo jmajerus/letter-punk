@@ -649,7 +649,7 @@ export function createBoardRenderer(options) {
     if (foundWords.length === 0) {
       const placeholder = document.createElement('div');
       placeholder.className = 'word-pill';
-      placeholder.textContent = 'No words forged yet.';
+      placeholder.textContent = 'No words routed yet.';
       foundWordsElement.append(placeholder);
       return;
     }

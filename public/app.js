@@ -720,8 +720,8 @@ async function applyBoardFromInputs() {
   closeBoardModal();
   setMessage(
     overrideWords.length > 0
-      ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Forge away.`
-      : 'Applied custom board. Forge away.',
+      ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`
+      : 'Applied custom board. Route away.',
   );
 }
 
@@ -1382,7 +1382,7 @@ async function hydrateSharedPuzzle(progressWords, canonicalWordsFromLink, { isCa
   } else if (progressWords.length > 0) {
     setMessage(`Loaded a shared puzzle in progress. Pick up where they left off!${freeChainSuffix}`, 'success');
   } else {
-    setMessage('Loaded a shared puzzle. Forge away.', 'success');
+    setMessage('Loaded a shared puzzle. Route away.', 'success');
   }
 }
 
@@ -1723,7 +1723,7 @@ async function stopArcadeMode() {
   gameEngine.applyBoardDefinition(buildBoard());
   renderUi();
   puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: true }).then(() => renderUi());
-  setMessage('Ready to play. Forge away.', 'success');
+  setMessage('Ready to play. Route away.', 'success');
   armIdleTimers();
 }
 

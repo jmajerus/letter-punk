@@ -413,7 +413,7 @@ export function createGameEngine(options) {
 
     if (state.foundWords.some((entry) => entry.word === word)) {
       emitWordResult({ outcome: 'duplicate', validationSource: '', wordLength: length, word });
-      emitMessage('You already forged that word.', 'error');
+      emitMessage('You already routed that word.', 'error');
       return;
     }
 
