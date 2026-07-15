@@ -43,6 +43,19 @@ function sortCatalogById(catalog) {
   return [...catalog].sort((left, right) => String(left?.id || '').localeCompare(String(right?.id || '')));
 }
 
+// Catalog ids are "YYYY-MM-DD"; the shareable ?date= param drops the dashes
+// for a shorter, plainer-looking URL (see playPuzzleByDate/
+// getActiveCatalogDateParam). Kept as a pair of small, pure conversions
+// rather than baking the format into either call site.
+function compactDateFromId(id) {
+  return String(id || '').replace(/-/g, '');
+}
+
+function idFromCompactDate(compactDate) {
+  const match = /^(\d{4})(\d{2})(\d{2})$/.exec(String(compactDate || ''));
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+}
+
 /**
  * Creates a puzzle service that loads catalog data and exposes previous/today/
  * next navigation helpers plus derived UI state.
@@ -165,6 +178,42 @@ export function createPuzzleFetcher(options = {}) {
 
     const activeEntry = state.puzzleCatalog[state.activePuzzleIndex];
     return Boolean(activeEntry?.id) && activeEntry.id === getTodayPuzzleId();
+  }
+
+  // The compact-date counterpart to a board/canonical-carrying share link:
+  // a dated catalog puzzle needs nothing beyond its date in the URL at all,
+  // since the board and canonical solution are already fully derivable by
+  // the recipient's own client from the same public catalog, keyed by that
+  // date. Returns null for a custom/random board, which has no catalog
+  // date to reference and still needs the full encoded link.
+  function getActiveCatalogDateParam() {
+    if (state.puzzleSource !== 'catalog' || state.activePuzzleIndex < 0) {
+      return null;
+    }
+
+    const activeEntry = state.puzzleCatalog[state.activePuzzleIndex];
+    return activeEntry?.id ? compactDateFromId(activeEntry.id) : null;
+  }
+
+  // Counterpart to playPreviousPuzzle/playNextPuzzle/playTodayPuzzle -- same
+  // { ok, error } shape -- for loading a specific dated puzzle by its
+  // compact-date url param rather than by relative navigation.
+  function playPuzzleByDate(compactDate) {
+    const id = idFromCompactDate(compactDate);
+    if (!id) {
+      return { ok: false, error: 'Invalid puzzle date.' };
+    }
+
+    const index = state.puzzleCatalog.findIndex((entry) => entry.id === id);
+    if (index < 0) {
+      return { ok: false, error: 'That date is not in the puzzle catalog.' };
+    }
+
+    if (!applyCatalogPuzzle(index)) {
+      return { ok: false, error: 'Could not load the selected puzzle.' };
+    }
+
+    return { ok: true };
   }
 
   function getPreviousSolutionUiLabels() {
@@ -307,6 +356,9 @@ export function createPuzzleFetcher(options = {}) {
     getPuzzleStatusText,
     getYesterdayPuzzleData,
     getNavigationState,
+    isActiveCatalogPuzzleToday,
+    getActiveCatalogDateParam,
+    playPuzzleByDate,
     loadDailyPuzzleCatalog,
     playPreviousPuzzle,
     playNextPuzzle,

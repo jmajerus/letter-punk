@@ -2,31 +2,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatMaskedShareText, formatUnmaskedShareText } from '../public/modules/shareText.js';
 
-test('a single unconnected word renders a start block, middle blocks, and an end block', () => {
+test('a word renders one letter block per character, bookended by start/end anchors', () => {
   const text = formatMaskedShareText({ wordLengths: [5] });
   const lines = text.split('\n');
   assert.equal(lines[0], 'Letter Punk');
-  assert.equal(lines[1], '🟩⬛⬛⬛🟥');
+  assert.equal(lines[1], '🟩🟦🟦🟦🟦🟦🟥', 'anchors are extra glyphs, not stand-ins for a letter -- 5 letters means 5 blocks, plus 2 anchors');
 });
 
-test('a chained transition replaces both the end block and the following start block with the chain block', () => {
+test('a chained transition replaces both the end anchor and the following start anchor with the chain block, letter-block count unaffected', () => {
   const text = formatMaskedShareText({
     wordLengths: [4, 5],
     chainTransitions: [true],
   });
   const lines = text.split('\n');
-  assert.equal(lines[1], '🟩⬛⬛🔗');
-  assert.equal(lines[2], '🔗⬛⬛⬛🟥');
+  assert.equal(lines[1], '🟩🟦🟦🟦🟦🔗');
+  assert.equal(lines[2], '🔗🟦🟦🟦🟦🟦🟥');
 });
 
-test('an unchained transition keeps ordinary start/end blocks on both words', () => {
+test('an unchained transition keeps ordinary start/end anchors on both words', () => {
   const text = formatMaskedShareText({
     wordLengths: [4, 8],
     chainTransitions: [false],
   });
   const lines = text.split('\n');
-  assert.equal(lines[1], '🟩⬛⬛🟥');
-  assert.equal(lines[2], '🟩⬛⬛⬛⬛⬛⬛🟥');
+  assert.equal(lines[1], '🟩🟦🟦🟦🟦🟥');
+  assert.equal(lines[2], '🟩🟦🟦🟦🟦🟦🟦🟦🟦🟥');
 });
 
 test('a three-word solve marks each transition independently, mixing chained and unchained', () => {
@@ -35,9 +35,14 @@ test('a three-word solve marks each transition independently, mixing chained and
     chainTransitions: [true, false],
   });
   const lines = text.split('\n');
-  assert.equal(lines[1], '🟩⬛🔗'); // word 1: chains into word 2
-  assert.equal(lines[2], '🔗⬛⬛🟥'); // word 2: starts chained, ends independent
-  assert.equal(lines[3], '🟩⬛🟥'); // word 3: fully independent
+  assert.equal(lines[1], '🟩🟦🟦🟦🔗'); // word 1: chains into word 2
+  assert.equal(lines[2], '🔗🟦🟦🟦🟦🟥'); // word 2: starts chained, ends independent
+  assert.equal(lines[3], '🟩🟦🟦🟦🟥'); // word 3: fully independent
+});
+
+test('a single-letter word gets one letter block plus its two anchors, no special-casing needed', () => {
+  const text = formatMaskedShareText({ wordLengths: [1] });
+  assert.equal(text.split('\n')[1], '🟩🟦🟥');
 });
 
 test('earned titles are surfaced as a bare count, never by name', () => {
@@ -146,9 +151,9 @@ test('formatUnmaskedShareText precedes its url with the same rule and blurb', ()
   assert.equal(lines.at(-1), 'https://example.com/#p=xyz');
 });
 
-test('a two-letter word has no middle blocks, just start and end back to back', () => {
+test('a two-letter word still gets one letter block per letter, same as any other length', () => {
   const text = formatMaskedShareText({ wordLengths: [2] });
-  assert.equal(text.split('\n')[1], '🟩🟥');
+  assert.equal(text.split('\n')[1], '🟩🟦🟦🟥');
 });
 
 test('formatUnmaskedShareText spells out the actual word between start and end blocks', () => {

@@ -13,6 +13,17 @@
  * same block (CHAIN_BLOCK) at the tail of one row and the head of the
  * next, which reads as "these connect" regardless of font or spacing.
  *
+ * Every letter position gets its own LETTER_BLOCK, and the start/end/chain
+ * anchors (START_BLOCK/END_BLOCK/CHAIN_BLOCK) are always extra glyphs
+ * bookending that run, never a stand-in for a letter -- so a row's glyph
+ * count for actual letters is exactly the word's length in both the
+ * masked and unmasked renderings, the same way spelling the word out does
+ * in the unmasked one. An earlier version of the masked row instead
+ * replaced the first/last position with the anchor glyph (e.g. a 4-letter
+ * word was 4 glyphs total, not 6), which quietly disagreed with the
+ * unmasked row's own "anchors are additions, not replacements" shape --
+ * counting glyphs told a different story than reading the word did.
+ *
  * A trailing "N words · M letters" line adds nothing a recipient couldn't
  * already work out by counting blocks themselves -- it's a convenience,
  * the same role Wordle-adjacent stat lines play at the bottom of a shared
@@ -65,7 +76,12 @@
  */
 const START_BLOCK = '🟩';
 const END_BLOCK = '🟥';
-const MIDDLE_BLOCK = '⬛';
+// Blue reads as brighter/shinier than a flat dark square (closer to the
+// in-game board's silver-steel-tank tiles, see boardRenderer.js, than
+// black ever did) without disappearing against a white chat background
+// the way plain white did -- there's no literal steel-blue or silver
+// square in the standard emoji set, and this is the only blue one.
+const LETTER_BLOCK = '🟦';
 const CHAIN_BLOCK = '🔗';
 
 function buildWordRow(length, startsChained, endsChained) {
@@ -73,16 +89,13 @@ function buildWordRow(length, startsChained, endsChained) {
     return '';
   }
 
-  if (length === 1) {
-    return startsChained || endsChained ? CHAIN_BLOCK : START_BLOCK;
-  }
-
-  const start = startsChained ? CHAIN_BLOCK : START_BLOCK;
-  const end = endsChained ? CHAIN_BLOCK : END_BLOCK;
-  const middleCount = Math.max(0, length - 2);
-  return start + MIDDLE_BLOCK.repeat(middleCount) + end;
+  const startAnchor = startsChained ? CHAIN_BLOCK : START_BLOCK;
+  const endAnchor = endsChained ? CHAIN_BLOCK : END_BLOCK;
+  return startAnchor + LETTER_BLOCK.repeat(length) + endAnchor;
 }
 
+// Already matches buildWordRow's shape: anchors bookend the letters (here,
+// the real word) rather than replacing any of them -- see the file header.
 function buildUnmaskedWordRow(word, startsChained, endsChained) {
   if (!word) {
     return '';

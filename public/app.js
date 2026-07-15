@@ -763,17 +763,50 @@ function describeShareTeaser(resultSummary) {
 }
 
 // Shared by both shareResult and revealSolution: a link to a blank version
-// of whatever puzzle is currently active (gameEngine.getBoard() already
-// reflects Previous/Next-navigated days, not just today's, so this needs
-// no separate date handling). Deliberately blank rather than carrying the
-// sender's own progress or a masked resultSummary teaser -- the point of
-// the link, per its own Settings copy, is letting someone without the game
-// bookmarked jump in and play the puzzle themselves; handing them an
-// already-solved or replay-animated board doesn't serve that, especially
-// for someone unfamiliar with how to back out of a finished game and start
-// their own attempt. Returns '' (not thrown) if the hash can't be built,
-// so a link failure never blocks the text-only share it's attached to.
+// of whatever puzzle is currently active. Deliberately blank rather than
+// carrying the sender's own progress or a masked resultSummary teaser --
+// the point of the link, per its own Settings copy, is letting someone
+// without the game bookmarked jump in and play the puzzle themselves;
+// handing them an already-solved or replay-animated board doesn't serve
+// that, especially for someone unfamiliar with how to back out of a
+// finished game and start their own attempt. Returns '' (not thrown) if
+// the hash can't be built, so a link failure never blocks the text-only
+// share it's attached to.
+//
+// When the active puzzle is literally today's catalog puzzle, this skips
+// any payload entirely and returns the bare base URL: visiting the site
+// with nothing appended already loads today's puzzle by default, so
+// encoding one would just make the link longer for no benefit. This is
+// deliberately narrower than "no payload needed because it looks like the
+// default puzzle" -- isActiveCatalogPuzzleToday() checks the active
+// catalog entry's id against today's literal calendar date, not a
+// fallback/home index.
+//
+// Any *other* dated catalog puzzle (reached via Previous/Next, or a custom
+// board built to a specific canonical solution) gets a `?date=YYYYMMDD`
+// link instead of the cryptic #p=... hash -- a dated puzzle's board and
+// canonical solution are already fully public in the daily-puzzles catalog
+// itself, so the recipient's own client can look all of that up by date;
+// the link only needs to say *which* date. This also means opening the
+// link is indistinguishable from having navigated there normally (see
+// playPuzzleByDate in puzzleFetcher.js), so Previous/Next/Today's Puzzle
+// keep working immediately afterward -- e.g. share yesterday's puzzle, the
+// recipient solves it, then taps the right arrow straight into today's.
+//
+// Only a genuinely custom or random board -- not sourced from the catalog
+// at all -- falls through to the full encoded #p=... hash, since there's
+// no public date reference for the recipient's client to look anything up
+// by; that's the one case still worth the length.
 function buildBlankPuzzleShareUrl() {
+  if (puzzleFetcher.isActiveCatalogPuzzleToday()) {
+    return `${window.location.origin}${window.location.pathname}`;
+  }
+
+  const datedParam = puzzleFetcher.getActiveCatalogDateParam();
+  if (datedParam) {
+    return `${window.location.origin}${window.location.pathname}?date=${datedParam}`;
+  }
+
   try {
     const hash = encodeShareHash({
       board: gameEngine.getBoard(),
@@ -1471,6 +1504,18 @@ function getSharePuzzlePayload() {
   return getShareHashSegments().find((part) => part.startsWith('p=')) || '';
 }
 
+// The compact-date counterpart to getSharePuzzlePayload -- a query param,
+// not a hash segment, since it's independent of the #p=... scheme entirely.
+// See buildBlankPuzzleShareUrl/playPuzzleByDate for why a dated puzzle link
+// only ever needs this one small piece of information.
+function getRequestedDateParam() {
+  try {
+    return new URLSearchParams(window.location.search).get('date') || '';
+  } catch {
+    return '';
+  }
+}
+
 // Kiosk/attract-mode flag — see docs/development.md for the intended setup.
 // Accepts a bare `arcade` or `arcade=1` (any value); only its presence
 // matters.
@@ -2106,6 +2151,16 @@ function initializeGame() {
   setMessage('Double letters are welcome here: tap the same letter twice in a row.');
 
   const sharedPuzzleLoaded = tryLoadSharedPuzzleFromHash();
+  // Mutually exclusive with the hash-based #p=... scheme by construction --
+  // a dated puzzle link only carries this, never both -- so the hash wins
+  // if a URL somehow has both. Unlike the hash, this can't be resolved
+  // synchronously: it names a catalog date rather than carrying the board
+  // itself, so it has to wait for the catalog fetch below to know whether
+  // that date even exists. A brief flash of the default random board while
+  // that resolves is the accepted tradeoff for the link staying this short
+  // -- the same flash every normal (non-shared) page load already has
+  // before the catalog's home puzzle applies.
+  const requestedDate = sharedPuzzleLoaded ? '' : getRequestedDateParam();
 
   if (!sharedPuzzleLoaded) {
     puzzleFetcher.markRandomBoard();
@@ -2113,11 +2168,25 @@ function initializeGame() {
   renderUi();
 
   // The catalog still loads either way — Next/Previous/Today's Puzzle need
-  // it — but a shared link's board must not be replaced by today's puzzle.
-  puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: !sharedPuzzleLoaded }).then(() => {
+  // it — but a shared link's board must not be replaced by today's puzzle,
+  // and neither should a still-pending ?date= lookup.
+  puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: !sharedPuzzleLoaded && !requestedDate }).then(() => {
     if (sharedPuzzleLoaded) {
       renderUi();
       return;
+    }
+
+    if (requestedDate) {
+      const result = puzzleFetcher.playPuzzleByDate(requestedDate);
+      if (result.ok) {
+        setMessage(`Loaded the puzzle for ${getActivePuzzleDateLabel()}.`, 'success');
+      } else {
+        // Falls back to the normal home puzzle rather than leaving the
+        // random board from before the catalog loaded on screen -- an
+        // invalid or out-of-range date shouldn't strand the recipient.
+        puzzleFetcher.playTodayPuzzle();
+        setMessage("That date isn't available — loaded today's puzzle instead.", 'error');
+      }
     }
 
     const pState = puzzleFetcher.getState();
