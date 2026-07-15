@@ -39,6 +39,12 @@
  *     build resistance to manipulation -- vaccine misinformation and
  *     political disinformation respectively -- by having players try the
  *     tactics themselves
+ *   - Poynter's own official MediaWise AI literacy hub
+ *
+ * Rotation length is derived from CAMPAIGNS.length rather than a fixed
+ * per-entry duration, so the time to see every entry once stays roughly
+ * constant (TARGET_FULL_ROTATION_DAYS) as entries are added, instead of
+ * the full cycle just quietly getting longer every time this list grows.
  */
 const CAMPAIGNS = [
   {
@@ -69,9 +75,23 @@ const CAMPAIGNS = [
     cta: 'Try Harmony Square',
     link: 'https://inoculation.science/inoculation-games/harmony-square/',
   },
+  {
+    id: 'poynter-ai-literacy',
+    eyebrow: 'Supporting: Poynter',
+    headline: "Navigating AI thoughtfully isn't just for experts",
+    cta: 'Explore AI literacy resources',
+    link: 'https://www.poynter.org/mediawise/ailiteracy/',
+  },
 ];
 
 const DAY_MS = 86_400_000;
+// Roughly how long a full cycle through every entry should take, holding
+// this constant (rather than a fixed per-entry duration) as the reason the
+// per-entry time shortens automatically as CAMPAIGNS grows. 5 days matches
+// the original ~1-day-per-entry cadence at the list's current size (5
+// entries); adding a 6th later shortens each entry's turn to ~20 hours
+// instead of stretching the full cycle out to 6 days.
+const TARGET_FULL_ROTATION_DAYS = 5;
 
 export function createCampaignCard({ containerElement }) {
   let dismissedThisSession = false;
@@ -80,8 +100,9 @@ export function createCampaignCard({ containerElement }) {
     if (CAMPAIGNS.length === 0) {
       return null;
     }
-    const dayIndex = Math.floor(Date.now() / DAY_MS);
-    return CAMPAIGNS[dayIndex % CAMPAIGNS.length];
+    const rotationIntervalMs = (TARGET_FULL_ROTATION_DAYS * DAY_MS) / CAMPAIGNS.length;
+    const rotationIndex = Math.floor(Date.now() / rotationIntervalMs);
+    return CAMPAIGNS[rotationIndex % CAMPAIGNS.length];
   }
 
   function render() {
