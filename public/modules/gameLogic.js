@@ -359,7 +359,14 @@ export function createGameEngine(options) {
   // Callable at any time, not just at the moment of solving -- recomputed
   // fresh from state.foundWords rather than cached, so it can't drift out
   // of sync with whatever the player has actually done.
-  function getShareSummary() {
+  //
+  // includeWords is opt-in and off by default on purpose: the real words
+  // are only added to the returned object when a caller explicitly asks
+  // for them (for the separate, deliberately-invoked "Reveal Solution"
+  // action -- see formatUnmaskedShareText in shareText.js), so the masked
+  // Share path can never be accidentally made to carry real words through
+  // a default it didn't ask for.
+  function getShareSummary({ includeWords = false } = {}) {
     const wordsInSolveOrder = [...state.foundWords].reverse();
     const wordLengths = wordsInSolveOrder.map((entry) => entry.length);
 
@@ -386,7 +393,7 @@ export function createGameEngine(options) {
       titles.push('Solo Plumber');
     }
 
-    return {
+    const summary = {
       wordCount: state.foundWords.length,
       characterCount: playerCharacterCount,
       wordLengths,
@@ -400,6 +407,12 @@ export function createGameEngine(options) {
       // history) -- see isEligibleForUnionPlumber for why.
       completedInFreeChain: state.completedUnderFreeChain === true,
     };
+
+    if (includeWords) {
+      summary.words = wordsInSolveOrder.map((entry) => entry.word.toUpperCase());
+    }
+
+    return summary;
   }
 
   function getSnapshot() {

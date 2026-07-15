@@ -39,6 +39,11 @@
           <section class="panel-card">
             <p class="section-label">Accepted words</p>
             <div id="foundWords" class="found-words" aria-label="Accepted words list" aria-live="polite" aria-relevant="additions text"></div>
+            <div class="share-actions">
+              <button id="shareBtn" class="primary" type="button" aria-label="Share your result" hidden>Share</button>
+              <button id="revealSolutionBtn" class="secondary" type="button" hidden>Reveal Solution</button>
+            </div>
+            <div id="shareStatusMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
           </section>
 
           <div class="panel-art-wrap">
@@ -58,7 +63,6 @@
             </div>
             <div class="board-tools">
               <div class="board-tool-buttons">
-                <button id="shareBtn" class="help-btn" type="button" aria-label="Share your result">Share</button>
                 <button id="settingsBtn" class="help-btn" type="button" aria-label="Open settings" aria-haspopup="dialog" aria-controls="settingsModal">Settings</button>
                 <button id="yesterdayBtn" class="help-btn" type="button" aria-label="Open yesterday puzzle solution" aria-haspopup="dialog" aria-controls="yesterdayModal">Yesterday</button>
                 <button id="helpBtn" class="help-btn" type="button" aria-label="Open help" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
@@ -120,7 +124,7 @@
             <input id="shareIncludeLinkToggle" class="settings-checkbox" type="checkbox" />
             <label for="shareIncludeLinkToggle">Include link when sharing</label>
           </div>
-          <p class="help-copy">Off by default, so a shared result stays a clean, Wordle-style summary — no letters, no link. Turn this on to also include a link to the exact puzzle, useful for sending it to someone who doesn't already have Letter Punk bookmarked.</p>
+          <p class="help-copy">Off by default, so a shared result stays a clean, Wordle-style summary — no letters, no link. Turn this on to also include a link to a blank copy of the puzzle, so someone who doesn't already have Letter Punk bookmarked can jump straight in and play it themselves.</p>
         </div>
         <div class="settings-option">
           <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board…</button>

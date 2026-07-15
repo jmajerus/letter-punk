@@ -15,7 +15,7 @@ import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
 import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
 import { recordFinishedGame } from './modules/historyManager.js';
 import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
-import { formatMaskedShareText } from './modules/shareText.js';
+import { formatMaskedShareText, formatUnmaskedShareText } from './modules/shareText.js';
 import { createPipeEasterEgg } from './modules/pipeEasterEgg.js';
 import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
 import { createPsaBanner } from './modules/psaBanner.js';
@@ -33,6 +33,12 @@ const currentWordElement = document.getElementById('currentWord');
 const messageElement = document.getElementById('message');
 const dictionarySourceIndicatorElement = document.getElementById('dictionarySourceIndicator');
 const foundWordsElement = document.getElementById('foundWords');
+const revealSolutionButton = document.getElementById('revealSolutionBtn');
+// Shared by Share and Reveal Solution -- both live together in the
+// Accepted Words card now, so one status area (matching the existing
+// Copy Blank Link/Copy Progress Link precedent in Set Board) is clearer
+// than two separate ones a reader would have to check individually.
+const shareStatusMessageElement = document.getElementById('shareStatusMessage');
 const letterCountStatElement = document.getElementById('letterCountStat');
 const panelArtElement = document.getElementById('panelArt');
 const steamVentAnchorElement = document.getElementById('steamVentAnchor');
@@ -319,6 +325,18 @@ function setBoardLinkMessage(text, kind = '') {
   }
 }
 
+function setShareStatusMessage(text, kind = '') {
+  if (!shareStatusMessageElement) {
+    return;
+  }
+
+  shareStatusMessageElement.textContent = text;
+  shareStatusMessageElement.classList.remove('success', 'error');
+  if (kind) {
+    shareStatusMessageElement.classList.add(kind);
+  }
+}
+
 function fillBoardInputs(values) {
   boardTopInput.value = values.top || '';
   boardRightInput.value = values.right || '';
@@ -465,6 +483,34 @@ function renderFreeChainBadge(snapshot) {
   freeChainBadgeElement.hidden = !snapshot.freeChainMode;
 }
 
+// Share and Reveal Solution both only matter once the board is solved, and
+// both live together in the Accepted Words card rather than the persistent
+// top toolbar -- Share used to sit there, but moved here to appear exactly
+// when it becomes relevant instead of sitting inert the rest of the time,
+// matching Wordle's own "the share action is what greets you on
+// completion" pattern (and the order the two are actually used in: masked
+// first, unmasked later). Also avoids reintroducing the multi-button
+// mobile wrapping bug fixed earlier for that toolbar row.
+//
+// usedLetters is fully recomputed from state.foundWords on every undo (see
+// rebuildUsedLettersFromFoundWords in gameLogic.js), not tracked as a
+// grow-only tally, so this correctly flips back to hidden the moment a
+// player backs out of a completed solve to try an alternate one -- no risk
+// of these staying visible (or of Share/Reveal Solution describing an
+// abandoned attempt) once state actually changes.
+function renderShareActionsVisibility(snapshot) {
+  const isSolved = snapshot.usedLetters.size === gameEngine.getBoardSize();
+  if (shareButton) {
+    shareButton.hidden = !isSolved;
+  }
+  if (revealSolutionButton) {
+    revealSolutionButton.hidden = !isSolved;
+  }
+  if (!isSolved) {
+    setShareStatusMessage('');
+  }
+}
+
 function getPreviousSolutionUiLabels() {
   return puzzleFetcher.getNavigationState().previousLabels;
 }
@@ -564,6 +610,7 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   renderValidationSourceIndicator(snapshot);
   renderLetterCountStat(snapshot);
   renderFreeChainBadge(snapshot);
+  renderShareActionsVisibility(snapshot);
   renderer.renderLetterUsage(snapshot.prospectiveUsedLetters, snapshot.currentTokenLetters, snapshot.letterUsageCounts);
   renderer.renderBoardLinks(snapshot.tokens, snapshot.foundWords, gameEngine.tokensFromWord);
   updatePuzzleNavigation();
@@ -715,42 +762,89 @@ function describeShareTeaser(resultSummary) {
     + `(${characterCount} characters)${bonusSuffix}. Beat their score?`;
 }
 
+// Shared by both shareResult and revealSolution: a link to a blank version
+// of whatever puzzle is currently active (gameEngine.getBoard() already
+// reflects Previous/Next-navigated days, not just today's, so this needs
+// no separate date handling). Deliberately blank rather than carrying the
+// sender's own progress or a masked resultSummary teaser -- the point of
+// the link, per its own Settings copy, is letting someone without the game
+// bookmarked jump in and play the puzzle themselves; handing them an
+// already-solved or replay-animated board doesn't serve that, especially
+// for someone unfamiliar with how to back out of a finished game and start
+// their own attempt. Returns '' (not thrown) if the hash can't be built,
+// so a link failure never blocks the text-only share it's attached to.
+function buildBlankPuzzleShareUrl() {
+  try {
+    const hash = encodeShareHash({
+      board: gameEngine.getBoard(),
+      canonicalWords: getActiveCanonicalWords(),
+    });
+    return `${window.location.origin}${window.location.pathname}#${hash}`;
+  } catch {
+    return '';
+  }
+}
+
 async function shareResult() {
   if (!isBoardFullySolved()) {
-    setMessage('Solve the board first, then Share your result.', 'error');
+    setShareStatusMessage('Solve the board first, then Share your result.', 'error');
     return;
   }
 
   const summary = gameEngine.getShareSummary();
-
-  let url = '';
-  if (isShareIncludeLinkEnabled()) {
-    try {
-      const hash = encodeShareHash({
-        board: gameEngine.getBoard(),
-        canonicalWords: getActiveCanonicalWords(),
-        resultSummary: summary,
-      });
-      url = `${window.location.origin}${window.location.pathname}#${hash}`;
-    } catch {
-      // A link is a bonus on top of the masked text, not the point of
-      // this action -- if it can't be built for some reason, still share
-      // the text rather than failing the whole action.
-    }
-  }
-
+  const url = isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
   const text = formatMaskedShareText(summary, { dateLabel: getActivePuzzleDateLabel(), url });
 
   if (!navigator.clipboard?.writeText) {
-    setMessage(`Clipboard write is unavailable. Copy this manually:\n${text}`, 'error');
+    setShareStatusMessage(`Clipboard write is unavailable. Copy this manually:\n${text}`, 'error');
     return;
   }
 
   try {
     await navigator.clipboard.writeText(text);
-    setMessage('Copied your result to the clipboard.', 'success');
+    setShareStatusMessage('Copied your result to the clipboard.', 'success');
   } catch {
-    setMessage('Could not copy automatically.', 'error');
+    setShareStatusMessage('Could not copy automatically.', 'error');
+  }
+}
+
+// Deliberately a separate action from shareResult, not a mode of it: a
+// persisted "reveal" setting would silently change what the primary Share
+// button does days after someone forgot they'd flipped it, risking an
+// accidental spoiler to the wrong audience. This button only exists once
+// solved (see renderShareActionsVisibility) and always does the same
+// thing every time it's pressed, so Share stays masked no matter what.
+//
+// A link, if included, is the same blank-puzzle link Share uses (see
+// buildBlankPuzzleShareUrl) -- earlier this replayed the sender's own
+// progress instead, which was a nicer showcase but worked against the
+// link's actual stated purpose (getting someone without the game
+// bookmarked into their own attempt); the text here already reveals the
+// full solution on its own, so the link no longer needs to carry it too.
+async function revealSolution() {
+  if (!isBoardFullySolved()) {
+    setShareStatusMessage('Solve the board first to reveal your solution.', 'error');
+    return;
+  }
+
+  const summary = gameEngine.getShareSummary({ includeWords: true });
+  const url = isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
+
+  const text = formatUnmaskedShareText(
+    { ...summary, canonicalWords: getActiveCanonicalWords() },
+    { dateLabel: getActivePuzzleDateLabel(), url },
+  );
+
+  if (!navigator.clipboard?.writeText) {
+    setShareStatusMessage(`Clipboard write is unavailable. Copy this manually:\n${text}`, 'error');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    setShareStatusMessage('Copied your full solution to the clipboard.', 'success');
+  } catch {
+    setShareStatusMessage('Could not copy automatically.', 'error');
   }
 }
 
@@ -1153,6 +1247,7 @@ function wireEvents() {
   yesterdayButton?.addEventListener('click', openYesterdayModal);
   helpButton?.addEventListener('click', openHelpModal);
   shareButton?.addEventListener('click', shareResult);
+  revealSolutionButton?.addEventListener('click', revealSolution);
   closeSettingsButton?.addEventListener('click', closeSettingsModal);
   saveSettingsButton?.addEventListener('click', closeSettingsModal);
   closeYesterdayButton?.addEventListener('click', closeYesterdayModal);

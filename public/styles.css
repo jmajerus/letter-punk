@@ -1115,6 +1115,13 @@ body.arcade-mode .board-tools {
   margin-top: 12px;
 }
 
+.share-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .word-pill {
   display: inline-flex;
   align-items: center;

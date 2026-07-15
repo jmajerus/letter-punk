@@ -910,3 +910,25 @@ test('getShareSummary is callable before the board is solved and reflects whatev
   assert.deepEqual(summary.wordLengths, [3]);
   assert.deepEqual(summary.chainTransitions, []);
 });
+
+test('getShareSummary omits actual words by default', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary();
+  assert.equal(summary.words, undefined, 'real words must not leak unless explicitly requested');
+});
+
+test('getShareSummary includes uppercase words in solve order when explicitly requested', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary({ includeWords: true });
+  assert.deepEqual(summary.words, ['ADGJ', 'JBEHK', 'KCFIL']);
+});
