@@ -284,7 +284,11 @@ export function createBoardRenderer(options) {
   const usageBadges = new Map();
   const invalidTileFlashTimers = new WeakMap();
 
-  function getTokenAnchor(token) {
+  // edgeInset is configurable so word-boundary markers (see below) can sit
+  // closer to the tile than the pipe/joint anchor does, rather than
+  // sharing the exact same point and ending up drawn on top of the joint
+  // fitting -- negative values pull the point back onto the tile itself.
+  function getTokenAnchor(token, edgeInset = 2) {
     const button = letterButtons.get(token.letter);
     if (!button || !boardLinksElement) {
       return null;
@@ -294,7 +298,6 @@ export function createBoardRenderer(options) {
     const buttonRect = button.getBoundingClientRect();
     const centerX = buttonRect.left + (buttonRect.width / 2) - boardRect.left;
     const centerY = buttonRect.top + (buttonRect.height / 2) - boardRect.top;
-    const edgeInset = 2;
 
     if (token.side === 0) {
       return { x: centerX, y: buttonRect.bottom - boardRect.top + edgeInset };
@@ -518,23 +521,138 @@ export function createBoardRenderer(options) {
     }
   }
 
+  function appendJointAtPoint(point, opacity) {
+    const jointOuter = createSvgCircle('board-pipe-joint-shell', point.x, point.y, 8.5);
+    const jointInner = createSvgCircle('board-pipe-joint-core', point.x, point.y, 5.25);
+    const valveCross = createSvgPath(
+      'board-pipe-valve-lines',
+      `M ${point.x - 2.6} ${point.y} L ${point.x + 2.6} ${point.y} M ${point.x} ${point.y - 2.6} L ${point.x} ${point.y + 2.6}`,
+      false,
+    );
+    const valveCore = createSvgCircle('board-pipe-valve-core', point.x, point.y, 1.2);
+    const jointOpacity = Math.min(1, opacity + HISTORY_JOINT_OPACITY_BOOST);
+    jointOuter.style.opacity = String(jointOpacity);
+    jointInner.style.opacity = String(jointOpacity);
+    valveCross.style.opacity = String(jointOpacity);
+    valveCore.style.opacity = String(jointOpacity);
+    boardLinksElement.append(jointOuter, jointInner, valveCross, valveCore);
+  }
+
   function appendPipeJoints(points, opacity = 1) {
     for (let index = 1; index < points.length - 1; index += 1) {
-      const point = points[index];
-      const jointOuter = createSvgCircle('board-pipe-joint-shell', point.x, point.y, 8.5);
-      const jointInner = createSvgCircle('board-pipe-joint-core', point.x, point.y, 5.25);
-      const valveCross = createSvgPath(
-        'board-pipe-valve-lines',
-        `M ${point.x - 2.6} ${point.y} L ${point.x + 2.6} ${point.y} M ${point.x} ${point.y - 2.6} L ${point.x} ${point.y + 2.6}`,
-        false,
-      );
-      const valveCore = createSvgCircle('board-pipe-valve-core', point.x, point.y, 1.2);
-      const jointOpacity = Math.min(1, opacity + HISTORY_JOINT_OPACITY_BOOST);
-      jointOuter.style.opacity = String(jointOpacity);
-      jointInner.style.opacity = String(jointOpacity);
-      valveCross.style.opacity = String(jointOpacity);
-      valveCore.style.opacity = String(jointOpacity);
-      boardLinksElement.append(jointOuter, jointInner, valveCross, valveCore);
+      appendJointAtPoint(points[index], opacity);
+    }
+  }
+
+  // Every tile a pipe actually terminates at gets the same joint fitting
+  // used for interior route bends -- previously that decoration only
+  // appeared at bends, never at the tile-anchor points themselves (where a
+  // route starts or ends), which is the far more common case. wordSequences
+  // is newest-to-oldest here specifically so a letter reused across
+  // multiple words draws once, at its most recent (least faded) opacity,
+  // rather than once per occurrence stacked on top of itself.
+  function appendTokenTerminusJoints(wordSequences) {
+    const drawnLetters = new Set();
+    for (let index = wordSequences.length - 1; index >= 0; index -= 1) {
+      const { tokens, opacity } = wordSequences[index];
+      for (const token of tokens) {
+        if (drawnLetters.has(token.letter)) {
+          continue;
+        }
+        const anchor = getTokenAnchor(token);
+        if (!anchor) {
+          continue;
+        }
+        drawnLetters.add(token.letter);
+        appendJointAtPoint(anchor, opacity);
+      }
+    }
+  }
+
+  const WORD_MARKER_OFFSET = 8;
+  // .tile-letter's own CSS border sits exactly at the button's edge, i.e.
+  // inset 0 in getTokenAnchor's terms -- placing markers right there (not
+  // the pipe/joint's own inset +2, and not further inside at -6, which
+  // just left them floating in the middle of the tile's flat surface with
+  // no line to visually anchor to) sits them right on that border instead,
+  // separated from the joint fitting without looking untethered.
+  const WORD_MARKER_EDGE_INSET = 0;
+  // Word-boundary markers are deliberately not allowed to fade down to the
+  // same near-invisible floor as the ambient steel pipes (HISTORY_OPACITY_MIN,
+  // 0.22). A faded gray pipe still just reads as "a fainter pipe" -- no
+  // information is lost. A faded colored dot is different: green and red
+  // both wash out toward indistinguishable well before they'd actually
+  // disappear, so the marker looks like it's still saying something right
+  // up until the specific thing it's saying (which color) is already
+  // unreadable. Clamping to a floor keeps every marker clearly one color
+  // or the other for as long as it's visible at all.
+  const WORD_MARKER_OPACITY_MIN = 0.75;
+
+  // Start/end markers share a tile's anchor point exactly when a word's
+  // last letter chains into the next word's first letter (the normal,
+  // non-Free-Chain case) -- nudged apart perpendicular to the pipe's own
+  // approach direction at that tile (along the board edge, not into or
+  // out of the board) so both stay individually readable instead of
+  // drawing exactly on top of each other. Harmless when they don't
+  // overlap too -- just a small, barely-noticeable nudge off the anchor.
+  function offsetForWordMarker(side, role) {
+    const sign = role === 'start' ? -1 : 1;
+    if (side === 0 || side === 2) {
+      return { x: sign * WORD_MARKER_OFFSET, y: 0 };
+    }
+    return { x: 0, y: sign * WORD_MARKER_OFFSET };
+  }
+
+  function appendWordStartMarker(token, opacity) {
+    const anchor = getTokenAnchor(token, WORD_MARKER_EDGE_INSET);
+    if (!anchor) {
+      return;
+    }
+    const offset = offsetForWordMarker(token.side, 'start');
+    const point = { x: anchor.x + offset.x, y: anchor.y + offset.y };
+    const dot = createSvgCircle('board-word-start-marker', point.x, point.y, 4);
+    dot.style.opacity = String(Math.max(opacity, WORD_MARKER_OPACITY_MIN));
+    boardLinksElement.append(dot);
+  }
+
+  function appendWordEndMarker(token, opacity) {
+    const anchor = getTokenAnchor(token, WORD_MARKER_EDGE_INSET);
+    if (!anchor) {
+      return;
+    }
+    const offset = offsetForWordMarker(token.side, 'end');
+    const point = { x: anchor.x + offset.x, y: anchor.y + offset.y };
+    const dot = createSvgCircle('board-word-end-marker', point.x, point.y, 4);
+    dot.style.opacity = String(Math.max(opacity, WORD_MARKER_OPACITY_MIN));
+    boardLinksElement.append(dot);
+  }
+
+  // Strava-style route markers: a green dot where each word begins, a red
+  // dot where each *completed* word ends (the current in-progress word
+  // only gets a start marker -- it hasn't ended yet). A ring-plus-X end
+  // marker was tried first but the thin X strokes didn't hold up at this
+  // scale; a solid red dot reads reliably and the green/red pairing is
+  // its own well-understood convention. In normal chain mode this doubles
+  // as the inter-word connector signal for free: a word's end tile and
+  // the next word's start tile are the same coordinate there, so seeing
+  // both markers together already says "this closed one word and opened
+  // the next" without a dedicated third icon. In Free Chain mode those
+  // tiles usually don't coincide, so the markers instead show where each
+  // independent word actually begins and ends -- which nothing on the
+  // board previously indicated at all.
+  function appendWordBoundaryMarkers(wordSequences) {
+    for (const { tokens, opacity, isComplete } of wordSequences) {
+      if (tokens.length === 0) {
+        continue;
+      }
+
+      appendWordStartMarker(tokens[0], opacity);
+
+      if (!isComplete) {
+        continue;
+      }
+
+      appendWordEndMarker(tokens[tokens.length - 1], opacity);
     }
   }
 
@@ -728,16 +846,23 @@ export function createBoardRenderer(options) {
     }
 
     const routes = [];
+    // Oldest-to-newest, one entry per word (history words plus the
+    // current in-progress one, if it has at least a seeded first letter)
+    // -- lets appendTokenTerminusJoints mark every tile any route actually
+    // terminates at, deduped by letter, most-recent opacity wins.
+    const wordSequences = [];
 
     const historyWords = foundWords.slice(0, HISTORY_ROUTE_LIMIT);
     for (let historyIndex = historyWords.length - 1; historyIndex >= 0; historyIndex -= 1) {
       const entry = historyWords[historyIndex];
       const historyTokens = tokensFromWord(entry.word);
+      const opacity = getHistoryOpacity(historyIndex);
+      wordSequences.push({ tokens: historyTokens, opacity, isComplete: true });
+
       if (historyTokens.length < 2) {
         continue;
       }
 
-      const opacity = getHistoryOpacity(historyIndex);
       routes.push(
         ...pushRoutesFromTokens(historyTokens, width, height, {
           animateNewest: false,
@@ -746,6 +871,15 @@ export function createBoardRenderer(options) {
           opacity,
         }),
       );
+    }
+
+    // Pushed whenever the builder has at least the auto-seeded starting
+    // letter, not gated on hasCurrentTokens (which requires 2+) -- that
+    // seeded tile should get its terminus joint the moment a word is
+    // accepted and reseeds the next letter, not only once the player
+    // types a second letter of the next word.
+    if (tokens.length > 0) {
+      wordSequences.push({ tokens, opacity: 1, isComplete: false });
     }
 
     if (hasCurrentTokens) {
@@ -769,6 +903,9 @@ export function createBoardRenderer(options) {
       });
       appendPipeJoints(entry.route.points, entry.opacity);
     }
+
+    appendTokenTerminusJoints(wordSequences);
+    appendWordBoundaryMarkers(wordSequences);
   }
 
   function flashInvalidTile(letter) {
