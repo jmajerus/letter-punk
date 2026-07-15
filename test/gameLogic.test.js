@@ -408,28 +408,50 @@ test('solving with more characters than the canonical count still gets a positiv
   assert.match(lastMessage(events).text, /Vocabulary Wrangler: that's 4 characters longer than the canonical 10-character solution/);
 });
 
-test('letterUsageCounts tracks reuse across accepted words and the word in progress', async () => {
+test('letterUsageCounts tracks reuse across accepted words and the word in progress, without double-counting the required chain letter', async () => {
   const { engine } = createHarness({ acceptedWords: ['adg', 'gda'] });
 
   typeWord(engine, 'adg');
   await engine.submitWord();
-  typeWord(engine, 'gda'); // reuses a, d, g a second time each
+  typeWord(engine, 'gda');
   await engine.submitWord();
 
-  // "gda" ends in 'a', so the engine immediately reseeds the builder with
-  // 'a' as the next required starting letter — that in-progress token
-  // counts too, which is why 'a' is already at 3, not 2, at this point.
+  // "gda" must start with 'g' (adg's last letter) -- that's not a new,
+  // independent use of 'g', just the same connecting point already
+  // counted once as "adg"'s ending, so it's excluded here. Its 'd' and
+  // trailing 'a' are genuine reuse and do count. "gda" then ends in 'a',
+  // so the engine immediately reseeds the builder with 'a' as the next
+  // required starting letter -- that reseeded token is excluded from the
+  // count for the same reason, so 'a' stays at 2, not 3.
   let counts = engine.getSnapshot().letterUsageCounts;
-  assert.equal(counts.get('a'), 3, 'two accepted words plus the reseeded in-progress token');
-  assert.equal(counts.get('d'), 2);
-  assert.equal(counts.get('g'), 2);
+  assert.equal(counts.get('a'), 2, 'adg\'s a, plus gda\'s trailing a -- not the reseeded connector token');
+  assert.equal(counts.get('d'), 2, 'adg\'s d plus gda\'s d');
+  assert.equal(counts.get('g'), 1, 'adg\'s g only -- gda\'s leading g is the required connector, not a new use');
   assert.equal(counts.get('b'), undefined, 'an unused letter should not appear in the count map');
 
   // Continue typing into the still-unsubmitted word — further reuse should
-  // count immediately, without needing to submit first.
+  // count immediately, without needing to submit first. This 'd' is a
+  // genuine new choice (not the seeded connector token), so it counts.
   engine.appendToken('d');
   counts = engine.getSnapshot().letterUsageCounts;
   assert.equal(counts.get('d'), 3, 'a letter typed but not yet submitted should still count');
+});
+
+test('letterUsageCounts does not exclude the connector letter in Free Chain mode', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg', 'gda'], freeChainMode: true });
+
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+  // Free Chain mode never auto-seeds a starting letter, and doesn't
+  // require "gda" to start with adg's last letter at all -- every letter
+  // here is a genuine independent choice, so none should be excluded.
+  typeWord(engine, 'gda');
+  await engine.submitWord();
+
+  const counts = engine.getSnapshot().letterUsageCounts;
+  assert.equal(counts.get('a'), 2, 'one a from each word, no reseed to add a third');
+  assert.equal(counts.get('d'), 2);
+  assert.equal(counts.get('g'), 2);
 });
 
 test('runningCharacterCount tallies accepted words plus the word in progress, live', async () => {

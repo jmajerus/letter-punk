@@ -189,18 +189,43 @@ export function createGameEngine(options) {
   // How many times each letter has appeared so far, across every accepted
   // word plus the word currently being built — not just whether a letter
   // has been used, but how many times. Drives the tile usage-count badge.
+  //
+  // In normal (non-Free-Chain) play, every word after the first is
+  // required to start with the previous word's last letter -- that shared
+  // connecting letter isn't a new, independent use, just the same point
+  // counted once already as the previous word's ending. Without excluding
+  // it, the badge fired on essentially every multi-word solve regardless
+  // of anything the player actually chose to do, which isn't what "you've
+  // used this letter N times" is supposed to communicate. Free Chain mode
+  // never auto-seeds a starting letter at all, so no exclusion applies
+  // there -- every letter is a genuine independent choice.
   function getLetterUsageCounts() {
     const counts = new Map();
     const increment = (letter) => counts.set(letter, (counts.get(letter) || 0) + 1);
 
-    for (const entry of state.foundWords) {
-      for (const letter of entry.word) {
+    // foundWords is stored newest-first (unshift); walk oldest-to-newest so
+    // "is this the very first word of the puzzle" reads naturally from
+    // position rather than array index.
+    const wordsInSolveOrder = [...state.foundWords].reverse();
+    wordsInSolveOrder.forEach((entry, wordIndex) => {
+      const isFirstWordOfPuzzle = wordIndex === 0;
+      [...entry.word].forEach((letter, letterIndex) => {
+        if (letterIndex === 0 && !isFirstWordOfPuzzle && !freeChainMode) {
+          return;
+        }
         increment(letter);
+      });
+    });
+
+    // Same exclusion for the word currently being built: its first token
+    // is the auto-seeded continuation of the previous word's last letter
+    // whenever a previous word exists and Free Chain mode is off.
+    state.tokens.forEach((token, tokenIndex) => {
+      if (tokenIndex === 0 && state.foundWords.length > 0 && !freeChainMode) {
+        return;
       }
-    }
-    for (const token of state.tokens) {
       increment(token.letter);
-    }
+    });
 
     return counts;
   }
