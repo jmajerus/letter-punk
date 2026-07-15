@@ -238,6 +238,18 @@ function clearFreeChainSessionOverride() {
   applyFreeChainModeToEngine();
 }
 
+// Typical status messages ("Added D. Current build: AD.") stay exactly as
+// fast as before -- MESSAGE_MIN_DISPLAY_MS is what every message used to
+// get, flat, regardless of length. But a full-board solve can now stack
+// several sentences onto one message (a character-count title plus the
+// Solo Plumber bonus clause easily runs 250+ characters), and a fixed 4s
+// isn't enough to read those. Scaling by length keeps short messages
+// snappy while giving long ones real reading time, capped so a
+// pathologically long future message can't linger indefinitely.
+const MESSAGE_MIN_DISPLAY_MS = 4000;
+const MESSAGE_MS_PER_CHARACTER = 50;
+const MESSAGE_MAX_DISPLAY_MS = 15000;
+
 function setMessage(text, kind = '') {
   messageElement.textContent = text;
   messageElement.classList.remove('success', 'error');
@@ -249,10 +261,15 @@ function setMessage(text, kind = '') {
     window.clearTimeout(messageTimer);
   }
 
+  const displayMs = Math.min(
+    MESSAGE_MAX_DISPLAY_MS,
+    Math.max(MESSAGE_MIN_DISPLAY_MS, text.length * MESSAGE_MS_PER_CHARACTER),
+  );
+
   messageTimer = window.setTimeout(() => {
     messageElement.textContent = '';
     messageElement.classList.remove('success', 'error');
-  }, 4000);
+  }, displayMs);
 }
 
 function setBoardInputMessage(text, kind = '') {
