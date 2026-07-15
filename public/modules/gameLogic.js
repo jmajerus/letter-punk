@@ -230,6 +230,31 @@ export function createGameEngine(options) {
     return counts;
   }
 
+  // Which character-count title a solve earns, as a key rather than
+  // message text -- shared by the live "solved" message below and
+  // getShareSummary(), so the two can never quietly disagree about which
+  // title a given count actually earns. Returns null when no canonical
+  // reference is known at all (the generic "Great solve"/"Outstanding
+  // solve" fallback case, which isn't a title in the shareable sense).
+  function getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount) {
+    if (!Number.isFinite(canonicalCharacterCount) || canonicalCharacterCount <= 0) {
+      return null;
+    }
+
+    const delta = playerCharacterCount - canonicalCharacterCount;
+    if (Math.abs(delta) <= 1) {
+      return 'dead-reckoner';
+    }
+
+    return delta < 0 ? 'efficiency-engineer' : 'vocabulary-wrangler';
+  }
+
+  const CHARACTER_COUNT_TITLE_NAMES = {
+    'dead-reckoner': 'Dead Reckoner',
+    'efficiency-engineer': 'Efficiency Engineer',
+    'vocabulary-wrangler': 'Vocabulary Wrangler',
+  };
+
   // True when no letter is ever used as both the first letter of one
   // accepted word and the last letter of another (or the same) word --
   // i.e. no word hands off into another via a shared tile the way normal
@@ -295,6 +320,53 @@ export function createGameEngine(options) {
   function getRunningCharacterCount() {
     const acceptedTotal = state.foundWords.reduce((total, entry) => total + entry.length, 0);
     return acceptedTotal + state.tokens.length;
+  }
+
+  // Everything a masked share (see public/modules/shareText.js) needs to
+  // describe a solve without revealing the actual words: how long each
+  // word was, in solve order, and which consecutive pairs chained into
+  // each other -- the same underlying fact the board's green/red
+  // word-boundary markers already show, translated into plain data
+  // instead of pixels. wordLengths[i] pairs with chainTransitions[i-1]
+  // (starts chained) and chainTransitions[i] (ends chained), one shorter
+  // than wordLengths since there's one transition between each pair.
+  // Callable at any time, not just at the moment of solving -- recomputed
+  // fresh from state.foundWords rather than cached, so it can't drift out
+  // of sync with whatever the player has actually done.
+  function getShareSummary() {
+    const wordsInSolveOrder = [...state.foundWords].reverse();
+    const wordLengths = wordsInSolveOrder.map((entry) => entry.length);
+
+    const chainTransitions = [];
+    for (let index = 1; index < wordsInSolveOrder.length; index += 1) {
+      const previous = wordsInSolveOrder[index - 1];
+      const current = wordsInSolveOrder[index];
+      chainTransitions.push(current.word[0] === previous.word[previous.word.length - 1]);
+    }
+
+    const titles = [];
+    const playerCharacterCount = state.foundWords.reduce((total, entry) => total + entry.length, 0);
+    const canonicalCharacterCount = Number(
+      typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
+    );
+    const characterCountTitleKey = getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount);
+    if (characterCountTitleKey) {
+      titles.push(CHARACTER_COUNT_TITLE_NAMES[characterCountTitleKey]);
+    }
+
+    if (freeChainMode && isFullyChained(state.foundWords)) {
+      titles.push('Union Plumber');
+    } else if (hasNoStartEndOverlap(state.foundWords)) {
+      titles.push('Solo Plumber');
+    }
+
+    return {
+      wordCount: state.foundWords.length,
+      characterCount: playerCharacterCount,
+      wordLengths,
+      chainTransitions,
+      titles,
+    };
   }
 
   function getSnapshot() {
@@ -574,7 +646,8 @@ export function createGameEngine(options) {
           ? " Solo Plumber: every word stood on its own, no letter doing double duty as one word's ending and another's beginning."
           : '';
 
-      if (Number.isFinite(canonicalCharacterCount) && canonicalCharacterCount > 0) {
+      const characterCountTitleKey = getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount);
+      if (characterCountTitleKey) {
         const prefix = `Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters.`;
         const delta = playerCharacterCount - canonicalCharacterCount;
         const absDelta = Math.abs(delta);
@@ -584,7 +657,7 @@ export function createGameEngine(options) {
         // still a remarkably narrow target to hit, and reporting the
         // magnitude here — rather than gatekeeping whether it "counts" —
         // lets the player judge for themselves how close it really was.
-        if (absDelta <= 1) {
+        if (characterCountTitleKey === 'dead-reckoner') {
           const landing = absDelta === 0
             ? 'you landed exactly on the canonical count!'
             : 'you landed within one character of the canonical count!';
@@ -592,7 +665,7 @@ export function createGameEngine(options) {
           return;
         }
 
-        if (delta < 0) {
+        if (characterCountTitleKey === 'efficiency-engineer') {
           emitMessage(
             `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!${overlapStyleSuffix}`,
             'success',
@@ -663,6 +736,7 @@ export function createGameEngine(options) {
     clearTokens,
     submitWord,
     tokensFromWord,
+    getShareSummary,
     setFreeChainMode,
     isFreeChainMode() {
       return freeChainMode;

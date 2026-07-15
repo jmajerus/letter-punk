@@ -129,3 +129,43 @@ test('encodeShareHash throws if the board does not have exactly 12 unique letter
   ];
   assert.throws(() => encodeShareHash({ board: badBoard }));
 });
+
+test('omitting resultSummary produces the exact same hash as before it existed', () => {
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
+  assert.equal(hash, 'p=RVIADEKLMOTS~~bb809b82', 'no trailing separator or extra segment when unused');
+});
+
+test('a masked resultSummary round-trips through encode/decode with no actual letters exposed', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    resultSummary: {
+      wordLengths: [8, 10],
+      chainTransitions: [true],
+      titles: ['Efficiency Engineer', 'Union Plumber'],
+    },
+  });
+
+  assert.ok(!/AARDVARK|KILOMETRES/i.test(hash), 'the masked segment never contains real words');
+
+  const decoded = decodeShareHash(hash);
+  assert.deepEqual(decoded.resultSummary, {
+    wordLengths: [8, 10],
+    chainTransitions: [true],
+    titles: ['Efficiency Engineer', 'Union Plumber'],
+  });
+  assert.deepEqual(decoded.progressWords, [], 'a masked share carries no progress -- the board opens blank');
+});
+
+test('resultSummary is null when the link carries none', () => {
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
+  assert.equal(decodeShareHash(hash).resultSummary, null);
+});
+
+test('a resultSummary with no titles round-trips as an empty titles array, not a missing field', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    resultSummary: { wordLengths: [5], chainTransitions: [], titles: [] },
+  });
+  const decoded = decodeShareHash(hash);
+  assert.deepEqual(decoded.resultSummary, { wordLengths: [5], chainTransitions: [], titles: [] });
+});

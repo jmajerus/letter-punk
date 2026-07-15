@@ -745,3 +745,81 @@ test('setFreeChainMode is a no-op when the mode is not actually changing', () =>
   assert.deepEqual(engine.getSnapshot().tokens.map((t) => t.letter), ['a', 'd']);
   assert.equal(events.stateChanges.length, stateChangesBefore);
 });
+
+test('getShareSummary reports word lengths and chain transitions in solve order, Union Plumber earned in Free Chain mode', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    freeChainMode: true,
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary();
+  assert.equal(summary.wordCount, 3);
+  assert.equal(summary.characterCount, 14);
+  assert.deepEqual(summary.wordLengths, [4, 5, 5]);
+  assert.deepEqual(summary.chainTransitions, [true, true]);
+  assert.deepEqual(summary.titles, ['Union Plumber']);
+});
+
+test('getShareSummary still reports the true chain shape in normal mode, but does not credit Union Plumber for it', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary();
+  // The structural fact (every transition actually chains) is unaffected
+  // by mode -- only whether it counts as an earned title is.
+  assert.deepEqual(summary.chainTransitions, [true, true]);
+  assert.deepEqual(summary.titles, []);
+});
+
+test('getShareSummary reports Solo Plumber and no chained transitions for an independent Free Chain solve', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'behkcfil'],
+    freeChainMode: true,
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'behkcfil');
+  await engine.submitWord();
+
+  const summary = engine.getShareSummary();
+  assert.deepEqual(summary.wordLengths, [4, 8]);
+  assert.deepEqual(summary.chainTransitions, [false]);
+  assert.deepEqual(summary.titles, ['Solo Plumber']);
+});
+
+test('getShareSummary includes a character-count title alongside an overlap-style title, not instead of it', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'behkcfil'],
+    freeChainMode: true,
+    getCanonicalCharacterCount: () => 20, // more than the actual 12 characters played
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'behkcfil');
+  await engine.submitWord();
+
+  const summary = engine.getShareSummary();
+  assert.deepEqual(summary.titles, ['Efficiency Engineer', 'Solo Plumber']);
+});
+
+test('getShareSummary is callable before the board is solved and reflects whatever has been accepted so far', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adg'] });
+  typeWord(engine, 'adg');
+  await engine.submitWord();
+
+  const summary = engine.getShareSummary();
+  assert.equal(summary.wordCount, 1);
+  assert.deepEqual(summary.wordLengths, [3]);
+  assert.deepEqual(summary.chainTransitions, []);
+});

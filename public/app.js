@@ -15,6 +15,7 @@ import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
 import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
 import { recordFinishedGame } from './modules/historyManager.js';
 import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
+import { formatMaskedShareText } from './modules/shareText.js';
 import { createPipeEasterEgg } from './modules/pipeEasterEgg.js';
 import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
 import { createPsaBanner } from './modules/psaBanner.js';
@@ -24,6 +25,7 @@ const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: 
 const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
 const PROVENANCE_BADGES_STORAGE_KEY = 'letter-punk.provenance-badges';
 const FREE_CHAIN_STORAGE_KEY = 'letter-punk.free-chain';
+const SHARE_INCLUDE_LINK_STORAGE_KEY = 'letter-punk.share-include-link';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -75,9 +77,12 @@ const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
 const solutionWordsInput = document.getElementById('solutionWordsInput');
 const generateBoardButton = document.getElementById('generateBoardBtn');
-const copyShareLinkButton = document.getElementById('copyShareLinkBtn');
-const copyProgressLinkButton = document.getElementById('copyProgressLinkBtn');
 const boardInputMessageElement = document.getElementById('boardInputMessage');
+const shareButton = document.getElementById('shareBtn');
+const shareIncludeLinkToggle = document.getElementById('shareIncludeLinkToggle');
+const copyBlankLinkButton = document.getElementById('copyBlankLinkBtn');
+const copyProgressLinkButton = document.getElementById('copyProgressLinkBtn');
+const boardLinkMessageElement = document.getElementById('boardLinkMessage');
 
 const BOARD_INPUTS = {
   top: boardTopInput,
@@ -102,6 +107,9 @@ function readPreference(storageKey) {
 let reducedMotionPreference = readPreference(REDUCED_MOTION_STORAGE_KEY);
 let provenanceBadgesPreference = readPreference(PROVENANCE_BADGES_STORAGE_KEY);
 let freeChainPreference = readPreference(FREE_CHAIN_STORAGE_KEY);
+// Off by default so a shared result stays clean text with no link, the
+// way a Wordle grid never carries a link either -- see shareResult.
+let shareIncludeLinkPreference = readPreference(SHARE_INCLUDE_LINK_STORAGE_KEY);
 // Session-only, in-memory: forces Free Chain mode on for the puzzle
 // currently loaded, without touching freeChainPreference (the persisted
 // Settings default). Only a shared link whose progress words don't actually
@@ -144,6 +152,10 @@ const completedPuzzleIds = new Set();
 
 function isProvenanceBadgesEnabled() {
   return provenanceBadgesPreference === 'on';
+}
+
+function isShareIncludeLinkEnabled() {
+  return shareIncludeLinkPreference === 'on';
 }
 
 function isReducedMotionEnabled() {
@@ -189,6 +201,17 @@ function setProvenanceBadgesPreference(enabled) {
 function syncProvenanceBadgesPreferenceToUi() {
   if (provenanceBadgesToggle) {
     provenanceBadgesToggle.checked = isProvenanceBadgesEnabled();
+  }
+}
+
+function setShareIncludeLinkPreference(enabled) {
+  shareIncludeLinkPreference = setPreference(SHARE_INCLUDE_LINK_STORAGE_KEY, enabled);
+  syncShareIncludeLinkPreferenceToUi();
+}
+
+function syncShareIncludeLinkPreferenceToUi() {
+  if (shareIncludeLinkToggle) {
+    shareIncludeLinkToggle.checked = isShareIncludeLinkEnabled();
   }
 }
 
@@ -281,6 +304,18 @@ function setBoardInputMessage(text, kind = '') {
   boardInputMessageElement.classList.remove('success', 'error');
   if (kind) {
     boardInputMessageElement.classList.add(kind);
+  }
+}
+
+function setBoardLinkMessage(text, kind = '') {
+  if (!boardLinkMessageElement) {
+    return;
+  }
+
+  boardLinkMessageElement.textContent = text;
+  boardLinkMessageElement.classList.remove('success', 'error');
+  if (kind) {
+    boardLinkMessageElement.classList.add(kind);
   }
 }
 
@@ -589,6 +624,7 @@ function openSettingsModal() {
   syncMotionPreferenceToUi();
   syncProvenanceBadgesPreferenceToUi();
   syncFreeChainPreferenceToUi();
+  syncShareIncludeLinkPreferenceToUi();
   settingsModal.hidden = false;
   provenanceBadgesToggle?.focus();
 }
@@ -619,7 +655,88 @@ function closeBoardModal() {
   }
 
   boardModal.hidden = true;
-  setBoardButton?.focus();
+  // setBoardButton now lives inside the Settings modal (see its click
+  // listener in wireEvents), which is always closed by the time this runs
+  // -- focusing it directly would land focus on an element inside a
+  // hidden container. The Settings button is the closest stable return
+  // point now.
+  settingsButton?.focus();
+}
+
+function isBoardFullySolved() {
+  const snapshot = gameEngine.getSnapshot();
+  return snapshot.usedLetters.size === gameEngine.getBoardSize();
+}
+
+// "2026-07-15" -> "July 15", parsed as explicit local-date components
+// (not new Date(isoString), which reads a bare date as UTC midnight and
+// can display as the previous day in negative-UTC-offset timezones).
+function getActivePuzzleDateLabel() {
+  const puzzleState = puzzleFetcher.getState();
+  if (puzzleState.puzzleSource !== 'catalog' || puzzleState.activePuzzleIndex < 0) {
+    return '';
+  }
+
+  const id = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id);
+  if (!match) {
+    return '';
+  }
+
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+}
+
+// Shown once, as a one-time toast, when a masked share link is opened --
+// the sender's own result summary, framed as something to beat rather
+// than just reported. See tryLoadSharedPuzzleFromHash.
+function describeShareTeaser(resultSummary) {
+  const { wordLengths, titles } = resultSummary;
+  const wordCount = wordLengths.length;
+  const characterCount = wordLengths.reduce((total, length) => total + length, 0);
+  const titleSuffix = titles.length > 0 ? ` — ${titles.join(', ')}` : '';
+  return `A friend solved this in ${wordCount} word${wordCount === 1 ? '' : 's'} `
+    + `(${characterCount} characters)${titleSuffix}. Beat their score?`;
+}
+
+async function shareResult() {
+  if (!isBoardFullySolved()) {
+    setMessage('Solve the board first, then Share your result.', 'error');
+    return;
+  }
+
+  const summary = gameEngine.getShareSummary();
+
+  let url = '';
+  if (isShareIncludeLinkEnabled()) {
+    try {
+      const hash = encodeShareHash({
+        board: gameEngine.getBoard(),
+        canonicalWords: getActiveCanonicalWords(),
+        resultSummary: summary,
+      });
+      url = `${window.location.origin}${window.location.pathname}#${hash}`;
+    } catch {
+      // A link is a bonus on top of the masked text, not the point of
+      // this action -- if it can't be built for some reason, still share
+      // the text rather than failing the whole action.
+    }
+  }
+
+  const text = formatMaskedShareText(summary, { dateLabel: getActivePuzzleDateLabel(), url });
+
+  if (!navigator.clipboard?.writeText) {
+    setMessage(`Clipboard write is unavailable. Copy this manually:\n${text}`, 'error');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    setMessage('Copied your result to the clipboard.', 'success');
+  } catch {
+    setMessage('Could not copy automatically.', 'error');
+  }
 }
 
 function getActiveModal() {
@@ -915,27 +1032,27 @@ async function copyShareLink({ includeProgress }) {
   try {
     hash = encodeShareHash({ board, progressWords, canonicalWords: getActiveCanonicalWords() });
   } catch {
-    setBoardInputMessage('Could not build a share link for this board.', 'error');
+    setBoardLinkMessage('Could not build a share link for this board.', 'error');
     return;
   }
 
   const url = `${window.location.origin}${window.location.pathname}#${hash}`;
 
   if (!navigator.clipboard?.writeText) {
-    setBoardInputMessage(`Clipboard write is unavailable. Copy this link manually: ${url}`, 'error');
+    setBoardLinkMessage(`Clipboard write is unavailable. Copy this link manually: ${url}`, 'error');
     return;
   }
 
   try {
     await navigator.clipboard.writeText(url);
-    setBoardInputMessage(
+    setBoardLinkMessage(
       includeProgress && progressWords.length > 0
         ? 'Copied a link with your current progress to your clipboard.'
-        : 'Copied a share link to your clipboard.',
+        : 'Copied a blank link to your clipboard.',
       'success',
     );
   } catch {
-    setBoardInputMessage(`Could not copy automatically. Copy this link manually: ${url}`, 'error');
+    setBoardLinkMessage(`Could not copy automatically. Copy this link manually: ${url}`, 'error');
   }
 }
 
@@ -1009,10 +1126,18 @@ function wireEvents() {
   previousPuzzleButton?.addEventListener('click', playPreviousPuzzle);
   todayPuzzleButton?.addEventListener('click', playTodayPuzzle);
   nextPuzzleButton?.addEventListener('click', playNextPuzzle);
-  setBoardButton?.addEventListener('click', openBoardModal);
+  // setBoardButton lives inside the Settings modal now -- close Settings
+  // first so the two modals never end up visibly stacked on top of each
+  // other, since openBoardModal itself doesn't know or care what else
+  // might currently be open.
+  setBoardButton?.addEventListener('click', () => {
+    closeSettingsModal();
+    openBoardModal();
+  });
   settingsButton?.addEventListener('click', openSettingsModal);
   yesterdayButton?.addEventListener('click', openYesterdayModal);
   helpButton?.addEventListener('click', openHelpModal);
+  shareButton?.addEventListener('click', shareResult);
   closeSettingsButton?.addEventListener('click', closeSettingsModal);
   saveSettingsButton?.addEventListener('click', closeSettingsModal);
   closeYesterdayButton?.addEventListener('click', closeYesterdayModal);
@@ -1024,7 +1149,7 @@ function wireEvents() {
   pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
   generateBoardButton?.addEventListener('click', generateBoardFromWordsInput);
-  copyShareLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: false }));
+  copyBlankLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: false }));
   copyProgressLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: true }));
 
   helpModal?.addEventListener('click', (event) => {
@@ -1065,6 +1190,12 @@ function wireEvents() {
     const enabled = Boolean(freeChainToggle.checked);
     setFreeChainPreference(enabled);
     setMessage(`Free Chain mode ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+  });
+
+  shareIncludeLinkToggle?.addEventListener('change', () => {
+    const enabled = Boolean(shareIncludeLinkToggle.checked);
+    setShareIncludeLinkPreference(enabled);
+    setMessage(`Including a link when sharing is now ${enabled ? 'on' : 'off'}.`, 'success');
   });
 
   if (typeof SYSTEM_REDUCED_MOTION_QUERY.addEventListener === 'function') {
@@ -1777,7 +1908,14 @@ function tryLoadSharedPuzzleFromHash() {
 
     startArcadeMode(decoded.board, decoded.progressWords, decoded.canonicalWords);
   } else {
-    hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
+    const hydration = hydrateSharedPuzzle(decoded.progressWords, decoded.canonicalWords);
+    // A masked share (see shareResult) carries no progress words -- its
+    // resultSummary is the whole point of the link, so it should replace
+    // hydrateSharedPuzzle's own generic "loaded a blank puzzle" message
+    // rather than race with it.
+    if (decoded.resultSummary) {
+      hydration.then(() => setMessage(describeShareTeaser(decoded.resultSummary), 'success'));
+    }
   }
 
   return true;

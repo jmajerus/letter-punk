@@ -58,7 +58,7 @@
             </div>
             <div class="board-tools">
               <div class="board-tool-buttons">
-                <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board</button>
+                <button id="shareBtn" class="help-btn" type="button" aria-label="Share your result">Share</button>
                 <button id="settingsBtn" class="help-btn" type="button" aria-label="Open settings" aria-haspopup="dialog" aria-controls="settingsModal">Settings</button>
                 <button id="yesterdayBtn" class="help-btn" type="button" aria-label="Open yesterday puzzle solution" aria-haspopup="dialog" aria-controls="yesterdayModal">Yesterday</button>
                 <button id="helpBtn" class="help-btn" type="button" aria-label="Open help" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
@@ -114,6 +114,23 @@
             <label for="freeChainToggle">Free Chain mode</label>
           </div>
           <p class="help-copy">Skip the letter-chaining requirement between words — no auto-filled starting letters, solve at your own pace. A "Free Chain" badge shows on the board while it's active. Opening a shared puzzle link may turn this on temporarily to match how it was played, without changing this setting.</p>
+        </div>
+        <div class="settings-option">
+          <div class="settings-toggle-row">
+            <input id="shareIncludeLinkToggle" class="settings-checkbox" type="checkbox" />
+            <label for="shareIncludeLinkToggle">Include link when sharing</label>
+          </div>
+          <p class="help-copy">Off by default, so a shared result stays a clean, Wordle-style summary — no letters, no link. Turn this on to also include a link to the exact puzzle, useful for sending it to someone who doesn't already have Letter Punk bookmarked.</p>
+        </div>
+        <div class="settings-option">
+          <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board…</button>
+          <p class="help-copy">Paste a board from classic Letter Boxed, or generate one from your own solution word(s). An advanced option most players won't need day to day.</p>
+          <div class="board-paste-actions">
+            <button id="copyBlankLinkBtn" class="secondary" type="button">Copy Blank Link</button>
+            <button id="copyProgressLinkBtn" class="secondary" type="button">Copy Progress Link</button>
+          </div>
+          <p class="help-copy">Copy a link to this exact board — blank, or with your current progress included. Unlike Share above, these always include the link and never mask the words.</p>
+          <div id="boardLinkMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         </div>
         <div class="help-actions">
           <button id="saveSettingsBtn" class="primary" type="button">Done</button>
@@ -195,11 +212,6 @@
         <div id="boardInputMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="help-actions">
           <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>
-        </div>
-        <p class="help-copy">Share the currently active board with a link. The canonical solution, if known, is never sent as plain text.</p>
-        <div class="board-paste-actions">
-          <button id="copyShareLinkBtn" class="secondary" type="button">Copy Share Link</button>
-          <button id="copyProgressLinkBtn" class="secondary" type="button">Copy Progress Link</button>
         </div>
       </div>
     </div>
