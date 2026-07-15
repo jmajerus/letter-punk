@@ -35,6 +35,13 @@ export function createGameEngine(options) {
     usedLetters: new Set(),
     starterLocked: false,
     lastValidationSummary: '',
+    // The mode active at the exact moment the board was first fully
+    // covered -- null until that happens. Union Plumber eligibility reads
+    // this instead of the live freeChainMode flag -- see
+    // isEligibleForUnionPlumber -- so a player can't earn (or lose) the
+    // title after the fact by toggling Settings post-solve, with no
+    // submission in between.
+    completedUnderFreeChain: null,
   };
 
   function refreshLettersToSide() {
@@ -314,6 +321,25 @@ export function createGameEngine(options) {
     return true;
   }
 
+  // Union Plumber reflects the mode active at the moment the board was
+  // actually completed (state.completedUnderFreeChain), not whatever
+  // Settings currently says and not a strict history of every word
+  // submitted along the way. Reading the live freeChainMode flag here
+  // would let a player earn this title after the fact just by flipping
+  // Free Chain mode on right before sharing a puzzle they solved entirely
+  // in normal mode -- no replay, no different words, free credit. But
+  // requiring every earlier word to individually have been submitted
+  // under Free Chain mode would be too strict: Undo always works in this
+  // game, so a player could have backed up and resubmitted any earlier
+  // word under a different mode at any point -- the exact history of
+  // which mode was active for which word is never the only path to a
+  // given state, so it isn't meaningful. Only the mode actually in effect
+  // at the one moment nothing could be taken back -- the submission that
+  // completed the board -- reflects a real constraint.
+  function isEligibleForUnionPlumber(foundWords) {
+    return state.completedUnderFreeChain === true && isFullyChained(foundWords);
+  }
+
   // Total letters typed so far: every accepted word plus the word
   // currently under construction — a live running count, not just the
   // final tally shown once the board is solved.
@@ -354,7 +380,7 @@ export function createGameEngine(options) {
       titles.push(CHARACTER_COUNT_TITLE_NAMES[characterCountTitleKey]);
     }
 
-    if (freeChainMode && isFullyChained(state.foundWords)) {
+    if (isEligibleForUnionPlumber(state.foundWords)) {
       titles.push('Union Plumber');
     } else if (hasNoStartEndOverlap(state.foundWords)) {
       titles.push('Solo Plumber');
@@ -366,6 +392,13 @@ export function createGameEngine(options) {
       wordLengths,
       chainTransitions,
       titles,
+      // Surfaced so a masked share can explain *why* a Bonus count is what
+      // it is -- e.g. why a friend's solve could earn Union Plumber and
+      // this one couldn't. Same underlying signal as
+      // isEligibleForUnionPlumber (the mode at the moment of completion,
+      // not the live freeChainMode toggle and not a strict per-word
+      // history) -- see isEligibleForUnionPlumber for why.
+      completedInFreeChain: state.completedUnderFreeChain === true,
     };
   }
 
@@ -391,6 +424,7 @@ export function createGameEngine(options) {
     state.usedLetters.clear();
     state.starterLocked = false;
     state.lastValidationSummary = '';
+    state.completedUnderFreeChain = null;
   }
 
   function applyBoardDefinition(nextBoard) {
@@ -608,6 +642,16 @@ export function createGameEngine(options) {
     // complete — the right signal for a one-time celebration, as opposed
     // to something that would fire again on every further word.
     const justCompleted = solved && !wasAlreadyComplete;
+    if (justCompleted) {
+      // The mode active at the exact moment the board was completed --
+      // captured once and never touched again, including by later
+      // continued play or a Settings change. Earlier words in the solve
+      // don't get their own say: the player could always have backed up
+      // and resubmitted them under a different mode (Undo always works),
+      // so only the mode actually in effect at the moment nothing could
+      // be taken back is meaningful. See isEligibleForUnionPlumber.
+      state.completedUnderFreeChain = freeChainMode;
+    }
     emitWordResult({
       outcome: 'accepted',
       validationSource: validation.source || '',
@@ -640,7 +684,7 @@ export function createGameEngine(options) {
       // mutually exclusive for 2+ words (see isFullyChained), so this is
       // a plain if/else rather than two independent checks that could
       // both fire.
-      const overlapStyleSuffix = freeChainMode && isFullyChained(state.foundWords)
+      const overlapStyleSuffix = isEligibleForUnionPlumber(state.foundWords)
         ? ' Union Plumber: every word chained straight into the next anyway — the old-school discipline, freely chosen instead of required.'
         : hasNoStartEndOverlap(state.foundWords)
           ? " Solo Plumber: every word stood on its own, no letter doing double duty as one word's ending and another's beginning."

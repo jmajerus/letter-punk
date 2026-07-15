@@ -125,12 +125,6 @@
         <div class="settings-option">
           <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board…</button>
           <p class="help-copy">Paste a board from classic Letter Boxed, or generate one from your own solution word(s). An advanced option most players won't need day to day.</p>
-          <div class="board-paste-actions">
-            <button id="copyBlankLinkBtn" class="secondary" type="button">Copy Blank Link</button>
-            <button id="copyProgressLinkBtn" class="secondary" type="button">Copy Progress Link</button>
-          </div>
-          <p class="help-copy">Copy a link to this exact board — blank, or with your current progress included. Unlike Share above, these always include the link and never mask the words.</p>
-          <div id="boardLinkMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         </div>
         <div class="help-actions">
           <button id="saveSettingsBtn" class="primary" type="button">Done</button>
@@ -212,6 +206,14 @@
         <div id="boardInputMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="help-actions">
           <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>
+        </div>
+        <div class="settings-option">
+          <p class="help-copy"><strong>Share this board</strong> — copy a link to the board you're currently playing, blank or with your current progress included. Unlike Share on the main screen, these always include the link and never mask the words.</p>
+          <div class="board-paste-actions">
+            <button id="copyBlankLinkBtn" class="secondary" type="button">Copy Blank Link</button>
+            <button id="copyProgressLinkBtn" class="secondary" type="button">Copy Progress Link</button>
+          </div>
+          <div id="boardLinkMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         </div>
       </div>
     </div>

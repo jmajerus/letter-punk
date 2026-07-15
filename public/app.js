@@ -645,6 +645,7 @@ function openBoardModal() {
 
   fillBoardInputsFromCurrentBoard();
   setBoardInputMessage('');
+  setBoardLinkMessage('');
   boardModal.hidden = false;
   boardTopInput?.focus();
 }
@@ -691,13 +692,27 @@ function getActivePuzzleDateLabel() {
 // Shown once, as a one-time toast, when a masked share link is opened --
 // the sender's own result summary, framed as something to beat rather
 // than just reported. See tryLoadSharedPuzzleFromHash.
+//
+// Titles are surfaced as a bare count ("Bonus +1"/"Bonus +2"), matching
+// formatMaskedShareText -- see shareText.js for why naming the specific
+// character-count title would leak which side of the puzzle's canonical
+// count this solve landed on. A "Free Chain" badge is included the same
+// way, for the same reason: it explains why a Union Plumber-driven bonus
+// was even possible here, without naming titles directly.
 function describeShareTeaser(resultSummary) {
-  const { wordLengths, titles } = resultSummary;
+  const { wordLengths, titles, completedInFreeChain } = resultSummary;
   const wordCount = wordLengths.length;
   const characterCount = wordLengths.reduce((total, length) => total + length, 0);
-  const titleSuffix = titles.length > 0 ? ` — ${titles.join(', ')}` : '';
+  const badges = [];
+  if (completedInFreeChain) {
+    badges.push('Free Chain');
+  }
+  if (titles.length > 0) {
+    badges.push(`Bonus +${titles.length}`);
+  }
+  const bonusSuffix = badges.length > 0 ? `, ${badges.join(' · ')}` : '';
   return `A friend solved this in ${wordCount} word${wordCount === 1 ? '' : 's'} `
-    + `(${characterCount} characters)${titleSuffix}. Beat their score?`;
+    + `(${characterCount} characters)${bonusSuffix}. Beat their score?`;
 }
 
 async function shareResult() {

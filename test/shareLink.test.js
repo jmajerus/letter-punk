@@ -142,6 +142,7 @@ test('a masked resultSummary round-trips through encode/decode with no actual le
       wordLengths: [8, 10],
       chainTransitions: [true],
       titles: ['Efficiency Engineer', 'Union Plumber'],
+      completedInFreeChain: true,
     },
   });
 
@@ -152,6 +153,7 @@ test('a masked resultSummary round-trips through encode/decode with no actual le
     wordLengths: [8, 10],
     chainTransitions: [true],
     titles: ['Efficiency Engineer', 'Union Plumber'],
+    completedInFreeChain: true,
   });
   assert.deepEqual(decoded.progressWords, [], 'a masked share carries no progress -- the board opens blank');
 });
@@ -167,5 +169,19 @@ test('a resultSummary with no titles round-trips as an empty titles array, not a
     resultSummary: { wordLengths: [5], chainTransitions: [], titles: [] },
   });
   const decoded = decodeShareHash(hash);
-  assert.deepEqual(decoded.resultSummary, { wordLengths: [5], chainTransitions: [], titles: [] });
+  assert.deepEqual(decoded.resultSummary, {
+    wordLengths: [5],
+    chainTransitions: [],
+    titles: [],
+    completedInFreeChain: false,
+  });
+});
+
+test('completedInFreeChain defaults to false when omitted from resultSummary', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    resultSummary: { wordLengths: [5], chainTransitions: [], titles: ['Solo Plumber'] },
+  });
+  const decoded = decodeShareHash(hash);
+  assert.equal(decoded.resultSummary.completedInFreeChain, false);
 });

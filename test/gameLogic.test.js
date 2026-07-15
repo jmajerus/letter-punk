@@ -406,6 +406,64 @@ test('Union Plumber is not earned in normal chain mode, even though every word t
   assert.doesNotMatch(lastMessage(events).text, /Union Plumber/);
 });
 
+test('Union Plumber cannot be earned retroactively by switching to Free Chain mode after solving in normal mode', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  // Solved entirely in normal mode, where this chain structure is forced,
+  // not chosen -- switching the mode afterward, with nothing replayed,
+  // must not change what was already earned.
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+  assert.doesNotMatch(lastMessage(events).text, /Union Plumber/);
+
+  engine.setFreeChainMode(true);
+  const summary = engine.getShareSummary();
+  assert.ok(!summary.titles.includes('Union Plumber'), 'toggling the mode after the fact must not grant free credit');
+});
+
+test('an earlier word submitted outside Free Chain mode does not disqualify Union Plumber, as long as the board was completed under Free Chain mode', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    freeChainMode: true,
+  });
+
+  // The first word happened to be submitted before Free Chain mode was
+  // turned on -- but Undo always works in this game, so that word could
+  // always have been backed out and resubmitted under Free Chain mode
+  // instead. Its earlier history isn't a meaningful constraint; only the
+  // mode active at the moment the board was actually completed is.
+  engine.setFreeChainMode(false);
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+
+  engine.setFreeChainMode(true);
+  for (const word of ['jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary();
+  assert.ok(summary.titles.includes('Union Plumber'), 'the board was completed under Free Chain mode, so it counts');
+});
+
+test('switching out of Free Chain mode after completing the board does not retroactively revoke an already-earned Union Plumber', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    freeChainMode: true,
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  engine.setFreeChainMode(false);
+  const summary = engine.getShareSummary();
+  assert.ok(summary.titles.includes('Union Plumber'), 'already legitimately earned -- a later mode change should not take it back');
+});
+
 test('Union Plumber requires at least two words -- a solo full-board solve earns Solo Plumber instead', async () => {
   const { engine, events } = createHarness({
     acceptedWords: ['adgjbehkcfil'],
@@ -763,6 +821,7 @@ test('getShareSummary reports word lengths and chain transitions in solve order,
   assert.deepEqual(summary.wordLengths, [4, 5, 5]);
   assert.deepEqual(summary.chainTransitions, [true, true]);
   assert.deepEqual(summary.titles, ['Union Plumber']);
+  assert.equal(summary.completedInFreeChain, true);
 });
 
 test('getShareSummary still reports the true chain shape in normal mode, but does not credit Union Plumber for it', async () => {
@@ -778,6 +837,7 @@ test('getShareSummary still reports the true chain shape in normal mode, but doe
   // by mode -- only whether it counts as an earned title is.
   assert.deepEqual(summary.chainTransitions, [true, true]);
   assert.deepEqual(summary.titles, []);
+  assert.equal(summary.completedInFreeChain, false);
 });
 
 test('getShareSummary reports Solo Plumber and no chained transitions for an independent Free Chain solve', async () => {
@@ -811,6 +871,33 @@ test('getShareSummary includes a character-count title alongside an overlap-styl
 
   const summary = engine.getShareSummary();
   assert.deepEqual(summary.titles, ['Efficiency Engineer', 'Solo Plumber']);
+});
+
+test('getShareSummary reports completedInFreeChain based on the mode at the moment of completion, regardless of any mode used earlier or later', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    freeChainMode: true,
+  });
+
+  // Earlier word submitted outside Free Chain mode -- irrelevant, since
+  // it could always have been backed out and resubmitted differently.
+  engine.setFreeChainMode(false);
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+
+  // Completed under Free Chain mode.
+  engine.setFreeChainMode(true);
+  for (const word of ['jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  // Toggled again afterward -- also irrelevant, since it happened after
+  // the board was already complete.
+  engine.setFreeChainMode(false);
+
+  const summary = engine.getShareSummary();
+  assert.equal(summary.completedInFreeChain, true, 'only the mode at the moment of completion matters');
 });
 
 test('getShareSummary is callable before the board is solved and reflects whatever has been accepted so far', async () => {

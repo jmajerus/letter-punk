@@ -25,8 +25,9 @@
  *   before they've opened (or finished) the puzzle.
  *
  * - `resultSummary`: a masked share (see public/modules/shareText.js) --
- *   word lengths, which transitions chained, and earned title names, with
- *   no actual letters at all. Deliberately independent of progressWords:
+ *   word lengths, which transitions chained, earned title names, and
+ *   whether the whole solve happened under Free Chain mode, with no
+ *   actual letters at all. Deliberately independent of progressWords:
  *   a masked share always opens to a blank board (there's nothing to
  *   replay), it just also carries the sender's result as data for a
  *   one-time "here's what to beat" toast on open, rather than baking it
@@ -159,7 +160,7 @@ function encodeResultSummary(resultSummary) {
     return '';
   }
 
-  const { wordLengths, chainTransitions = [], titles = [] } = resultSummary;
+  const { wordLengths, chainTransitions = [], titles = [], completedInFreeChain = false } = resultSummary;
   const lengthsPart = wordLengths
     .map((length) => Math.max(0, Math.min(MAX_WORD_LENGTH_CODE, Math.floor(length))).toString(36))
     .join(WORD_SEPARATOR);
@@ -168,8 +169,9 @@ function encodeResultSummary(resultSummary) {
     .map((name) => TITLE_CODES[name])
     .filter(Boolean)
     .join(WORD_SEPARATOR);
+  const freeChainPart = completedInFreeChain ? '1' : '0';
 
-  return [lengthsPart, chainPart, titlesPart].join(RESULT_FIELD_SEPARATOR);
+  return [lengthsPart, chainPart, titlesPart, freeChainPart].join(RESULT_FIELD_SEPARATOR);
 }
 
 function decodeResultSummary(segment) {
@@ -177,7 +179,7 @@ function decodeResultSummary(segment) {
     return null;
   }
 
-  const [lengthsPart = '', chainPart = '', titlesPart = ''] = segment.split(RESULT_FIELD_SEPARATOR);
+  const [lengthsPart = '', chainPart = '', titlesPart = '', freeChainPart = ''] = segment.split(RESULT_FIELD_SEPARATOR);
   if (!lengthsPart) {
     return null;
   }
@@ -194,8 +196,9 @@ function decodeResultSummary(segment) {
   const titles = titlesPart
     ? titlesPart.split(WORD_SEPARATOR).map((code) => TITLE_NAMES[code]).filter(Boolean)
     : [];
+  const completedInFreeChain = freeChainPart === '1';
 
-  return { wordLengths, chainTransitions, titles };
+  return { wordLengths, chainTransitions, titles, completedInFreeChain };
 }
 
 /**
@@ -203,7 +206,7 @@ function decodeResultSummary(segment) {
  * @param {Array<{letters: string[]}>} options.board Board sides in SIDE_NAMES order.
  * @param {string[]} [options.progressWords] Words already played, in order. Stored as plain text.
  * @param {string[]} [options.canonicalWords] The known reference solution, if any. Stored obfuscated.
- * @param {{wordLengths: number[], chainTransitions?: boolean[], titles?: string[]}} [options.resultSummary]
+ * @param {{wordLengths: number[], chainTransitions?: boolean[], titles?: string[], completedInFreeChain?: boolean}} [options.resultSummary]
  *   A masked share's result data (see public/modules/shareText.js). Omit entirely for a normal
  *   share/progress link -- only present, the segment is appended and the format matches exactly
  *   what encodeShareHash has always produced.
@@ -238,7 +241,7 @@ export function encodeShareHash({ board, progressWords = [], canonicalWords = []
 
 /**
  * @param {string} hash location.hash value, with or without the leading '#'.
- * @returns {{ board: Array<{side: number, name: string, letters: string[]}>, progressWords: string[], canonicalWords: string[], resultSummary: {wordLengths: number[], chainTransitions: boolean[], titles: string[]} | null } | null}
+ * @returns {{ board: Array<{side: number, name: string, letters: string[]}>, progressWords: string[], canonicalWords: string[], resultSummary: {wordLengths: number[], chainTransitions: boolean[], titles: string[], completedInFreeChain: boolean} | null } | null}
  */
 export function decodeShareHash(hash) {
   const raw = String(hash || '').replace(/^#/, '');
