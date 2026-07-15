@@ -80,6 +80,6 @@ For local setup, the dictionary/puzzle build pipeline, testing, and deployment, 
 
 ## License
 
-Letter Punk is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). In short: you're free to use, study, modify, and share this code for any noncommercial purpose — personal use, research, education, hobby projects, nonprofits — no permission needed. Commercial use requires a separate agreement with the licensor. There's no separate license for [docs/design-philosophy.md](docs/design-philosophy.md), which is dedicated to the public domain (CC0) on its own terms, independent of the code.
+Letter Punk is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). In short: you're free to use, study, modify, and share this code for any noncommercial purpose — personal use, research, education, hobby projects, nonprofits — no permission needed. Commercial use requires a separate agreement with the licensor. There's no separate license for [docs/design-philosophy.md](docs/design-philosophy.md), which is dedicated to the public domain (CC0) on its own terms, independent of the code.
 
 This license covers Letter Punk's own code and expression only — it doesn't and can't extend to the underlying word-chaining game mechanic itself, which was never anyone's to own in the first place. See [Letter-Boxed-Game-Logic-Copyright.md](Letter-Boxed-Game-Logic-Copyright.md#what-letter-punks-own-license-does-and-doesnt-cover) for the reasoning.

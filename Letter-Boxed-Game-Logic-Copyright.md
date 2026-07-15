@@ -20,7 +20,7 @@ Letter Punk keeps the same core chaining rule as Letter Boxed (each letter must 
 
 ## What Letter Punk's own license does (and doesn't) cover
 
-The same principle that let Letter Punk exist also limits what its own license can claim. The [PolyForm Noncommercial License](LICENSE) covers this project's specific code, wording, and visual design — not the underlying word-chaining mechanic or the double-letter idea, neither of which was ever anyone's to own. Someone is free to build their own independent word-chain game from scratch, noncommercial or commercial, without copying Letter Punk's actual expression. For a noncommercial version, that's simply welcome, no conflict there.
+The same principle that let Letter Punk exist also limits what its own license can claim. The [PolyForm Noncommercial License](LICENSE.md) covers this project's specific code, wording, and visual design — not the underlying word-chaining mechanic or the double-letter idea, neither of which was ever anyone's to own. Someone is free to build their own independent word-chain game from scratch, noncommercial or commercial, without copying Letter Punk's actual expression. For a noncommercial version, that's simply welcome, no conflict there.
 
 ## Not legal advice
 
