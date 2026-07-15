@@ -313,6 +313,113 @@ test('solving in more than 2 words with no canonical reference still reports the
   assert.match(lastMessage(events).text, /Solved in 3 words using 14 characters\. Great solve\./);
 });
 
+test('Solo Plumber is earned in Free Chain mode when no letter is both a start and an end', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'behkcfil'],
+    freeChainMode: true,
+  });
+
+  // adgj starts 'a', ends 'j'. behkcfil starts 'b', ends 'l'. No overlap
+  // between {a, b} and {j, l} -- every word stood on its own.
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'behkcfil');
+  await engine.submitWord();
+
+  assert.match(lastMessage(events).text, /Solo Plumber: every word stood on its own/);
+});
+
+test('Solo Plumber is not earned even in Free Chain mode if a letter is reused as both a start and an end', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehkcfil'],
+    freeChainMode: true,
+  });
+
+  // Free Chain mode doesn't require jbehkcfil to start with 'j' -- the
+  // player chose to reuse it anyway, so 'j' is both adgj's ending and
+  // jbehkcfil's starting letter. Should not earn Solo Plumber despite
+  // being a Free Chain solve.
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'jbehkcfil');
+  await engine.submitWord();
+
+  assert.doesNotMatch(lastMessage(events).text, /Solo Plumber/);
+});
+
+test('normal chain mode never earns Solo Plumber across multiple words, since the chain rule forces the overlap', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  assert.doesNotMatch(lastMessage(events).text, /Solo Plumber/);
+});
+
+test('Solo Plumber combines with a character-count title in the same message, not instead of it', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'behkcfil'],
+    freeChainMode: true,
+    getCanonicalCharacterCount: () => 20, // more than the actual 12 characters played
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'behkcfil');
+  await engine.submitWord();
+
+  const { text } = lastMessage(events);
+  assert.match(text, /Efficiency Engineer: you came in 8 characters under the canonical 20-character solution!/);
+  assert.match(text, /Solo Plumber: every word stood on its own/);
+});
+
+test('Union Plumber is earned in Free Chain mode when the player voluntarily chains every word anyway', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    freeChainMode: true,
+  });
+
+  // Nothing requires jbehk to start with 'j' or kcfil to start with 'k' in
+  // Free Chain mode -- the player chose to chain them anyway.
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const { text } = lastMessage(events);
+  assert.match(text, /Union Plumber: every word chained straight into the next anyway/);
+  assert.doesNotMatch(text, /Solo Plumber/, 'fully chained and zero-overlap are mutually exclusive for 2+ words');
+});
+
+test('Union Plumber is not earned in normal chain mode, even though every word technically chains', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  // Same word set as the Free Chain test above, but normal mode forces
+  // this structure on every solve -- it isn't an achievement here.
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  assert.doesNotMatch(lastMessage(events).text, /Union Plumber/);
+});
+
+test('Union Plumber requires at least two words -- a solo full-board solve earns Solo Plumber instead', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgjbehkcfil'],
+    freeChainMode: true,
+  });
+
+  typeWord(engine, 'adgjbehkcfil');
+  await engine.submitWord();
+
+  const { text } = lastMessage(events);
+  assert.doesNotMatch(text, /Union Plumber/, '"chained" is meaningless for a single word');
+  assert.match(text, /Solo Plumber: every word stood on its own/);
+});
+
 test('justCompleted is true only for the word that first completes the board, not for further words that keep it complete', async () => {
   const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil', 'lad'] });
 

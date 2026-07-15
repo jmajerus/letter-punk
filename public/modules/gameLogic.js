@@ -230,6 +230,65 @@ export function createGameEngine(options) {
     return counts;
   }
 
+  // True when no letter is ever used as both the first letter of one
+  // accepted word and the last letter of another (or the same) word --
+  // i.e. no word hands off into another via a shared tile the way normal
+  // chain mode always forces at every transition. Checked directly
+  // against the word list rather than branching on Free Chain mode: this
+  // is a property of how a solve actually happened, not something the
+  // player pre-selects, matching every other path to winning in this
+  // game (see docs/roadmap.md's "No-overlap style recognition"). A word
+  // that starts and ends with the same letter also fails this on its
+  // own, consistent with that tile visibly getting both a green and a
+  // red word-boundary marker (see boardRenderer.js).
+  function hasNoStartEndOverlap(foundWords) {
+    const startLetters = new Set();
+    const endLetters = new Set();
+    for (const entry of foundWords) {
+      startLetters.add(entry.word[0]);
+      endLetters.add(entry.word[entry.word.length - 1]);
+    }
+    for (const letter of startLetters) {
+      if (endLetters.has(letter)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // True when every word after the first starts with the immediately
+  // previous word's last letter, in solve order -- the same structural
+  // relationship normal chain mode always enforces, checked here purely
+  // from the finished word list. Requires at least two words: "chained"
+  // doesn't mean anything for a single-word solve, which is the one case
+  // that would otherwise be vacuously true here the same way
+  // hasNoStartEndOverlap is vacuously true for it -- this keeps the two
+  // mutually exclusive rather than both firing on a solo word.
+  //
+  // Deliberately NOT checked the way hasNoStartEndOverlap is (data only,
+  // no mode branch): in normal chain mode this condition is true on
+  // *every* solve, by construction, since the game already requires it --
+  // it's the opposite situation from hasNoStartEndOverlap, which is
+  // already almost always false there without needing a mode check.
+  // Callers must gate this on Free Chain mode themselves, or it isn't an
+  // achievement, just the baseline.
+  function isFullyChained(foundWords) {
+    if (foundWords.length < 2) {
+      return false;
+    }
+    // foundWords is stored newest-first (unshift); walk oldest-to-newest
+    // so each comparison is against the chronologically previous word.
+    const wordsInSolveOrder = [...foundWords].reverse();
+    for (let index = 1; index < wordsInSolveOrder.length; index += 1) {
+      const previous = wordsInSolveOrder[index - 1];
+      const current = wordsInSolveOrder[index];
+      if (current.word[0] !== previous.word[previous.word.length - 1]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // Total letters typed so far: every accepted word plus the word
   // currently under construction — a live running count, not just the
   // final tally shown once the board is solved.
@@ -500,6 +559,20 @@ export function createGameEngine(options) {
       const canonicalCharacterCount = Number(
         typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
       );
+      // Orthogonal to the character-count titles below -- a solve can earn
+      // one of these alongside one of those, since one measures efficiency
+      // and this measures the start/end relationship between words.
+      // Appended as a bonus clause, never its own branch, so it never
+      // displaces or competes with whichever title the character count
+      // already earned. Union Plumber and Solo Plumber are themselves
+      // mutually exclusive for 2+ words (see isFullyChained), so this is
+      // a plain if/else rather than two independent checks that could
+      // both fire.
+      const overlapStyleSuffix = freeChainMode && isFullyChained(state.foundWords)
+        ? ' Union Plumber: every word chained straight into the next anyway — the old-school discipline, freely chosen instead of required.'
+        : hasNoStartEndOverlap(state.foundWords)
+          ? " Solo Plumber: every word stood on its own, no letter doing double duty as one word's ending and another's beginning."
+          : '';
 
       if (Number.isFinite(canonicalCharacterCount) && canonicalCharacterCount > 0) {
         const prefix = `Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters.`;
@@ -515,31 +588,31 @@ export function createGameEngine(options) {
           const landing = absDelta === 0
             ? 'you landed exactly on the canonical count!'
             : 'you landed within one character of the canonical count!';
-          emitMessage(`${prefix} Dead Reckoner: ${landing}`, 'success');
+          emitMessage(`${prefix} Dead Reckoner: ${landing}${overlapStyleSuffix}`, 'success');
           return;
         }
 
         if (delta < 0) {
           emitMessage(
-            `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!`,
+            `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!${overlapStyleSuffix}`,
             'success',
           );
           return;
         }
 
         emitMessage(
-          `${prefix} Vocabulary Wrangler: that's ${absDelta} characters longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!`,
+          `${prefix} Vocabulary Wrangler: that's ${absDelta} characters longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!${overlapStyleSuffix}`,
           'success',
         );
         return;
       }
 
       if (state.foundWords.length <= 2) {
-        emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Outstanding solve!`, 'success');
+        emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Outstanding solve!${overlapStyleSuffix}`, 'success');
         return;
       }
 
-      emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Great solve.`, 'success');
+      emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Great solve.${overlapStyleSuffix}`, 'success');
       return;
     }
 
