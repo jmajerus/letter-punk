@@ -126,6 +126,18 @@ npm run build:pipe-art
 
 Requires a local Chrome/Chromium install (pass `--chrome=/path/to/chrome` or set `CHROME_PATH` if it's not auto-detected). Optionally override the simulated board/word chain with `--board=RVI,ADE,KLM,OTS --words=AARDVARK,KILOMETRES`.
 
+## Pipe route joints and word markers
+
+Live board rendering (`renderBoardLinks` in `boardRenderer.js`) draws two decorative layers on top of the routed pipe segments themselves:
+
+- **Terminus joints** (`appendTokenTerminusJoints`): the same shell/core/valve-cross fitting originally used only at interior route bends now also appears at every tile a route actually starts or ends at — previously only bends got this treatment, so most tile connections had no fitting at all. Deduped by letter (each board letter is unique, so a reused letter only needs one joint) at that letter's most recent, least-faded opacity.
+- **Word-boundary markers** (`appendWordBoundaryMarkers`): a green dot where each word begins, a red dot where each *completed* word ends (the in-progress word only gets a start marker). In normal chain mode, a word's ending tile and the next word's starting tile are the same coordinate, so both markers landing there together is what actually shows the two words are chained — there's no separate "connector" icon. In Free Chain mode, where those tiles usually don't coincide, the markers instead show where each independent word begins and ends, which nothing else on the board indicates.
+
+Two things worth knowing if touching this code:
+
+- Marker opacity is floored well above the pipes' own fade-by-recency minimum (`WORD_MARKER_OPACITY_MIN` vs. `HISTORY_OPACITY_MIN`). A faded gray pipe still reads fine as "a fainter pipe" — no information is lost. A faded colored dot is different: green and red both wash out toward indistinguishable well before they'd actually disappear, so an unfloored marker looks like it's still saying something right up until the specific thing it's saying is already unreadable.
+- Markers are anchored at `WORD_MARKER_EDGE_INSET = 0` — exactly on `.tile-letter`'s own CSS border — not the pipe/joint's own anchor (`edgeInset = 2`, just past the tile into the corridor) and not further inside the tile, which was tried first and looked untethered, floating over the tile's flat surface with no line to visually attach to. They're also nudged apart from each other along the tile's edge (`offsetForWordMarker`) so a shared connector tile's two markers don't draw exactly on top of one another or the joint fitting sitting at that same point.
+
 ## Testing
 
 Run the test suite with:
