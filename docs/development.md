@@ -213,7 +213,7 @@ The `index` field (`indexes[0]`) is Analytics Engine's sampling/grouping key, no
 
 `getAnalyticsPuzzleId(pState)` in `app.js` builds this value: a catalog puzzle's date id, or — for a custom board — `flattenBoard(gameEngine.getBoard())` (exported from `shareLink.js`, the same 12-letter identity a share link itself encodes), so two players on the same custom board layout naturally share an index instead of all custom boards (and, before this, all custom boards *and* every genuinely random fallback board) being lumped into the single generic `'random'` bucket. A truly random board (e.g. the daily-puzzle catalog failing to load) has no identity of its own and is the one case that still falls back to `'random'`.
 
-Opening a shared `#p=...` link now correctly emits `puzzle_load` too — `tryLoadSharedPuzzleFromHash()` tracks it synchronously, right after `puzzleFetcher.markCustomBoard()`, since board and puzzle source are both already known at that point and don't need the catalog fetch the rest of boot waits on. This is deliberately unconditional, even for an `&arcade=1` link: unlike the `!arcadeModeActive` guard around `trackWordSubmit`/`trackGameSolved` (which exists specifically to stop an unattended kiosk's looping attract-mode replays from flooding Analytics Engine with duplicate solve events), the very first load of an arcade link *is* the one genuine "someone opened this shared link" event — it's the repeated re-solves after that which are the noise worth suppressing, not the initial open.
+Opening a shared `#p=...` link now correctly emits `puzzle_load` too — `tryLoadSharedPuzzleFromHash()` tracks it synchronously, right after `puzzleFetcher.markCustomBoard()`, since board and puzzle source are both already known at that point and don't need the catalog fetch the rest of boot waits on. This is deliberately unconditional, even for an `&arcade=1` link: unlike the `!arcadeMode.isActive()` guard around `trackWordSubmit`/`trackGameSolved` (which exists specifically to stop an unattended kiosk's looping attract-mode replays from flooding Analytics Engine with duplicate solve events), the very first load of an arcade link *is* the one genuine "someone opened this shared link" event — it's the repeated re-solves after that which are the noise worth suppressing, not the initial open.
 
 ## Testing
 
@@ -228,8 +228,8 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 ## Repo structure
 
 - `public/` static site files served by Workers or Pages
-- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`, `psaBanner.js`
-- `public/app.js` app bootstrap and UI orchestration
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`, `shareText.js`, `puzzleReplay.js`, `arcadeMode.js`, `historyManager.js`, `analyticsClient.js`, `pipeEasterEgg.js`, `steamVentEasterEgg.js`, `psaBanner.js`, `campaignCard.js`
+- `public/app.js` app bootstrap and UI orchestration — the composition root: wires the modules above together, owns DOM element lookups, event listeners, modal state, and settings persistence
 - `src/worker.js` Cloudflare Worker entry point — routes `/api/*` and `/admin`, serves static assets otherwise
 - `src/admin.js` analytics dashboard behind `/admin`
 - `src/psaFeed.js` fetches/parses/caches the ICRC + WHO awareness-banner feeds — see "Awareness banner" below
