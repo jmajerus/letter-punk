@@ -26,12 +26,7 @@ import {
   DEFAULT_ARCADE_WARNING_SECONDS,
   DEFAULT_ARCADE_IDLE_RESTART_SECONDS,
 } from './modules/arcadeMode.js';
-
-const SYSTEM_REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
-const REDUCED_MOTION_STORAGE_KEY = 'letter-punk.reduced-motion';
-const PROVENANCE_BADGES_STORAGE_KEY = 'letter-punk.provenance-badges';
-const FREE_CHAIN_STORAGE_KEY = 'letter-punk.free-chain';
-const SHARE_INCLUDE_LINK_STORAGE_KEY = 'letter-punk.share-include-link';
+import { createSettings } from './modules/settings.js';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -103,147 +98,9 @@ const BOARD_INPUTS = {
   left: boardLeftInput,
 };
 
-function readPreference(storageKey) {
-  try {
-    const value = window.localStorage.getItem(storageKey);
-    if (value === 'on' || value === 'off') {
-      return value;
-    }
-  } catch {
-    // Ignore storage reads when unavailable.
-  }
-
-  return null;
-}
-
-let reducedMotionPreference = readPreference(REDUCED_MOTION_STORAGE_KEY);
-let provenanceBadgesPreference = readPreference(PROVENANCE_BADGES_STORAGE_KEY);
-let freeChainPreference = readPreference(FREE_CHAIN_STORAGE_KEY);
-// Off by default so a shared result stays clean text with no link, the
-// way a Wordle grid never carries a link either -- see shareResult.
-let shareIncludeLinkPreference = readPreference(SHARE_INCLUDE_LINK_STORAGE_KEY);
-// Session-only, in-memory: forces Free Chain mode on for the puzzle
-// currently loaded, without touching freeChainPreference (the persisted
-// Settings default). Only a shared link whose progress words don't actually
-// chain sets this — see hydrateSharedPuzzle — and only the three
-// board-application paths (catalog navigation, manual Set Board, a new
-// shared link) clear it. Toggling the Settings checkbox itself is the one
-// and only way to make a change stick beyond the current puzzle.
-let freeChainSessionOverride = null;
 let messageTimer = null;
 let lastRenderedBoardSignature = '';
 const completedPuzzleIds = new Set();
-
-function isProvenanceBadgesEnabled() {
-  return provenanceBadgesPreference === 'on';
-}
-
-function isShareIncludeLinkEnabled() {
-  return shareIncludeLinkPreference === 'on';
-}
-
-function isReducedMotionEnabled() {
-  if (reducedMotionPreference === 'on') {
-    return true;
-  }
-
-  if (reducedMotionPreference === 'off') {
-    return false;
-  }
-
-  return SYSTEM_REDUCED_MOTION_QUERY.matches;
-}
-
-function setPreference(storageKey, enabled) {
-  const value = enabled ? 'on' : 'off';
-  try {
-    window.localStorage.setItem(storageKey, value);
-  } catch {
-    // Ignore storage writes when unavailable.
-  }
-  return value;
-}
-
-function setReducedMotionPreference(enabled) {
-  reducedMotionPreference = setPreference(REDUCED_MOTION_STORAGE_KEY, enabled);
-  syncMotionPreferenceToUi();
-}
-
-function syncMotionPreferenceToUi() {
-  const reducedMotionEnabled = isReducedMotionEnabled();
-  document.body.classList.toggle('reduce-motion', reducedMotionEnabled);
-  if (reducedMotionToggle) {
-    reducedMotionToggle.checked = reducedMotionEnabled;
-  }
-}
-
-function setProvenanceBadgesPreference(enabled) {
-  provenanceBadgesPreference = setPreference(PROVENANCE_BADGES_STORAGE_KEY, enabled);
-  syncProvenanceBadgesPreferenceToUi();
-}
-
-function syncProvenanceBadgesPreferenceToUi() {
-  if (provenanceBadgesToggle) {
-    provenanceBadgesToggle.checked = isProvenanceBadgesEnabled();
-  }
-}
-
-function setShareIncludeLinkPreference(enabled) {
-  shareIncludeLinkPreference = setPreference(SHARE_INCLUDE_LINK_STORAGE_KEY, enabled);
-  syncShareIncludeLinkPreferenceToUi();
-}
-
-function syncShareIncludeLinkPreferenceToUi() {
-  if (shareIncludeLinkToggle) {
-    shareIncludeLinkToggle.checked = isShareIncludeLinkEnabled();
-  }
-}
-
-// The session override (if any) always wins over the persisted default —
-// it exists specifically to reflect a shared link's actual played state,
-// which the persisted default can't know about.
-function isFreeChainModeEnabled() {
-  return freeChainSessionOverride !== null ? freeChainSessionOverride : freeChainPreference === 'on';
-}
-
-function syncFreeChainPreferenceToUi() {
-  if (freeChainToggle) {
-    freeChainToggle.checked = isFreeChainModeEnabled();
-  }
-}
-
-function applyFreeChainModeToEngine() {
-  gameEngine.setFreeChainMode(isFreeChainModeEnabled());
-  syncFreeChainPreferenceToUi();
-}
-
-// The only path that writes FREE_CHAIN_STORAGE_KEY — called solely from the
-// Settings checkbox handler. An explicit Settings change always wins over,
-// and clears, any temporary session override a shared link may have set,
-// since the player just told us directly what they want going forward.
-function setFreeChainPreference(enabled) {
-  freeChainPreference = setPreference(FREE_CHAIN_STORAGE_KEY, enabled);
-  freeChainSessionOverride = null;
-  applyFreeChainModeToEngine();
-}
-
-function setFreeChainSessionOverride(enabled) {
-  freeChainSessionOverride = enabled;
-  applyFreeChainModeToEngine();
-}
-
-// Scopes a session override to the puzzle that produced it: called at the
-// start of every path that loads a genuinely different board (catalog
-// navigation, manual Set Board, a new shared link) so a Free Chain override
-// from a previous shared link never leaks into an unrelated puzzle.
-function clearFreeChainSessionOverride() {
-  if (freeChainSessionOverride === null) {
-    return;
-  }
-
-  freeChainSessionOverride = null;
-  applyFreeChainModeToEngine();
-}
 
 // Typical status messages ("Added D. Current build: AD.") stay exactly as
 // fast as before -- MESSAGE_MIN_DISPLAY_MS is what every message used to
@@ -333,10 +190,25 @@ const dictionaryValidator = createDictionaryValidator({
   fallbackApiUrl: '',
 });
 
+// setFreeChainModeOnEngine is a callback (not a direct gameEngine
+// reference) so settings can be created here, before gameEngine exists --
+// same closure-over-the-outer-let trick renderer's onTileSelect uses below.
+// initializeGame's createGameEngine call needs settings.isFreeChainModeEnabled()
+// for its own initial value, which would be circular the other way around.
+const settings = createSettings({
+  reducedMotionToggle,
+  provenanceBadgesToggle,
+  freeChainToggle,
+  shareIncludeLinkToggle,
+  setFreeChainModeOnEngine(enabled) {
+    gameEngine.setFreeChainMode(enabled);
+  },
+});
+
 const renderer = createBoardRenderer({
   boardElement,
   boardLinksElement,
-  isReducedMotionEnabled,
+  isReducedMotionEnabled: settings.isReducedMotionEnabled,
   onTileSelect(letter) {
     gameEngine.appendToken(letter);
   },
@@ -349,7 +221,7 @@ const renderer = createBoardRenderer({
 const pipeEasterEgg = createPipeEasterEgg({
   containerElement: panelArtElement,
   artworkUrl: '/assets/pipe-manifold.svg',
-  isReducedMotionEnabled,
+  isReducedMotionEnabled: settings.isReducedMotionEnabled,
 });
 
 // A second, separately-hidden easter egg — steam puffs rising from the
@@ -358,7 +230,7 @@ const pipeEasterEgg = createPipeEasterEgg({
 // remain independently discoverable.
 const steamVentEasterEgg = createSteamVentEasterEgg({
   anchorElement: steamVentAnchorElement,
-  isReducedMotionEnabled,
+  isReducedMotionEnabled: settings.isReducedMotionEnabled,
 });
 
 // Rotating awareness banner sourced from ICRC's and WHO's own newsroom
@@ -401,7 +273,7 @@ const puzzleFetcher = createPuzzleFetcher({
   applyBoard(nextBoard) {
     canonicalWords = [];
     dictionaryValidator.clearSessionOverrides();
-    clearFreeChainSessionOverride();
+    settings.clearFreeChainSessionOverride();
     gameEngine.applyBoardDefinition(nextBoard);
   },
 });
@@ -429,7 +301,7 @@ function renderValidationSourceIndicator(snapshot) {
     return;
   }
 
-  if (!isProvenanceBadgesEnabled()) {
+  if (!settings.isProvenanceBadgesEnabled()) {
     dictionarySourceIndicatorElement.textContent = '';
     return;
   }
@@ -615,7 +487,7 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   }
 
   renderer.renderCurrentWord(currentWordElement, snapshot.tokens);
-  renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, isProvenanceBadgesEnabled());
+  renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, settings.isProvenanceBadgesEnabled());
   renderValidationSourceIndicator(snapshot);
   renderLetterCountStat(snapshot);
   renderFreeChainBadge(snapshot);
@@ -677,10 +549,7 @@ function openSettingsModal() {
     return;
   }
 
-  syncMotionPreferenceToUi();
-  syncProvenanceBadgesPreferenceToUi();
-  syncFreeChainPreferenceToUi();
-  syncShareIncludeLinkPreferenceToUi();
+  settings.syncAllToUi();
   settingsModal.hidden = false;
   provenanceBadgesToggle?.focus();
 }
@@ -834,7 +703,7 @@ async function shareResult() {
   }
 
   const summary = gameEngine.getShareSummary();
-  const url = isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
+  const url = settings.isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
   const text = formatMaskedShareText(summary, { dateLabel: getActivePuzzleDateLabel(), url });
 
   if (!navigator.clipboard?.writeText) {
@@ -870,7 +739,7 @@ async function revealSolution() {
   }
 
   const summary = gameEngine.getShareSummary({ includeWords: true });
-  const url = isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
+  const url = settings.isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
 
   const text = formatUnmaskedShareText(
     { ...summary, canonicalWords: getActiveCanonicalWords() },
@@ -995,7 +864,7 @@ async function applyBoardFromInputs() {
     return;
   }
 
-  clearFreeChainSessionOverride();
+  settings.clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(parsed.board);
   puzzleFetcher.markCustomBoard();
 
@@ -1326,38 +1195,34 @@ function wireEvents() {
   });
 
   reducedMotionToggle?.addEventListener('change', () => {
-    setReducedMotionPreference(Boolean(reducedMotionToggle.checked));
+    settings.setReducedMotionPreference(Boolean(reducedMotionToggle.checked));
     renderUi();
     setMessage(`Reduced motion ${reducedMotionToggle.checked ? 'enabled' : 'disabled'}.`, 'success');
   });
 
   provenanceBadgesToggle?.addEventListener('change', () => {
     const enabled = Boolean(provenanceBadgesToggle.checked);
-    setProvenanceBadgesPreference(enabled);
+    settings.setProvenanceBadgesPreference(enabled);
     renderUi();
     setMessage(`Dictionary provenance badges ${enabled ? 'enabled' : 'disabled'}.`, 'success');
   });
 
   freeChainToggle?.addEventListener('change', () => {
     const enabled = Boolean(freeChainToggle.checked);
-    setFreeChainPreference(enabled);
+    settings.setFreeChainPreference(enabled);
     setMessage(`Free Chain mode ${enabled ? 'enabled' : 'disabled'}.`, 'success');
   });
 
   shareIncludeLinkToggle?.addEventListener('change', () => {
     const enabled = Boolean(shareIncludeLinkToggle.checked);
-    setShareIncludeLinkPreference(enabled);
+    settings.setShareIncludeLinkPreference(enabled);
     setMessage(`Including a link when sharing is now ${enabled ? 'on' : 'off'}.`, 'success');
   });
 
-  if (typeof SYSTEM_REDUCED_MOTION_QUERY.addEventListener === 'function') {
-    SYSTEM_REDUCED_MOTION_QUERY.addEventListener('change', () => {
-      if (reducedMotionPreference === null) {
-        syncMotionPreferenceToUi();
-        renderUi();
-      }
-    });
-  }
+  settings.onSystemReducedMotionChange(() => {
+    settings.syncMotionPreferenceToUi();
+    renderUi();
+  });
 
   for (const input of Object.values(BOARD_INPUTS)) {
     input?.addEventListener('input', () => {
@@ -1556,7 +1421,7 @@ function tryLoadSharedPuzzleFromHash() {
     return false;
   }
 
-  clearFreeChainSessionOverride();
+  settings.clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(decoded.board);
   puzzleFetcher.markCustomBoard();
   // Unlike trackWordSubmit/trackGameSolved (deliberately suppressed during
@@ -1596,7 +1461,7 @@ function tryLoadSharedPuzzleFromHash() {
 function initializeGame() {
   gameEngine = createGameEngine({
     initialBoard: buildBoard(),
-    freeChainMode: isFreeChainModeEnabled(),
+    freeChainMode: settings.isFreeChainModeEnabled(),
     validateWord: dictionaryValidator.validateWord,
     summarizeValidationSources,
     getCanonicalCharacterCount: getActiveCanonicalCharacterCount,
@@ -1653,10 +1518,10 @@ function initializeGame() {
 
   puzzleReplay = createPuzzleReplay({
     gameEngine,
-    isReducedMotionEnabled,
+    isReducedMotionEnabled: settings.isReducedMotionEnabled,
     applySolutionWordOverrides,
     setCanonicalWords,
-    setFreeChainSessionOverride,
+    setFreeChainSessionOverride: settings.setFreeChainSessionOverride,
     setMessage,
     steamVentEasterEgg,
     pipeEasterEgg,
@@ -1669,11 +1534,11 @@ function initializeGame() {
     puzzleReplay,
     pipeEasterEgg,
     getActiveCanonicalWords,
-    isFreeChainModeEnabled,
+    isFreeChainModeEnabled: settings.isFreeChainModeEnabled,
     setCanonicalWords,
     applySolutionWordOverrides,
-    setFreeChainSessionOverride,
-    clearFreeChainSessionOverride,
+    setFreeChainSessionOverride: settings.setFreeChainSessionOverride,
+    clearFreeChainSessionOverride: settings.clearFreeChainSessionOverride,
     setMessage,
     closeActiveModalIfAny,
     playTodayPuzzle,
@@ -1687,8 +1552,8 @@ function initializeGame() {
   psaBanner.init();
   campaignCard.init();
 
-  syncMotionPreferenceToUi();
-  syncProvenanceBadgesPreferenceToUi();
+  settings.syncMotionPreferenceToUi();
+  settings.syncProvenanceBadgesPreferenceToUi();
 
   setMessage('Double letters are welcome here: tap the same letter twice in a row.');
 
