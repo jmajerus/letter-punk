@@ -228,7 +228,7 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 ## Repo structure
 
 - `public/` static site files served by Workers or Pages
-- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`, `shareText.js`, `settings.js`, `puzzleReplay.js`, `arcadeMode.js`, `historyManager.js`, `analyticsClient.js`, `pipeEasterEgg.js`, `steamVentEasterEgg.js`, `psaBanner.js`, `campaignCard.js`
+- `public/modules/` ES module layer: `gameLogic.js`, `boardRenderer.js`, `dictionaryValidator.js`, `puzzleFetcher.js`, `buildLogic.js`, `shareLink.js`, `shareText.js`, `settings.js`, `modalManager.js`, `puzzleReplay.js`, `arcadeMode.js`, `historyManager.js`, `analyticsClient.js`, `pipeEasterEgg.js`, `steamVentEasterEgg.js`, `psaBanner.js`, `campaignCard.js`
 - `public/app.js` app bootstrap and UI orchestration — the composition root: wires the modules above together, owns DOM element lookups, event listeners, modal state, and settings persistence
 - `src/worker.js` Cloudflare Worker entry point — routes `/api/*` and `/admin`, serves static assets otherwise
 - `src/admin.js` analytics dashboard behind `/admin`

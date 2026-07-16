@@ -27,6 +27,7 @@ import {
   DEFAULT_ARCADE_IDLE_RESTART_SECONDS,
 } from './modules/arcadeMode.js';
 import { createSettings } from './modules/settings.js';
+import { createModalManager } from './modules/modalManager.js';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -278,6 +279,29 @@ const puzzleFetcher = createPuzzleFetcher({
   },
 });
 
+const modalManager = createModalManager({
+  helpModal,
+  closeHelpButton,
+  helpButton,
+  yesterdayModal,
+  closeYesterdayButton,
+  yesterdayButton,
+  yesterdayPuzzleDateElement,
+  yesterdayPuzzleWordsElement,
+  settingsModal,
+  settingsButton,
+  provenanceBadgesToggle,
+  boardModal,
+  boardTopInput,
+  getYesterdayPuzzleData: () => puzzleFetcher.getNavigationState().yesterdayData,
+  syncSettingsToUi: settings.syncAllToUi,
+  prepareBoardModal() {
+    fillBoardInputsFromCurrentBoard();
+    setBoardInputMessage('');
+    setBoardLinkMessage('');
+  },
+});
+
 function fillBoardInputsFromCurrentBoard() {
   const board = gameEngine.getBoard();
   fillBoardInputs({
@@ -460,7 +484,7 @@ function updatePuzzleNavigation() {
   }
 
   if (yesterdayModal && !yesterdayModal.hidden && !navigation.yesterdayData) {
-    closeYesterdayModal();
+    modalManager.closeYesterdayModal();
   }
 
   if (todayPuzzleButton) {
@@ -495,98 +519,6 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   renderer.renderLetterUsage(snapshot.prospectiveUsedLetters, snapshot.currentTokenLetters, snapshot.letterUsageCounts);
   renderer.renderBoardLinks(snapshot.tokens, snapshot.foundWords, gameEngine.tokensFromWord);
   updatePuzzleNavigation();
-}
-
-function openHelpModal() {
-  if (!helpModal) {
-    return;
-  }
-
-  helpModal.hidden = false;
-  closeHelpButton?.focus();
-}
-
-function closeHelpModal() {
-  if (!helpModal) {
-    return;
-  }
-
-  helpModal.hidden = true;
-  helpButton?.focus();
-}
-
-function openYesterdayModal() {
-  const yesterdayData = puzzleFetcher.getNavigationState().yesterdayData;
-  if (!yesterdayModal || !yesterdayData) {
-    return;
-  }
-
-  if (yesterdayPuzzleDateElement) {
-    yesterdayPuzzleDateElement.textContent = yesterdayData.id
-      ? `Date: ${yesterdayData.id}`
-      : 'Date: Yesterday';
-  }
-
-  if (yesterdayPuzzleWordsElement) {
-    yesterdayPuzzleWordsElement.textContent = yesterdayData.words.join(' -> ');
-  }
-
-  yesterdayModal.hidden = false;
-  closeYesterdayButton?.focus();
-}
-
-function closeYesterdayModal() {
-  if (!yesterdayModal) {
-    return;
-  }
-
-  yesterdayModal.hidden = true;
-  yesterdayButton?.focus();
-}
-
-function openSettingsModal() {
-  if (!settingsModal) {
-    return;
-  }
-
-  settings.syncAllToUi();
-  settingsModal.hidden = false;
-  provenanceBadgesToggle?.focus();
-}
-
-function closeSettingsModal() {
-  if (!settingsModal) {
-    return;
-  }
-
-  settingsModal.hidden = true;
-  settingsButton?.focus();
-}
-
-function openBoardModal() {
-  if (!boardModal) {
-    return;
-  }
-
-  fillBoardInputsFromCurrentBoard();
-  setBoardInputMessage('');
-  setBoardLinkMessage('');
-  boardModal.hidden = false;
-  boardTopInput?.focus();
-}
-
-function closeBoardModal() {
-  if (!boardModal) {
-    return;
-  }
-
-  boardModal.hidden = true;
-  // setBoardButton now lives inside the Settings modal (see its click
-  // listener in wireEvents), which is always closed by the time this runs
-  // -- focusing it directly would land focus on an element inside a
-  // hidden container. The Settings button is the closest stable return
-  // point now.
-  settingsButton?.focus();
 }
 
 function isBoardFullySolved() {
@@ -759,75 +691,6 @@ async function revealSolution() {
   }
 }
 
-function getActiveModal() {
-  if (boardModal && !boardModal.hidden) {
-    return boardModal;
-  }
-
-  if (settingsModal && !settingsModal.hidden) {
-    return settingsModal;
-  }
-
-  if (yesterdayModal && !yesterdayModal.hidden) {
-    return yesterdayModal;
-  }
-
-  if (helpModal && !helpModal.hidden) {
-    return helpModal;
-  }
-
-  return null;
-}
-
-// Closes whatever modal is currently open, if any -- used when the attract
-// loop reclaims the screen (see startArcadeMode). A modal left open over
-// the loop would both visually block the "this station is free" signal
-// the loop exists to send, and stay fully interactive underneath it, since
-// arcade mode's pointer-events lockout only covers the board and its own
-// controls, not modals.
-function closeActiveModalIfAny() {
-  const activeModal = getActiveModal();
-  if (activeModal === boardModal) {
-    closeBoardModal();
-  } else if (activeModal === settingsModal) {
-    closeSettingsModal();
-  } else if (activeModal === yesterdayModal) {
-    closeYesterdayModal();
-  } else if (activeModal === helpModal) {
-    closeHelpModal();
-  }
-}
-
-function trapFocusInModal(modal, event) {
-  if (!modal || event.key !== 'Tab') {
-    return;
-  }
-
-  const focusable = modal.querySelectorAll(
-    'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  );
-
-  if (focusable.length === 0) {
-    event.preventDefault();
-    return;
-  }
-
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  const active = document.activeElement;
-
-  if (event.shiftKey && active === first) {
-    event.preventDefault();
-    last.focus();
-    return;
-  }
-
-  if (!event.shiftKey && active === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
 // Whitelists solution words for the currently-applied board — a proper
 // noun or another game's word can define the board shape but still fail
 // normal dictionary validation, which would make the puzzle unsolvable by
@@ -871,7 +734,7 @@ async function applyBoardFromInputs() {
   const overrideWords = await applySolutionWordOverrides(canonicalWords);
 
   trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
-  closeBoardModal();
+  modalManager.closeBoardModal();
   setMessage(
     overrideWords.length > 0
       ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`
@@ -1151,21 +1014,21 @@ function wireEvents() {
   // other, since openBoardModal itself doesn't know or care what else
   // might currently be open.
   setBoardButton?.addEventListener('click', () => {
-    closeSettingsModal();
-    openBoardModal();
+    modalManager.closeSettingsModal();
+    modalManager.openBoardModal();
   });
-  settingsButton?.addEventListener('click', openSettingsModal);
-  yesterdayButton?.addEventListener('click', openYesterdayModal);
-  helpButton?.addEventListener('click', openHelpModal);
+  settingsButton?.addEventListener('click', modalManager.openSettingsModal);
+  yesterdayButton?.addEventListener('click', modalManager.openYesterdayModal);
+  helpButton?.addEventListener('click', modalManager.openHelpModal);
   shareButton?.addEventListener('click', shareResult);
   revealSolutionButton?.addEventListener('click', revealSolution);
-  closeSettingsButton?.addEventListener('click', closeSettingsModal);
-  saveSettingsButton?.addEventListener('click', closeSettingsModal);
-  closeYesterdayButton?.addEventListener('click', closeYesterdayModal);
-  yesterdayGotItButton?.addEventListener('click', closeYesterdayModal);
-  closeHelpButton?.addEventListener('click', closeHelpModal);
-  gotItButton?.addEventListener('click', closeHelpModal);
-  closeBoardButton?.addEventListener('click', closeBoardModal);
+  closeSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
+  saveSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
+  closeYesterdayButton?.addEventListener('click', modalManager.closeYesterdayModal);
+  yesterdayGotItButton?.addEventListener('click', modalManager.closeYesterdayModal);
+  closeHelpButton?.addEventListener('click', modalManager.closeHelpModal);
+  gotItButton?.addEventListener('click', modalManager.closeHelpModal);
+  closeBoardButton?.addEventListener('click', modalManager.closeBoardModal);
   applyBoardButton?.addEventListener('click', applyBoardFromInputs);
   pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
@@ -1175,22 +1038,22 @@ function wireEvents() {
 
   helpModal?.addEventListener('click', (event) => {
     if (event.target === helpModal) {
-      closeHelpModal();
+      modalManager.closeHelpModal();
     }
   });
   boardModal?.addEventListener('click', (event) => {
     if (event.target === boardModal) {
-      closeBoardModal();
+      modalManager.closeBoardModal();
     }
   });
   settingsModal?.addEventListener('click', (event) => {
     if (event.target === settingsModal) {
-      closeSettingsModal();
+      modalManager.closeSettingsModal();
     }
   });
   yesterdayModal?.addEventListener('click', (event) => {
     if (event.target === yesterdayModal) {
-      closeYesterdayModal();
+      modalManager.closeYesterdayModal();
     }
   });
 
@@ -1275,29 +1138,29 @@ function wireEvents() {
       }
     }
 
-    const activeModal = getActiveModal();
+    const activeModal = modalManager.getActiveModal();
     if (activeModal) {
-      trapFocusInModal(activeModal, event);
+      modalManager.trapFocusInModal(activeModal, event);
     }
 
     if (event.key === 'Escape' && activeModal) {
       event.preventDefault();
       if (activeModal === boardModal) {
-        closeBoardModal();
+        modalManager.closeBoardModal();
         return;
       }
 
       if (activeModal === settingsModal) {
-        closeSettingsModal();
+        modalManager.closeSettingsModal();
         return;
       }
 
       if (activeModal === yesterdayModal) {
-        closeYesterdayModal();
+        modalManager.closeYesterdayModal();
         return;
       }
 
-      closeHelpModal();
+      modalManager.closeHelpModal();
       return;
     }
 
@@ -1540,7 +1403,7 @@ function initializeGame() {
     setFreeChainSessionOverride: settings.setFreeChainSessionOverride,
     clearFreeChainSessionOverride: settings.clearFreeChainSessionOverride,
     setMessage,
-    closeActiveModalIfAny,
+    closeActiveModalIfAny: modalManager.closeActiveModalIfAny,
     playTodayPuzzle,
     renderUi,
   });
@@ -1607,7 +1470,7 @@ function initializeGame() {
   // Skipped in arcade mode: a kiosk's attract loop should just play, not
   // sit blocked behind a "Welcome" dialog on its very first cycle.
   if (helpModal && !arcadeMode.isActive() && !localStorage.getItem('brassbox-help-seen')) {
-    openHelpModal();
+    modalManager.openHelpModal();
     localStorage.setItem('brassbox-help-seen', '1');
   }
 }
