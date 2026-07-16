@@ -452,6 +452,11 @@ function getActiveCanonicalCharacterCount() {
   return words.length > 0 ? sumWordLengths(words) : null;
 }
 
+function getActiveCanonicalWordCount() {
+  const words = getActiveCanonicalWords();
+  return words.length > 0 ? words.length : null;
+}
+
 // The single string Analytics Engine uses as its sampling/grouping index
 // (see src/worker.js's buildDataPoint) -- a catalog puzzle's date id, or a
 // custom board's own flattened 12-letter layout (the same identity a
@@ -1335,6 +1340,7 @@ function initializeGame() {
     validateWord: dictionaryValidator.validateWord,
     summarizeValidationSources,
     getCanonicalCharacterCount: getActiveCanonicalCharacterCount,
+    getCanonicalWordCount: getActiveCanonicalWordCount,
     onStateChange(snapshot) {
       renderUi(snapshot);
       puzzleProgress.saveIfApplicable(snapshot);

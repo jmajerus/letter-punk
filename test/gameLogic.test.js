@@ -12,7 +12,9 @@ const TEST_BOARD = [
   { side: 3, name: 'left', letters: ['J', 'K', 'L'] },
 ];
 
-function createHarness({ acceptedWords = [], getCanonicalCharacterCount, freeChainMode } = {}) {
+function createHarness({
+  acceptedWords = [], getCanonicalCharacterCount, getCanonicalWordCount, freeChainMode,
+} = {}) {
   const accepted = new Set(acceptedWords);
   const events = { stateChanges: [], messages: [], invalidLetters: [], wordResults: [] };
 
@@ -29,6 +31,7 @@ function createHarness({ acceptedWords = [], getCanonicalCharacterCount, freeCha
       detail: matchedSources && matchedSources.length > 0 ? 'Accepted by the mock dictionary.' : '',
     }),
     getCanonicalCharacterCount,
+    getCanonicalWordCount,
     onStateChange: (snapshot) => events.stateChanges.push(snapshot),
     onMessage: (text, kind) => events.messages.push({ text, kind }),
     onInvalidLetter: (letter) => events.invalidLetters.push(letter),
@@ -245,6 +248,50 @@ test('clearTokens on an already-empty builder removes the remaining found word d
   assert.match(lastMessage(events).text, /Removed the previous accepted word/);
 });
 
+// Regression test for a real, user-reported bug: removeLatestFoundWord()
+// (the tokens-already-empty path clearTokens falls into right after solving,
+// since submitWord deliberately leaves the builder empty rather than
+// auto-seeding once the board is solved) used to call seedNextWord()
+// unconditionally. Removing a bonus word added *after* the board was
+// already solved doesn't change solved status -- none of a bonus word's
+// letters can be load-bearing, since the board was already fully covered
+// before it existed -- so there's no "next word" to seed a starting letter
+// for. Left unchecked, it seeded one anyway based on whichever word became
+// newest after the removal, and a second Undo on that phantom seed would
+// back into a real prior word the player never asked to touch.
+test('removing a bonus word added after the board is already solved does not seed a phantom starting letter', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil', 'lag'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+  assert.deepEqual(engine.getSnapshot().tokens, [], 'no reseed once the board is solved');
+
+  // A bonus word ('lag', starting with kcfil's final 'l') added after the
+  // board is already fully covered -- still solved, still no reseed.
+  typeWord(engine, 'lag');
+  await engine.submitWord();
+  assert.deepEqual(engine.getSnapshot().tokens, []);
+
+  // Undoing just the bonus word should leave the builder empty, not seed a
+  // starting letter based on 'kcfil' (the newest word again once 'lag' is
+  // gone) -- adgj+jbehk+kcfil alone still cover the whole board, so there's
+  // still no "next word" to seed a starter for.
+  engine.clearTokens();
+  let snapshot = engine.getSnapshot();
+  assert.deepEqual(snapshot.foundWords.map((entry) => entry.word), ['kcfil', 'jbehk', 'adgj']);
+  assert.deepEqual(snapshot.tokens, [], 'removing a bonus word should not seed a phantom starting letter');
+
+  // A further undo -- removing 'kcfil' this time -- genuinely un-solves the
+  // board (adgj+jbehk alone miss kcfil's c/f/i/l), so normal reseed
+  // behavior should resume exactly as it would mid-solve.
+  engine.clearTokens();
+  snapshot = engine.getSnapshot();
+  assert.deepEqual(snapshot.foundWords.map((entry) => entry.word), ['jbehk', 'adgj']);
+  assert.deepEqual(snapshot.tokens.map((t) => t.letter), ['k'], 'un-solving the board should still reseed the next required letter');
+});
+
 test('solving the full board reports solved:true and the correct message when word counts are provided', async () => {
   const { engine, events } = createHarness({
     acceptedWords: ['adgj', 'jbehk', 'kcfil'],
@@ -289,6 +336,66 @@ test('landing one character under the canonical count counts as Dead Reckoner, n
   }
 
   assert.match(lastMessage(events).text, /Dead Reckoner: you landed within one character of the canonical count!/);
+});
+
+// Word count gates the character-count titles: a solve that took more
+// words than the canonical reference doesn't get to claim Efficiency
+// Engineer/Dead Reckoner/Vocabulary Wrangler, even if its character count
+// alone would have earned one -- see isWordCountAtOrUnderCanonical in
+// gameLogic.js and docs/canonical-solution-rating.md's "Word count gates
+// character count" section.
+test('a character-count title still fires normally when word count matches the canonical count', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehkcfil'],
+    getCanonicalCharacterCount: () => 13,
+    getCanonicalWordCount: () => 2,
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'jbehkcfil');
+  await engine.submitWord();
+
+  assert.match(lastMessage(events).text, /Dead Reckoner: you landed exactly on the canonical count!/);
+});
+
+test('a character-count title is withheld when word count exceeds the canonical count, even with a favorable character count', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    // 14 played characters would be Vocabulary Wrangler territory against a
+    // 10-character canonical if word count didn't matter -- it shouldn't
+    // fire here, since 3 words is more than the 2-word canonical.
+    getCanonicalCharacterCount: () => 10,
+    getCanonicalWordCount: () => 2,
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const message = lastMessage(events).text;
+  assert.doesNotMatch(message, /Vocabulary Wrangler|Efficiency Engineer|Dead Reckoner/);
+  assert.match(message, /Solved in 3 words using 14 characters\. The reference solution does it in 2 — see if you can trim it down\./);
+});
+
+test('getShareSummary omits the character-count title from titles when word count exceeds canonical, but keeps Union Plumber', async () => {
+  const { engine } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getCanonicalCharacterCount: () => 10,
+    getCanonicalWordCount: () => 2,
+    freeChainMode: true,
+  });
+
+  // Chained anyway despite Free Chain mode not requiring it -- Union
+  // Plumber-eligible, and orthogonal to the word-count gate above.
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    await engine.submitWord();
+  }
+
+  const summary = engine.getShareSummary();
+  assert.deepEqual(summary.titles, ['Union Plumber']);
 });
 
 test('solving with no canonical reference at all still reports the character count, not just word count', async () => {

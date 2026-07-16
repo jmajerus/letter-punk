@@ -13,6 +13,7 @@ export function createGameEngine(options) {
     validateWord,
     summarizeValidationSources,
     getCanonicalCharacterCount,
+    getCanonicalWordCount,
     onStateChange,
     onMessage,
     onInvalidLetter,
@@ -128,7 +129,24 @@ export function createGameEngine(options) {
 
     state.foundWords.shift();
     rebuildUsedLettersFromFoundWords();
-    seedNextWord();
+
+    // Mirrors submitWord's own solved branch: if the board is still fully
+    // covered by what's left (true whenever the word just removed was a
+    // bonus word added after the board was already solved, since none of
+    // its letters could have been load-bearing), there's no "next word"
+    // to seed a starting letter for — same reasoning, same result. Without
+    // this check, seedNextWord() would seed a starter based on whichever
+    // word is now newest, even though the board is already done; a second
+    // Undo on that phantom seed would then back into a real prior word the
+    // player never asked to remove.
+    const stillSolved = state.usedLetters.size === lettersToSide.size;
+    if (stillSolved) {
+      state.tokens = [];
+      state.starterLocked = false;
+    } else {
+      seedNextWord();
+    }
+
     return true;
   }
 
@@ -254,6 +272,28 @@ export function createGameEngine(options) {
     }
 
     return delta < 0 ? 'efficiency-engineer' : 'vocabulary-wrangler';
+  }
+
+  // The gate character-count titles (Dead Reckoner/Efficiency Engineer/
+  // Vocabulary Wrangler) have to clear before they're allowed to fire at
+  // all, in both the in-game message and the masked share's Bonus count --
+  // see docs/canonical-solution-rating.md's "Word count gates character
+  // count" section. Word count is the mechanic classic Letter Boxed
+  // actually rates a solve on; scoring purely by character count meant
+  // every solve with a known canonical reference earned *some* title,
+  // which both rendered "Bonus" meaningless (everyone got one) and gave a
+  // player no reason to ever try for fewer words, since a 4-word solve
+  // could earn the exact same praise as a 2-word one. Returns true (fails
+  // open, never blocks praise) when canonicalWordCount itself isn't
+  // available -- canonical word count and canonical character count are
+  // both derived from the same reference word list, so in practice
+  // they're known or unknown together; this is defensive, not a real path.
+  function isWordCountAtOrUnderCanonical(playerWordCount, canonicalWordCount) {
+    if (!Number.isFinite(canonicalWordCount) || canonicalWordCount <= 0) {
+      return true;
+    }
+
+    return playerWordCount <= canonicalWordCount;
   }
 
   const CHARACTER_COUNT_TITLE_NAMES = {
@@ -382,8 +422,15 @@ export function createGameEngine(options) {
     const canonicalCharacterCount = Number(
       typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
     );
+    const canonicalWordCount = Number(
+      typeof getCanonicalWordCount === 'function' ? getCanonicalWordCount() : NaN,
+    );
     const characterCountTitleKey = getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount);
-    if (characterCountTitleKey) {
+    // Same word-count gate as submitWord's in-game message -- see
+    // isWordCountAtOrUnderCanonical -- so a masked share's Bonus count
+    // never counts a character-count title the solver themselves wasn't
+    // told they'd earned.
+    if (characterCountTitleKey && isWordCountAtOrUnderCanonical(state.foundWords.length, canonicalWordCount)) {
       titles.push(CHARACTER_COUNT_TITLE_NAMES[characterCountTitleKey]);
     }
 
@@ -688,6 +735,9 @@ export function createGameEngine(options) {
       const canonicalCharacterCount = Number(
         typeof getCanonicalCharacterCount === 'function' ? getCanonicalCharacterCount() : NaN,
       );
+      const canonicalWordCount = Number(
+        typeof getCanonicalWordCount === 'function' ? getCanonicalWordCount() : NaN,
+      );
       // Orthogonal to the character-count titles below -- a solve can earn
       // one of these alongside one of those, since one measures efficiency
       // and this measures the start/end relationship between words.
@@ -706,6 +756,23 @@ export function createGameEngine(options) {
       const characterCountTitleKey = getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount);
       if (characterCountTitleKey) {
         const prefix = `Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters.`;
+
+        // The character-count comparison only gets to speak once word count
+        // is at or under canonical too -- see isWordCountAtOrUnderCanonical.
+        // A solve that took more words than the reference still gets its
+        // facts reported (and Solo/Union Plumber still applies, since
+        // that's an orthogonal axis), but not the same praise a tighter
+        // solve earns, and not a title -- both here and in getShareSummary,
+        // so a masked share's Bonus count agrees with what the solver
+        // themselves was told.
+        if (!isWordCountAtOrUnderCanonical(state.foundWords.length, canonicalWordCount)) {
+          emitMessage(
+            `${prefix} The reference solution does it in ${canonicalWordCount} — see if you can trim it down.${overlapStyleSuffix}`,
+            'success',
+          );
+          return;
+        }
+
         const delta = playerCharacterCount - canonicalCharacterCount;
         const absDelta = Math.abs(delta);
 
