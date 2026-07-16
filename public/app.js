@@ -14,7 +14,7 @@ import { createDictionaryValidator, summarizeValidationSources } from './modules
 import { createPuzzleFetcher } from './modules/puzzleFetcher.js';
 import { trackPuzzleLoad, trackWordSubmit, trackGameSolved } from './modules/analyticsClient.js';
 import { recordFinishedGame } from './modules/historyManager.js';
-import { encodeShareHash, decodeShareHash } from './modules/shareLink.js';
+import { encodeShareHash, decodeShareHash, flattenBoard } from './modules/shareLink.js';
 import { formatMaskedShareText, formatUnmaskedShareText } from './modules/shareText.js';
 import { createPipeEasterEgg } from './modules/pipeEasterEgg.js';
 import { createSteamVentEasterEgg } from './modules/steamVentEasterEgg.js';
@@ -561,6 +561,26 @@ function getActiveCanonicalCharacterCount() {
   return words.length > 0 ? sumWordLengths(words) : null;
 }
 
+// The single string Analytics Engine uses as its sampling/grouping index
+// (see src/worker.js's buildDataPoint) -- a catalog puzzle's date id, or a
+// custom board's own flattened 12-letter layout (the same identity a
+// share link encodes), so distinct custom boards get counted accurately
+// under sampling instead of all sharing the generic 'random' fallback
+// bucket. Only a genuinely random board (catalog unavailable) falls
+// through to '' -> 'random' server-side, since those are one-off fallback
+// states, not something worth distinguishing individually.
+function getAnalyticsPuzzleId(pState) {
+  if (pState.puzzleSource === 'catalog') {
+    return pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '';
+  }
+
+  if (pState.puzzleSource === 'custom') {
+    return flattenBoard(gameEngine.getBoard());
+  }
+
+  return '';
+}
+
 function updatePuzzleNavigation() {
   if (dailyPuzzleStatusElement) {
     dailyPuzzleStatusElement.textContent = puzzleFetcher.getPuzzleStatusText();
@@ -992,7 +1012,7 @@ async function applyBoardFromInputs() {
 
   const overrideWords = await applySolutionWordOverrides(canonicalWords);
 
-  trackPuzzleLoad('custom', '');
+  trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
   closeBoardModal();
   setMessage(
     overrideWords.length > 0
@@ -2043,6 +2063,13 @@ function tryLoadSharedPuzzleFromHash() {
   clearFreeChainSessionOverride();
   gameEngine.applyBoardDefinition(decoded.board);
   puzzleFetcher.markCustomBoard();
+  // Unlike trackWordSubmit/trackGameSolved (deliberately suppressed during
+  // arcade's own attract-loop replays -- see the !arcadeModeActive guard
+  // below), this fires unconditionally: even for an arcade link, the very
+  // first load is the one genuine "someone opened this shared link" event,
+  // and it's exactly the puzzle_load the previous boot-sequence codepath
+  // was silently skipping for every shared link, arcade or not.
+  trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
 
   if (isArcadeModeRequested()) {
     // Remembered for the rest of the page's lifetime (see
@@ -2094,9 +2121,7 @@ function initializeGame() {
       outcome, validationSource, wordLength, word, solved, justCompleted,
     }) {
       const pState = puzzleFetcher.getState();
-      const puzzleId = pState.puzzleSource === 'catalog'
-        ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
-        : '';
+      const puzzleId = getAnalyticsPuzzleId(pState);
 
       // An arcade attract loop resubmits the same handful of words every
       // few seconds, indefinitely — real analytics for a one-off shared
@@ -2172,6 +2197,9 @@ function initializeGame() {
   // and neither should a still-pending ?date= lookup.
   puzzleFetcher.loadDailyPuzzleCatalog({ applyBoard: !sharedPuzzleLoaded && !requestedDate }).then(() => {
     if (sharedPuzzleLoaded) {
+      // Already tracked synchronously inside tryLoadSharedPuzzleFromHash --
+      // this only needed the catalog for Next/Previous/Today to work
+      // afterward, not to know what puzzle was loaded.
       renderUi();
       return;
     }
@@ -2190,10 +2218,7 @@ function initializeGame() {
     }
 
     const pState = puzzleFetcher.getState();
-    const puzzleId = pState.puzzleSource === 'catalog'
-      ? (pState.puzzleCatalog[pState.activePuzzleIndex]?.id || '')
-      : '';
-    trackPuzzleLoad(pState.puzzleSource, puzzleId);
+    trackPuzzleLoad(pState.puzzleSource, getAnalyticsPuzzleId(pState));
     renderUi();
   });
 

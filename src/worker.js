@@ -13,7 +13,15 @@ import { getPsaFeedItems } from './psaFeed.js';
  *   blob3 = secondary dimension (puzzleId or validationSource)
  *   blob4 = submitted word (word_submit only)
  *   double1 = numeric value (wordLength or wordCount; 0 when unused)
- *   index = puzzleId, or 'random' when no catalog puzzle is active
+ *   index = the puzzle's own identity, kept accurate under Analytics
+ *     Engine's per-index sampling rather than left generic: a catalog
+ *     puzzle's date id, or a custom board's flattened 12-letter layout
+ *     (see flattenBoard in public/modules/shareLink.js and
+ *     getAnalyticsPuzzleId in public/app.js) — the same identity a share
+ *     link itself encodes, so two players on the same custom board layout
+ *     naturally share an index. Only 'random' (a genuinely random board,
+ *     e.g. the daily-puzzle catalog being unavailable) has no identity of
+ *     its own and falls back to the literal string 'random'.
  */
 
 const ALLOWED_EVENTS = new Set(['puzzle_load', 'word_submit', 'game_solved']);

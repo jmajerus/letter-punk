@@ -58,7 +58,11 @@ const TITLE_NAMES = Object.fromEntries(
   Object.entries(TITLE_CODES).map(([name, code]) => [code, name]),
 );
 
-function flattenBoard(board) {
+// Exported: also used by app.js as a compact, stable identity for a custom
+// board (e.g. for analytics indexing) -- the same 12-letter string a share
+// link itself encodes, so two players on the same custom board layout
+// naturally get the same identity without needing a separate ID scheme.
+export function flattenBoard(board) {
   return SIDE_NAMES
     .map((_, side) => (board[side]?.letters || []).join(''))
     .join('')

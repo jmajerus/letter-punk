@@ -205,6 +205,16 @@ Because visibility is driven by `snapshot.usedLetters.size === boardSize`, fresh
 
 If a link is included (same `shareIncludeLinkToggle` preference Share uses), it's the same blank-puzzle link Share attaches — see "Deliberately not automatic" below and the Share section above for why: the text here already reveals everything, so the link's only job is getting a friend who doesn't have the game bookmarked into their own attempt at the same puzzle, not replaying the sender's.
 
+## Analytics
+
+Client-side (`public/modules/analyticsClient.js`) sends three fire-and-forget events — `puzzle_load`, `word_submit`, `game_solved` — to `POST /api/event`, fully documented (blob/double/index layout) in `src/worker.js`'s own top-of-file comment, which is the source of truth for the schema. Never throws, never awaits, never blocks gameplay; silently falls back to a no-op when the endpoint is unavailable (e.g. local `file://` dev).
+
+The `index` field (`indexes[0]`) is Analytics Engine's sampling/grouping key, not a timestamp — every data point already gets an automatic `timestamp` for *when* it was written, entirely separate from this. Setting the index correctly matters because AE downsamples per-index-value once volume gets high, keeping counts *within* a given index value statistically reliable even as the dataset grows; a value shared across unrelated events makes both noisier under sampling than they need to be.
+
+`getAnalyticsPuzzleId(pState)` in `app.js` builds this value: a catalog puzzle's date id, or — for a custom board — `flattenBoard(gameEngine.getBoard())` (exported from `shareLink.js`, the same 12-letter identity a share link itself encodes), so two players on the same custom board layout naturally share an index instead of all custom boards (and, before this, all custom boards *and* every genuinely random fallback board) being lumped into the single generic `'random'` bucket. A truly random board (e.g. the daily-puzzle catalog failing to load) has no identity of its own and is the one case that still falls back to `'random'`.
+
+Opening a shared `#p=...` link now correctly emits `puzzle_load` too — `tryLoadSharedPuzzleFromHash()` tracks it synchronously, right after `puzzleFetcher.markCustomBoard()`, since board and puzzle source are both already known at that point and don't need the catalog fetch the rest of boot waits on. This is deliberately unconditional, even for an `&arcade=1` link: unlike the `!arcadeModeActive` guard around `trackWordSubmit`/`trackGameSolved` (which exists specifically to stop an unattended kiosk's looping attract-mode replays from flooding Analytics Engine with duplicate solve events), the very first load of an arcade link *is* the one genuine "someone opened this shared link" event — it's the repeated re-solves after that which are the noise worth suppressing, not the initial open.
+
 ## Testing
 
 Run the test suite with:
