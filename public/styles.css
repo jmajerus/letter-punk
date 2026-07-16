@@ -1614,6 +1614,38 @@ body.arcade-mode .board-tools {
   }
 }
 
+/* Wide-but-short viewports (e.g. a 1920x1080 monitor at 100% zoom, where
+   browser chrome leaves under ~960px of usable height): plenty of width
+   to work with, so this is scoped by height alone. min-width keeps it from
+   ever combining with the phone-portrait tuning above -- the two ranges
+   are mutually exclusive on purpose, so neither can override the other's
+   .board-frame width. */
+@media (max-height: 1000px) and (min-width: 501px) {
+  .app-shell {
+    padding: 14px 0 20px;
+  }
+
+  .hero {
+    margin-bottom: 4px;
+  }
+
+  .board-header {
+    margin-bottom: 6px;
+  }
+
+  .board-wrap {
+    padding: 6px 0 10px;
+  }
+
+  .board-frame {
+    width: min(100%, 600px);
+  }
+
+  .controls {
+    margin-top: 4px;
+  }
+}
+
 /* Scale tiles relative to the board frame width so corners never collide.
    17cqw × 3 tiles + 2cqw × 2 gaps = 55cqw row width, centred starts at 22.5cqw.
    Left column ends at 2.5cqw + 17cqw = 19.5cqw — no overlap. */
