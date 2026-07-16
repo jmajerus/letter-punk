@@ -53,8 +53,15 @@ export function createPuzzleReplay({
   // PIPE_REPLAY_STEP_MS rather than instantly — plenty responsive for
   // "press any key to stop a demo loop" without needing to interrupt an
   // in-flight timer.
-  async function replayProgressWords(words, { isCancelled } = {}) {
-    const animated = !isReducedMotionEnabled();
+  //
+  // instant forces the no-pause path regardless of the reduced-motion
+  // setting — for a routine, frequently-repeated action like restoring a
+  // player's own saved progress every time they navigate to a past puzzle,
+  // even the normal pipe-draw pacing would feel slow on the tenth visit.
+  // Reduced motion is "less motion than default"; this is "none," on
+  // purpose, only for that one case.
+  async function replayProgressWords(words, { isCancelled, instant = false } = {}) {
+    const animated = !instant && !isReducedMotionEnabled();
     const cancelled = () => typeof isCancelled === 'function' && isCancelled();
 
     for (const word of words) {

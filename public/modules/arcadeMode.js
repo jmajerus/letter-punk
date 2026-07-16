@@ -278,7 +278,19 @@ export function createArcadeMode({
     }
 
     await puzzleReplay.replayProgressWords(saved.foundWords);
-    for (const letter of saved.inProgressLetters.toLowerCase()) {
+
+    // The last found word's chain-continuation auto-seed (see gameLogic.js's
+    // seedNextWord) already put the required next starting letter into the
+    // builder as a side effect of the replay above -- saved.inProgressLetters
+    // was captured as the *whole* builder contents at capture time, seed
+    // letter included, so appending it verbatim here would double that seed
+    // letter instead of continuing past it. Only type what's left beyond
+    // whatever the replay already produced, same "already/remaining" trick
+    // replayProgressWords itself uses per word.
+    const alreadySeeded = gameEngine.getSnapshot().tokens.map((token) => token.letter).join('').toLowerCase();
+    const savedLower = saved.inProgressLetters.toLowerCase();
+    const remainingToType = savedLower.startsWith(alreadySeeded) ? savedLower.slice(alreadySeeded.length) : savedLower;
+    for (const letter of remainingToType) {
       gameEngine.appendToken(letter);
     }
 

@@ -28,6 +28,7 @@ import {
 } from './modules/arcadeMode.js';
 import { createSettings } from './modules/settings.js';
 import { createModalManager } from './modules/modalManager.js';
+import { createPuzzleProgress } from './modules/puzzleProgress.js';
 
 const boardElement = document.getElementById('board');
 const boardLinksElement = document.getElementById('boardLinks');
@@ -50,6 +51,7 @@ const clearButton = document.getElementById('clearBtn');
 const previousPuzzleButton = document.getElementById('previousPuzzleBtn');
 const todayPuzzleButton = document.getElementById('todayPuzzleBtn');
 const nextPuzzleButton = document.getElementById('nextPuzzleBtn');
+const resetButton = document.getElementById('resetBtn');
 const setBoardButton = document.getElementById('setBoardBtn');
 const settingsButton = document.getElementById('settingsBtn');
 const yesterdayButton = document.getElementById('yesterdayBtn');
@@ -181,11 +183,12 @@ function fillBoardInputs(values) {
 }
 
 let gameEngine;
-// Both instantiated inside initializeGame(), once gameEngine itself exists
-// -- same reassign-after-declaration pattern gameEngine uses, since both
-// depend on it.
+// All three instantiated inside initializeGame(), once gameEngine itself
+// exists -- same reassign-after-declaration pattern gameEngine uses, since
+// each depends on it.
 let puzzleReplay;
 let arcadeMode;
+let puzzleProgress;
 
 const dictionaryValidator = createDictionaryValidator({
   fallbackApiUrl: '',
@@ -271,11 +274,14 @@ function setCanonicalWords(words) {
 
 const puzzleFetcher = createPuzzleFetcher({
   puzzlesUrl: '/api/puzzles',
-  applyBoard(nextBoard) {
+  async applyBoard(nextBoard) {
     canonicalWords = [];
     dictionaryValidator.clearSessionOverrides();
     settings.clearFreeChainSessionOverride();
-    gameEngine.applyBoardDefinition(nextBoard);
+    // Applies the board itself and, if there's saved progress for it,
+    // restores that on top -- see puzzleProgress.js's createPuzzleProgress
+    // for the ordering hazard this has to guard against.
+    await puzzleProgress.applyBoardAndRestore(nextBoard);
   },
 });
 
@@ -1009,6 +1015,7 @@ function wireEvents() {
   previousPuzzleButton?.addEventListener('click', playPreviousPuzzle);
   todayPuzzleButton?.addEventListener('click', playTodayPuzzle);
   nextPuzzleButton?.addEventListener('click', playNextPuzzle);
+  resetButton?.addEventListener('click', puzzleProgress.resetCurrent);
   // setBoardButton lives inside the Settings modal now -- close Settings
   // first so the two modals never end up visibly stacked on top of each
   // other, since openBoardModal itself doesn't know or care what else
@@ -1330,6 +1337,7 @@ function initializeGame() {
     getCanonicalCharacterCount: getActiveCanonicalCharacterCount,
     onStateChange(snapshot) {
       renderUi(snapshot);
+      puzzleProgress.saveIfApplicable(snapshot);
     },
     onMessage: setMessage,
     onInvalidLetter(letter) {
@@ -1406,6 +1414,16 @@ function initializeGame() {
     closeActiveModalIfAny: modalManager.closeActiveModalIfAny,
     playTodayPuzzle,
     renderUi,
+  });
+
+  puzzleProgress = createPuzzleProgress({
+    gameEngine,
+    puzzleFetcher,
+    puzzleReplay,
+    findChainBreaks,
+    clearFreeChainSessionOverride: settings.clearFreeChainSessionOverride,
+    setFreeChainSessionOverride: settings.setFreeChainSessionOverride,
+    setMessage,
   });
 
   renderUi();

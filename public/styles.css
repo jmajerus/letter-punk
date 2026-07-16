@@ -798,6 +798,15 @@ button:active {
   white-space: nowrap;
 }
 
+/* Deliberately smaller than the core word-entry controls (Undo Word/Undo
+   Letter/Enter) it sits next to -- a reset is a rarer, more deliberate
+   action than those, and shouldn't visually compete with them for
+   attention or accidental taps. */
+.reset-btn {
+  padding: 12px 14px;
+  font-size: 0.9rem;
+}
+
 #submitBtn {
   margin-left: auto;
 }
