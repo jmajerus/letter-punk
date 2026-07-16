@@ -24,8 +24,14 @@ A hard limit is sometimes defended as measuring something real: skill under pres
 
 **Let the middle be worth celebrating too, not just the extremes.** It's easy to build a system that only has something to say to the fastest, the biggest, or the best — and stays quiet for the person who read the situation carefully and landed almost exactly where they meant to. That kind of precision is its own skill, often a rarer one than either extreme, and it deserves its own recognition rather than folding invisibly into "didn't win, didn't lose."
 
+**Don't let the system be the one who decides a person is finished with it.**[^1] A result doesn't have to come with an expiration date. If someone reaches an outcome and wants to try again — right now, in the exact same spot, for no reason beyond wanting to — the honest move is to let them, not to treat that as something to be managed or rationed. A one-shot structure ("you get one try, then it's someone else's turn, come back tomorrow") is sometimes a real design choice with its own good reasons — pacing, suspense, a shared daily rhythm — but just as often it's an assumption nobody actually decided on, inherited from whatever was easiest to build.
+
+This is the same silence-as-failure habit as everything above, just pointed at a different question. It's one thing to make room for more than one way of succeeding at an attempt; it's a further thing to make room for a person simply not being done yet. Where a system can afford it, let a finished result stay revisitable instead of locked. Let stepping away and coming back mean picking up where things were left, not a fresh start imposed as the quiet cost of having left. And where the system invites comparison at all — a shared result, a score held up next to someone else's — let it read as an invitation into more play, not a verdict that closes the door.
+
 ## Why bother with any of this
 
 None of these ideas cost much to build. What they cost is the assumption that a single scoreboard was ever the honest way to describe success in the first place. A harsh, one-track framing of winning doesn't stay contained to the system it was built for — it's a small piece of how people learn to think about effort, worth, and each other, and that has a way of traveling. Building systems that can say something genuine to more than one kind of person doing more than one kind of good work seems like a small, achievable way to push back on that, one system at a time.
 
 If any of this is useful to you, use it — and if it helps you build something a little more generous than it needed to be, that's the point.
+
+[^1]: This one rhymes with a distinction James Carse draws in *Finite and Infinite Games*: a finite game is played to produce a winner and an ending, an infinite game is played for the sake of continuing to play. Not required background for anything above — just a good next read if the shape of the idea catches your interest.
