@@ -1432,15 +1432,175 @@ body.arcade-mode .board-tools {
 @media (max-width: 500px) {
   .app-shell {
     width: calc(100vw - 16px);
+    padding-top: 6px;
+  }
+
+  /* Tightened enough, alongside the other trims in this block, to bring
+     the Word Builder card's first line into view without scrolling on a
+     ~375x667 screen -- see docs/development.md's "Small-screen vertical
+     budget" section for the full accounting of where the savings come
+     from. Every reduction here stops short of the 14px text-size floor
+     documented near .eyebrow/.section-label above; nothing here goes
+     below it. */
+  .hero {
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-size: 1.7rem;
   }
 
   .board-card {
-    padding: 12px;
+    padding: 10px;
+  }
+
+  .board-header {
+    margin-bottom: 6px;
+  }
+
+  .board-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .puzzle-status {
+    margin-top: 4px;
+  }
+
+  .letter-count-stat {
+    margin-top: 2px;
+  }
+
+  .board-wrap {
+    padding: 4px 0 6px;
+  }
+
+  .board-frame {
+    width: min(90%, 680px);
+  }
+
+  .layout {
+    gap: 12px;
+  }
+
+  .panel-card {
+    padding: 14px;
+  }
+
+  /* .word-card's own padding-left/right (10px, set outside any media
+     query) would otherwise lose to this shorthand .panel-card override on
+     source order alone -- both are single-class selectors, so the later
+     declaration wins property-by-property. Re-affirmed here rather than
+     left to accidentally widen back to 14px on this one card. */
+  .word-card {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  /* The word-builder tokens had no responsive sizing of their own at all
+     -- a flat 24px regardless of screen size -- while the board's own
+     tile letters (.tile-letter, scaled via the @container query below)
+     shrink to roughly 18px at this width. Left alone, the letters a
+     player is actively building a word from end up visibly *larger* than
+     the letters on the board they came from, which reads as inconsistent
+     once you notice it. Matched to the same ~18px here, with the token's
+     own box and the current-word tray around it scaled down by the same
+     ~0.75 ratio -- not just the font. This can't share the board's
+     @container (max-width: 500px) block below: .token/.current-word live
+     in .word-card, outside .board-frame's container-query scope
+     (container-type: inline-size), so it has to be viewport-based here
+     instead. */
+  .current-word {
+    min-height: 60px;
+    padding: 8px 6px;
+    margin: 8px 0 8px;
+  }
+
+  .token {
+    min-width: 26px;
+    min-height: 33px;
+    padding: 7px 5px;
+    border-radius: 11px;
+    font-size: 18px;
+  }
+
+  .token-multiplier {
+    right: -4px;
+    bottom: -4px;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+
+  /* Same reasoning as .token above, just a smaller gap to close: an
+     accepted word's own text (.word-pill-label, 1.15em against the 17px
+     body font -- about 19.55px, never scaled at any breakpoint) reads
+     slightly larger than the ~18px board tile letters it's made up of.
+     Matched here for the same "one alphabet, one size" consistency,
+     with the pill's own padding/gap trimmed by a proportional amount
+     rather than just the text. */
+  .word-pill {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .word-pill-label {
+    font-size: 18px;
+  }
+
+  /* Below this width, the title block and the Settings/Yesterday/Help
+     buttons no longer both fit on one row at their natural size -- around
+     420px they start squeezing each other, wrapping "Route a word" and
+     "0 letters placed so far" onto two lines apiece. Stacking the three
+     buttons into a narrow vertical column (rather than dropping the whole
+     button row underneath the title, which costs a full extra row of
+     height every board load -- height that matters here, since a taller
+     board pushes the word-builder card further down) needs only as much
+     width as the single widest label ("Yesterday"), leaving the title
+     block enough room to stay on one line while the two sit side by side.
+     align-items: flex-start (both here and on .board-tools) top-aligns
+     the button column with "Steam board" instead of the default vertical
+     centering, which would otherwise center it against the taller,
+     four-line title block. */
+  .board-header {
+    align-items: flex-start;
+  }
+
+  .board-tools {
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .board-tool-buttons {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .help-btn {
+    padding: 6px 10px;
   }
 
   .board-wrap::before,
   .board-wrap::after {
     display: none;
+  }
+
+  .controls {
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .primary,
+  .secondary {
+    padding: 11px 16px;
+  }
+
+  .puzzle-nav-arrow {
+    padding: 9px 0;
+  }
+
+  .today-puzzle-btn,
+  .reset-btn {
+    padding: 9px 12px;
   }
 
   .psa-banner {
@@ -1474,6 +1634,32 @@ body.arcade-mode .board-tools {
     font-size: max(1.7cqw, 14px);
     right: -1.7cqw;
     bottom: -1.7cqw;
+  }
+
+  /* The used-tile checkmark and its striped corner tag are fixed-px
+     decorations sized for the desktop tile (102x84) -- left unscaled at
+     this container width, the 21px checkmark alone covers close to half
+     the width of a ~51px-wide tile, sitting almost directly over the
+     letter it's meant to be a small corner accent on. Shrunk and tucked
+     tighter into the same corner (2px insets instead of 5px/7px) rather
+     than just left to keep overlapping at a smaller size. Both stay
+     purely decorative status accents, not the sole conveyor of "used" --
+     the tank's swapped artwork and dashed border already carry that --
+     so there's no text-size floor to respect here the way there is for
+     .eyebrow/.section-label. */
+  .tile-letter.used::after {
+    top: 2px;
+    right: 2px;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+  }
+
+  .tile-letter.used::before {
+    left: 2px;
+    bottom: 2px;
+    width: 16px;
+    height: 5px;
   }
 
   .side-top {
