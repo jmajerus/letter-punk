@@ -114,7 +114,18 @@ For the reasoning behind the dual-dictionary approach itself, see [Dual Dictiona
 
 ## Daily puzzles
 
-Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client. Rebuild the catalog from `puzzle-seeds.json` with `npm run build:puzzles` (add `:dry` to preview without writing). Generation enforces `public/data/dictionary-blocklist.txt` — a blocked word can never be auto-picked as a companion, and a manually-authored `solutionWords`/`companionWord` in the seed file that's blocked, or that isn't actually chainable in normal play (each word after the first must start with the previous word's last letter), fails the build rather than shipping a broken puzzle.
+Daily boards are served from `public/data/daily-puzzles.json`, which also supports previous and next puzzle navigation in the client. Rebuild it with `npm run build:puzzles` (add `:dry` to preview without writing). Generation enforces `public/data/dictionary-blocklist.txt` — a blocked word can never be auto-picked as a companion, and a manually-authored `solutionWords`/`companionWord` that's blocked, or that isn't actually chainable in normal play (each word after the first must start with the previous word's last letter), fails the build rather than shipping a broken puzzle.
+
+**Two source files, two roles.** `puzzle-seeds.json` is sparse and reserved-only — a `{date: {seedWord}}` map for specific dates that need a deliberately chosen word (a holiday, a themed day), and it can be hand-edited at any time, including adding a date far out of order (e.g. a December date added while the days leading up to it don't exist yet). `puzzle-seeds.txt` is a flat, ordered text list (one candidate per line, blanks and `#` comments ignored) that fills every other date. A plain `npm run build:puzzles` run, with no arguments, does both in one pass:
+
+1. **Reserved dates first.** Every date in `puzzle-seeds.json` is (re)built from its `seedWord`, overwriting whatever was there before — this is what lets a reserved date override an already-generated day (Labor Day landing on a date the sequential fill had already claimed, say). The one exception: a reserved date that's today or earlier is left untouched and reported separately, so editing `puzzle-seeds.json` can never retroactively change an already-playable puzzle.
+2. **Forward-fill everything else**, starting the day after today (or after the catalog's current last built date, whichever is later) and walking forward one day at a time. Each open day pulls the next usable line from `puzzle-seeds.txt`, skipping — with a reason recorded in the build summary — anything too short, blocklisted, not recognized by the runtime dictionary (the same primary/fallback tries `npm run check-word` uses, since nothing here gets a human's review before shipping), or already used anywhere: earlier in the same file, already built into the catalog (past or future), or claimed by a reserved date not yet reached. This is why `puzzle-seeds.txt` doesn't need to be hand-pruned of words that duplicate history — the dedup check treats the whole existing catalog as already-spoken-for, so pasting in an old export or a messy brainstorm list is fine. A date the walk reaches that's already reserved is stepped over without consuming a fill word. The walk stops once the file is exhausted (and every remaining reserved date has been reached).
+
+Use `--from`/`--to` or `--year` to instead (re)build one explicit date range on demand — that mode still requires a `puzzle-seeds.json` entry for each date and skips the fill entirely, useful right after editing a single reserved date.
+
+**Backfilling into the past.** `npm run build:puzzles -- --direction backward` fills the other way: starting the day before the catalog's current earliest date and walking backward, one day at a time, again skipping any reserved date it reaches. The point is spoiler avoidance — a player who's caught up to today can dig further into the archive instead of paging forward past today into already-generated (but not-yet-"due") future puzzles just to have something new to solve. Backward fill still reads from `--fill` (default `puzzle-seeds.txt`), but since a forward run typically already exhausts most of that file, point `--fill` at a separate word list when backfilling (`--fill archive-words.txt`) rather than expecting leftovers from the same file. Reserved dates are still rebuilt unconditionally regardless of `--direction` — direction only controls the sequential fill.
+
+As the archive grows in both directions across months and years, plain Previous/Next arrow navigation will get tedious — a calendar-style date picker in the client is worth revisiting at that point, but isn't needed yet.
 
 ## Local puzzle progress
 
@@ -263,7 +274,7 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 - `src/worker.js` Cloudflare Worker entry point — routes `/api/*` and `/admin`, serves static assets otherwise
 - `src/admin.js` analytics dashboard behind `/admin`
 - `src/psaFeed.js` fetches/parses/caches the ICRC + WHO awareness-banner feeds — see "Awareness banner" below
-- `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from `puzzle-seeds.json`
+- `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from the reserved dates in `puzzle-seeds.json` plus the forward-fill list in `puzzle-seeds.txt` — see "Daily puzzles" above
 - `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
 - `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
 - `wrangler.toml` Cloudflare Worker config
