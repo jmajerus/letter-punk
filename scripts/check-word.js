@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { Command } = require('commander');
 
 const repoRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(repoRoot, 'public');
@@ -98,11 +99,21 @@ function checkWord(word, { primaryTrie, fallbackTrie, blockedWords, overrideWord
 }
 
 function main() {
-  const words = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
-  if (words.length === 0) {
-    console.error('Usage: node scripts/check-word.js WORD [WORD...]');
-    process.exit(1);
-  }
+  const program = new Command();
+  program
+    .name('check-word')
+    .description(`Checks each word against the same packed primary/fallback dictionaries and
+blocklist/overrides the live game uses at runtime, and warns if the packed
+dictionaries look older than their sources (run \`npm run build:dictionary\`
+if so).`)
+    .argument('<words...>', 'One or more words to check')
+    .addHelpText('after', `
+Examples:
+  $ node scripts/check-word.js CAT PIKEY NEGRO
+  $ npm run check-word -- CAT PIKEY NEGRO`)
+    .parse(process.argv);
+
+  const words = program.args;
 
   const PTrie = loadPTrieClass();
   const primaryTrie = loadTrie(PTrie, PRIMARY_PACKED_PATH);

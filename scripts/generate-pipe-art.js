@@ -27,6 +27,7 @@ const path = require('path');
 const http = require('http');
 const { spawn, spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const { Command } = require('commander');
 
 const repoRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(repoRoot, 'public');
@@ -72,48 +73,43 @@ const CSS_RULES_TO_INLINE = [
   { label: 'reduced-motion override', pattern: /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*\.board-pipe-live\s*,\s*\.board-pipe-arrow-live\s*\{/ },
 ];
 
+// Commander owns the CLI surface: each .option() call is the single
+// definition of a flag's name, value, default, and help text -- --help and
+// the actual parsing both come from these same declarations instead of a
+// hand-maintained usage string. Commander accepts both `--board=value` and
+// `--board value`, so the documented --flag=value examples below still work.
 function parseArgs(argv) {
-  const args = {
-    boardSides: DEFAULT_BOARD_SIDES,
-    words: DEFAULT_WORDS,
-    out: DEFAULT_OUT,
-    chrome: null,
-    keepHarness: false,
-    includeBoard: false,
-    frame: false,
+  const program = new Command();
+  program
+    .name('generate-pipe-art')
+    .description(`Regenerates public/assets/pipe-manifold.svg by driving a real headless
+Chrome through a simulated playthrough (a board + word chain) and capturing
+the resulting pipe-routing SVG, since the geometry depends on real DOM
+layout that can't be computed in plain Node.`)
+    .option('--board <sides>', 'Board letters, 3 per side', (value) => value.split(','), DEFAULT_BOARD_SIDES)
+    .option('--words <words>', 'Word chain to play, comma-separated', (value) => value.split(','), DEFAULT_WORDS)
+    .option('--out <path>', 'Output SVG path', DEFAULT_OUT)
+    .option('--chrome <path>', 'Chrome/Chromium binary to use (default: auto-detected)')
+    .option('--keep-harness', "Debug: don't delete the temporary harness page afterward")
+    .option('--include-board', 'Embed the real rendered tile/tank board under the pipes')
+    .option('--frame', "Draw a rectangular pipe frame around the artwork's perimeter")
+    .addHelpText('after', `
+Examples:
+  $ node scripts/generate-pipe-art.js
+  $ node scripts/generate-pipe-art.js --board=RVI,ADE,KLM,OTS --words=AARDVARK,KILOMETRES
+  $ node scripts/generate-pipe-art.js --out=public/assets/pipe-manifold.svg`)
+    .parse(argv);
+
+  const opts = program.opts();
+  return {
+    boardSides: opts.board,
+    words: opts.words,
+    out: opts.out,
+    chrome: opts.chrome || null,
+    keepHarness: Boolean(opts.keepHarness),
+    includeBoard: Boolean(opts.includeBoard),
+    frame: Boolean(opts.frame),
   };
-
-  for (const arg of argv.slice(2)) {
-    if (arg.startsWith('--board=')) {
-      args.boardSides = arg.slice('--board='.length).split(',');
-      continue;
-    }
-    if (arg.startsWith('--words=')) {
-      args.words = arg.slice('--words='.length).split(',');
-      continue;
-    }
-    if (arg.startsWith('--out=')) {
-      args.out = arg.slice('--out='.length);
-      continue;
-    }
-    if (arg.startsWith('--chrome=')) {
-      args.chrome = arg.slice('--chrome='.length);
-      continue;
-    }
-    if (arg === '--keep-harness') {
-      args.keepHarness = true;
-      continue;
-    }
-    if (arg === '--include-board') {
-      args.includeBoard = true;
-      continue;
-    }
-    if (arg === '--frame') {
-      args.frame = true;
-    }
-  }
-
-  return args;
 }
 
 function boardFromSides(sides) {

@@ -1,5 +1,100 @@
 [
   {
+    "id": "2026-06-26",
+    "board": {
+      "top": "TMO",
+      "right": "EPS",
+      "bottom": "BRC",
+      "left": "UIN"
+    },
+    "canonicalSolution": [
+      "TEMPO",
+      "OBSTRUCTIONS"
+    ],
+    "metadata": {
+      "seedWord": "TEMPO",
+      "companionWord": "OBSTRUCTIONS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 154
+    }
+  },
+  {
+    "id": "2026-06-27",
+    "board": {
+      "top": "LCR",
+      "right": "AET",
+      "bottom": "IOS",
+      "left": "GNU"
+    },
+    "canonicalSolution": [
+      "GLACIER",
+      "RECONSTRUCTS"
+    ],
+    "metadata": {
+      "seedWord": "GLACIER",
+      "companionWord": "RECONSTRUCTS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 377
+    }
+  },
+  {
+    "id": "2026-06-28",
+    "board": {
+      "top": "OIT",
+      "right": "RZN",
+      "bottom": "HAK",
+      "left": "LES"
+    },
+    "canonicalSolution": [
+      "HORIZONTAL",
+      "LOOKERS"
+    ],
+    "metadata": {
+      "seedWord": "HORIZONTAL",
+      "companionWord": "LOOKERS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 700
+    }
+  },
+  {
+    "id": "2026-06-29",
+    "board": {
+      "top": "ULN",
+      "right": "TAI",
+      "bottom": "DSE",
+      "left": "OHG"
+    },
+    "canonicalSolution": [
+      "OUTLANDISH",
+      "HEALING"
+    ],
+    "metadata": {
+      "seedWord": "OUTLANDISH",
+      "companionWord": "HEALING",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 840
+    }
+  },
+  {
+    "id": "2026-06-30",
+    "board": {
+      "top": "EIN",
+      "right": "RAF",
+      "bottom": "OPT",
+      "left": "MDS"
+    },
+    "canonicalSolution": [
+      "MERIDIAN",
+      "NONPROFITS"
+    ],
+    "metadata": {
+      "seedWord": "MERIDIAN",
+      "companionWord": "NONPROFITS",
+      "companionSource": "auto-dictionary",
+      "companionCandidateCount": 137
+    }
+  },
+  {
     "id": "2026-07-01",
     "board": {
       "top": "RVI",

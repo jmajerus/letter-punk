@@ -279,6 +279,8 @@ See [testing.md](testing.md) for what's covered, what isn't, and the harness pat
 - `scripts/generate-daily-puzzles.js` builds `public/data/daily-puzzles.json` from the reserved dates in `puzzle-seeds.json` plus the forward-fill list in `puzzle-seeds.txt` — see "Daily puzzles" above
 - `scripts/generate-pipe-art.js` regenerates the decorative pipe artwork from a simulated playthrough
 - `scripts/check-word.js` checks a word against the live packed dictionaries and blocklist
+
+All three use [Commander](https://github.com/tj/commander.js) for their CLI surface — each flag/argument is declared once (name, value, default, help text) and Commander derives both the actual parsing and the `--help`/`-h` output from that same declaration, rather than a hand-maintained usage string drifting out of sync with the parser. Run any of them with `--help` to see its current flags.
 - `wrangler.toml` Cloudflare Worker config
 - `test/` Node built-in test runner suite — see `testing.md` for current coverage
 - `docs/ai-edit-map.md` AI agent routing guide and prompt templates

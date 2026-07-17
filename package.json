@@ -5,13 +5,15 @@
   "private": true,
   "scripts": {
     "build:dictionary": "node public/util/compile-dict.js",
-    "build:puzzles": "node scripts/generate-daily-puzzles.js",
-    "build:puzzles:dry": "node scripts/generate-daily-puzzles.js --dry-run",
+    "build:puzzles": "node scripts/generate-daily-puzzles.js --direction forward --seeds puzzle-seeds.json --catalog public/data/daily-puzzles.json --fill puzzle-seeds.txt --dictionary public/data/3of6game.txt --blocklist public/data/dictionary-blocklist.txt --packed-dictionary public/util/compressed-dictionary.txt --packed-fallback public/util/compressed-dictionary-fallback.txt",
+    "build:puzzles:dry": "node scripts/generate-daily-puzzles.js --direction forward --seeds puzzle-seeds.json --catalog public/data/daily-puzzles.json --fill puzzle-seeds.txt --dictionary public/data/3of6game.txt --blocklist public/data/dictionary-blocklist.txt --packed-dictionary public/util/compressed-dictionary.txt --packed-fallback public/util/compressed-dictionary-fallback.txt --dry-run",
+    "build:puzzles:backward": "node scripts/generate-daily-puzzles.js --direction backward --seeds puzzle-seeds.json --catalog public/data/daily-puzzles.json --fill puzzle-seeds-backfill.txt --dictionary public/data/3of6game.txt --blocklist public/data/dictionary-blocklist.txt --packed-dictionary public/util/compressed-dictionary.txt --packed-fallback public/util/compressed-dictionary-fallback.txt",
     "build:pipe-art": "node scripts/generate-pipe-art.js",
     "check-word": "node scripts/check-word.js",
     "test": "node --test"
   },
   "dependencies": {
+    "commander": "^15.0.0",
     "dawg-lookup": "^2.2.1"
   }
 }

@@ -2,103 +2,70 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { Command, Option } = require('commander');
 
 const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
 
+// Commander owns the CLI surface: each .option()/.addOption() call is the
+// single definition of a flag's name, value, default, and help text --
+// --help and the actual parsing both come from these same declarations
+// instead of a hand-maintained usage string.
 function parseArgs(argv) {
-  const args = {
-    from: null,
-    to: null,
-    year: null,
-    seedsPath: 'puzzle-seeds.json',
-    catalogPath: 'public/data/daily-puzzles.json',
-    dictionaryPath: 'public/data/3of6game.txt',
-    blocklistPath: 'public/data/dictionary-blocklist.txt',
-    fillPath: 'puzzle-seeds.txt',
-    packedPrimaryPath: 'public/util/compressed-dictionary.txt',
-    packedFallbackPath: 'public/util/compressed-dictionary-fallback.txt',
-    direction: 'forward',
-    dryRun: false,
+  const program = new Command();
+  program
+    .name('generate-daily-puzzles')
+    .description(`Builds public/data/daily-puzzles.json (the live daily-puzzle catalog).
+
+Default mode (no --from/--to/--year): puzzle-seeds.json's sparse reserved
+dates are (re)built first (skipping any that are today or earlier, to
+avoid invalidating an already-playable puzzle), then every other open date
+is filled sequentially from puzzle-seeds.txt, starting the day after today
+(or after the catalog's current last date, whichever is later) and skipping
+anything already used anywhere in the catalog.
+
+Explicit range mode (--from/--to, or --year): rebuilds only the given
+date(s), each of which must already have a puzzle-seeds.json entry. Skips
+the reserved/fill logic above entirely -- use this to rebuild one reserved
+date on demand right after editing it.`)
+    .option('--from <YYYY-MM-DD>', 'Start of an explicit date range (needs --to)')
+    .option('--to <YYYY-MM-DD>', 'End of an explicit date range (needs --from)')
+    .option('--year <YYYY>', 'Rebuild every puzzle-seeds.json entry in this year')
+    .addOption(
+      new Option('--direction <mode>', "backward starts the day before the catalog's earliest date and fills toward the past, for spoiler-free archive growth")
+        .choices(['forward', 'backward'])
+        .default('forward'),
+    )
+    .option('--seeds <path>', 'Reserved-dates JSON', 'puzzle-seeds.json')
+    .option('--catalog <path>', 'Output catalog JSON', 'public/data/daily-puzzles.json')
+    .option('--fill <path>', 'Ordered fill word list', 'puzzle-seeds.txt')
+    .option('--dictionary <path>', 'Companion-word candidate pool', 'public/data/3of6game.txt')
+    .option('--blocklist <path>', 'Blocked words, excluded from auto-picks', 'public/data/dictionary-blocklist.txt')
+    .option('--packed-dictionary <path>', 'Primary runtime dictionary, used to validate fill words', 'public/util/compressed-dictionary.txt')
+    .option('--packed-fallback <path>', 'Fallback runtime dictionary, same purpose', 'public/util/compressed-dictionary-fallback.txt')
+    .option('--dry-run', 'Preview the result and print the summary without writing', false)
+    .addHelpText('after', `
+Examples:
+  $ node scripts/generate-daily-puzzles.js --dry-run
+  $ node scripts/generate-daily-puzzles.js
+  $ node scripts/generate-daily-puzzles.js --direction backward --fill archive-words.txt
+  $ node scripts/generate-daily-puzzles.js --from 2026-12-25 --to 2026-12-25`)
+    .parse(argv);
+
+  const opts = program.opts();
+  return {
+    from: opts.from || null,
+    to: opts.to || null,
+    year: opts.year || null,
+    direction: opts.direction,
+    seedsPath: opts.seeds,
+    catalogPath: opts.catalog,
+    fillPath: opts.fill,
+    dictionaryPath: opts.dictionary,
+    blocklistPath: opts.blocklist,
+    packedPrimaryPath: opts.packedDictionary,
+    packedFallbackPath: opts.packedFallback,
+    dryRun: Boolean(opts.dryRun),
   };
-
-  for (let index = 2; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--from' && argv[index + 1]) {
-      args.from = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--to' && argv[index + 1]) {
-      args.to = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--year' && argv[index + 1]) {
-      args.year = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--seeds' && argv[index + 1]) {
-      args.seedsPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--catalog' && argv[index + 1]) {
-      args.catalogPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--dictionary' && argv[index + 1]) {
-      args.dictionaryPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--blocklist' && argv[index + 1]) {
-      args.blocklistPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--fill' && argv[index + 1]) {
-      args.fillPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--packed-dictionary' && argv[index + 1]) {
-      args.packedPrimaryPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--packed-fallback' && argv[index + 1]) {
-      args.packedFallbackPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--direction' && argv[index + 1]) {
-      args.direction = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--dry-run') {
-      args.dryRun = true;
-    }
-  }
-
-  if (args.direction !== 'forward' && args.direction !== 'backward') {
-    throw new Error(`Invalid --direction '${args.direction}'. Use 'forward' or 'backward'.`);
-  }
-
-  return args;
 }
 
 function isIsoDate(value) {
@@ -134,6 +101,19 @@ function addDays(date, count) {
   const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   next.setDate(next.getDate() + count);
   return next;
+}
+
+// ISO "YYYY-MM-DD" strings sort chronologically as plain strings, so no
+// date parsing is needed here -- used to report the actual date span
+// touched by a run, regardless of which order the walk visited them in
+// (forward fills ascending, backward fills descending).
+function dateSpan(dates) {
+  if (dates.length === 0) {
+    return { earliestDate: null, latestDate: null };
+  }
+
+  const sorted = [...dates].sort();
+  return { earliestDate: sorted[0], latestDate: sorted[sorted.length - 1] };
 }
 
 function listDatesInRange(from, to) {
@@ -702,7 +682,7 @@ function main() {
 
     finish({
       args, seedsPath, catalogPath, dictionaryPath, blocklistPath, blockedWords, catalogById,
-      extraSummary: { mode: 'range', updated, skipped },
+      extraSummary: { mode: 'range', updated, skipped, ...dateSpan(updated) },
     });
     return;
   }
@@ -839,7 +819,7 @@ function main() {
       fillLinesScanned: fillIndex,
       fillWordsRejected,
       fillExhausted,
-      lastFilledDate: filled.length ? filled[filled.length - 1] : null,
+      ...dateSpan(filled),
     },
   });
 }
