@@ -274,6 +274,12 @@ function setCanonicalWords(words) {
 
 const puzzleFetcher = createPuzzleFetcher({
   puzzlesUrl: '/api/puzzles',
+  // The catalog only ever holds one calendar year at a time; landing on its
+  // first/last entry silently prefetches the adjacent year in the
+  // background (see puzzleFetcher.js's maybePrefetchAdjacentYear), and this
+  // is what re-evaluates the Previous/Next buttons' disabled state once/if
+  // that lands, since nothing else would otherwise notice the catalog grew.
+  onCatalogExtended: () => updatePuzzleNavigation(),
   async applyBoard(nextBoard) {
     canonicalWords = [];
     dictionaryValidator.clearSessionOverrides();
@@ -986,7 +992,7 @@ async function playPreviousPuzzle() {
   const puzzleState = puzzleFetcher.getState();
   const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
   trackPuzzleLoad('catalog', puzzleId);
-  setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
+  setMessage(`Loaded the puzzle for ${getActivePuzzleDateLabel()}.`, 'success');
 }
 
 async function playNextPuzzle() {
@@ -997,7 +1003,7 @@ async function playNextPuzzle() {
   const puzzleState = puzzleFetcher.getState();
   const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
   trackPuzzleLoad('catalog', puzzleId);
-  setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
+  setMessage(`Loaded the puzzle for ${getActivePuzzleDateLabel()}.`, 'success');
 }
 
 async function playTodayPuzzle() {
@@ -1010,7 +1016,7 @@ async function playTodayPuzzle() {
   const puzzleState = puzzleFetcher.getState();
   const puzzleId = puzzleState.puzzleCatalog[puzzleState.activePuzzleIndex]?.id || '';
   trackPuzzleLoad('catalog', puzzleId);
-  setMessage(`Loaded puzzle ${puzzleState.activePuzzleIndex + 1} of ${puzzleState.puzzleCatalog.length}.`, 'success');
+  setMessage(`Loaded the puzzle for ${getActivePuzzleDateLabel()}.`, 'success');
 }
 
 function wireEvents() {

@@ -24,7 +24,11 @@ function makeEntry(id, { canonicalSolution = ['CAB', 'BEG'], board = SAMPLE_BOAR
 // fallback branch in withYearQuery -- see puzzleFetcher.js) before ever
 // trying the static /data/daily-puzzles.json fallback.
 const CURRENT_YEAR = new Date().getFullYear();
+const NEXT_YEAR = CURRENT_YEAR + 1;
+const PREVIOUS_YEAR = CURRENT_YEAR - 1;
 const PRIMARY_URL = `/api/puzzles?year=${CURRENT_YEAR}`;
+const NEXT_YEAR_URL = `/api/puzzles?year=${NEXT_YEAR}`;
+const PREVIOUS_YEAR_URL = `/api/puzzles?year=${PREVIOUS_YEAR}`;
 const FALLBACK_URL = '/data/daily-puzzles.json';
 
 // responses: { [url]: catalogArray | undefined } -- undefined means "404".
@@ -120,7 +124,11 @@ test('loadDailyPuzzleCatalog falls back to the static JSON URL when the primary 
 
   const result = await fetcher.loadDailyPuzzleCatalog();
   assert.deepEqual(result, { loaded: true, source: 'catalog' });
-  assert.deepEqual(calls, [PRIMARY_URL, FALLBACK_URL]);
+  // The single-entry catalog here sits at both the first and last position,
+  // so applying it also fires the year-boundary prefetch (see
+  // maybePrefetchAdjacentYear) in the background; only the two calls made
+  // synchronously during the load itself are asserted here.
+  assert.deepEqual(calls.slice(0, 2), [PRIMARY_URL, FALLBACK_URL]);
 });
 
 test('loadDailyPuzzleCatalog falls back to a random board when every candidate URL fails', async () => {
@@ -312,4 +320,99 @@ test('getNavigationState reports everything disabled before any catalog has load
   assert.equal(nav.nextDisabled, true);
   assert.equal(nav.todayDisabled, true);
   assert.equal(nav.yesterdayData, null);
+});
+
+// /api/puzzles only ever returns one calendar year, so the catalog has to
+// silently grow across a year boundary or Next/Previous would just dead-end
+// on Dec 31/Jan 1 even though more puzzles exist server-side.
+test('landing on the catalog\'s last entry prefetches and merges the next year in the background', async () => {
+  const lastEntryId = `${CURRENT_YEAR}-12-31`;
+  const catalogThisYear = [makeEntry(`${CURRENT_YEAR}-12-29`), makeEntry(`${CURRENT_YEAR}-12-30`), makeEntry(lastEntryId)];
+  const catalogNextYear = [makeEntry(`${NEXT_YEAR}-01-01`), makeEntry(`${NEXT_YEAR}-01-02`)];
+  const calls = [];
+  const fetchImpl = makeFetchImpl(
+    { [PRIMARY_URL]: catalogThisYear, [NEXT_YEAR_URL]: catalogNextYear },
+    { onCall: (url) => calls.push(url) },
+  );
+
+  let extendedCount = 0;
+  const fetcher = createPuzzleFetcher({
+    fetchImpl,
+    applyBoard: () => {},
+    onCatalogExtended: () => { extendedCount += 1; },
+  });
+
+  await fetcher.loadDailyPuzzleCatalog({ applyBoard: false });
+  assert.deepEqual(fetcher.playPuzzleByDate(lastEntryId.replace(/-/g, '')), { ok: true });
+  assert.equal(fetcher.getState().puzzleCatalog.length, 3, 'merge has not landed yet -- prefetch is fire-and-forget');
+
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+  assert.equal(extendedCount, 1);
+  const state = fetcher.getState();
+  assert.deepEqual(state.puzzleCatalog.map((entry) => entry.id), [
+    `${CURRENT_YEAR}-12-29`, `${CURRENT_YEAR}-12-30`, lastEntryId, `${NEXT_YEAR}-01-01`, `${NEXT_YEAR}-01-02`,
+  ]);
+  assert.equal(state.activePuzzleIndex, 2, `still pointing at ${lastEntryId} after the merge`);
+
+  assert.equal(fetcher.playNextPuzzle(), true, 'can now advance into the newly merged year');
+  assert.equal(fetcher.getState().activePuzzleIndex, 3);
+
+  // Landing on the (no-longer-last) entry again must not re-fetch the next
+  // year a second time.
+  fetcher.playPuzzleByDate(lastEntryId.replace(/-/g, ''));
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  assert.equal(calls.filter((url) => url === NEXT_YEAR_URL).length, 1);
+});
+
+test('landing on the catalog\'s first entry prefetches and merges the previous year in the background', async () => {
+  const firstEntryId = `${CURRENT_YEAR}-01-01`;
+  const catalogThisYear = [makeEntry(firstEntryId), makeEntry(`${CURRENT_YEAR}-01-02`)];
+  const catalogPreviousYear = [makeEntry(`${PREVIOUS_YEAR}-12-31`)];
+  const fetchImpl = makeFetchImpl({
+    [PRIMARY_URL]: catalogThisYear,
+    [PREVIOUS_YEAR_URL]: catalogPreviousYear,
+  });
+
+  let extendedCount = 0;
+  const fetcher = createPuzzleFetcher({
+    fetchImpl,
+    applyBoard: () => {},
+    onCatalogExtended: () => { extendedCount += 1; },
+  });
+
+  await fetcher.loadDailyPuzzleCatalog({ applyBoard: false });
+  assert.deepEqual(fetcher.playPuzzleByDate(firstEntryId.replace(/-/g, '')), { ok: true });
+
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+  assert.equal(extendedCount, 1);
+  const state = fetcher.getState();
+  assert.deepEqual(state.puzzleCatalog.map((entry) => entry.id), [
+    `${PREVIOUS_YEAR}-12-31`, firstEntryId, `${CURRENT_YEAR}-01-02`,
+  ]);
+  assert.equal(state.activePuzzleIndex, 1, `still pointing at ${firstEntryId} after the merge, now shifted by the prepend`);
+
+  assert.equal(fetcher.playPreviousPuzzle(), true, 'can now go back into the newly merged year');
+  assert.equal(fetcher.getState().activePuzzleIndex, 0);
+});
+
+test('a year with no puzzles server-side does not extend the catalog or notify onCatalogExtended', async () => {
+  const lastEntryId = `${CURRENT_YEAR}-12-31`;
+  const fetchImpl = makeFetchImpl({ [PRIMARY_URL]: [makeEntry(lastEntryId)] });
+
+  let extendedCount = 0;
+  const fetcher = createPuzzleFetcher({
+    fetchImpl,
+    applyBoard: () => {},
+    onCatalogExtended: () => { extendedCount += 1; },
+  });
+
+  await fetcher.loadDailyPuzzleCatalog({ applyBoard: false });
+  fetcher.playPuzzleByDate(lastEntryId.replace(/-/g, ''));
+
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+  assert.equal(extendedCount, 0);
+  assert.equal(fetcher.getState().puzzleCatalog.length, 1);
 });

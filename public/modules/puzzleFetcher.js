@@ -65,6 +65,7 @@ export function createPuzzleFetcher(options = {}) {
     fetchImpl = fetch,
     puzzlesUrl = '/api/puzzles',
     applyBoard,
+    onCatalogExtended = () => {},
   } = options;
 
   const state = {
@@ -72,6 +73,9 @@ export function createPuzzleFetcher(options = {}) {
     activePuzzleIndex: -1,
     homePuzzleIndex: -1,
     puzzleSource: 'random',
+    // Years already requested from the server (successfully or not), so the
+    // year-boundary prefetch below never re-asks for the same year twice.
+    fetchedYears: new Set(),
   };
 
   function setPuzzleContext(source, puzzleIndex = -1) {
@@ -122,7 +126,109 @@ export function createPuzzleFetcher(options = {}) {
 
     setPuzzleContext('catalog', index);
     applyBoard(boardFromPuzzleEntry(entry));
+    maybePrefetchAdjacentYear(index);
     return true;
+  }
+
+  // /api/puzzles only ever returns one calendar year at a time (to keep the
+  // payload small), so landing on the first or last entry of whatever's
+  // currently loaded silently tries the adjacent year in the background —
+  // this is what lets Previous/Next cross a year boundary at all, since the
+  // catalog would otherwise just stop dead at Dec 31/Jan 1 even though more
+  // puzzles exist server-side. Fire-and-forget: Previous/Next/getNavigationState
+  // stay fully synchronous, and the boundary buttons simply re-enable
+  // themselves (via onCatalogExtended) once/if the fetch resolves.
+  function buildYearUrl(url, year) {
+    try {
+      const resolved = new URL(url, window.location.href);
+      resolved.searchParams.set('year', year);
+      return resolved.pathname + resolved.search;
+    } catch {
+      return `${url}${url.includes('?') ? '&' : '?'}year=${year}`;
+    }
+  }
+
+  async function fetchYearCatalog(year) {
+    const candidateUrls = [];
+    for (const url of [buildYearUrl(puzzlesUrl, year), '/data/daily-puzzles.json']) {
+      if (url && !candidateUrls.includes(url)) {
+        candidateUrls.push(url);
+      }
+    }
+
+    for (const url of candidateUrls) {
+      const response = await fetchImpl(url).catch(() => null);
+      if (!response || !response.ok) {
+        continue;
+      }
+
+      const payload = await response.json().catch(() => null);
+      const looksLikeCatalog = Array.isArray(payload)
+        && payload.length > 0
+        && payload.every((item) => typeof item?.id === 'string' && typeof item?.board === 'object');
+
+      if (looksLikeCatalog) {
+        return payload.filter((item) => String(item.id).startsWith(`${year}-`));
+      }
+    }
+
+    return [];
+  }
+
+  function mergeAdditionalEntries(additional) {
+    const activeEntry = state.puzzleCatalog[state.activePuzzleIndex] || null;
+    const homeEntry = state.homePuzzleIndex >= 0 ? state.puzzleCatalog[state.homePuzzleIndex] : null;
+
+    const byId = new Map(state.puzzleCatalog.map((entry) => [entry.id, entry]));
+    for (const entry of additional) {
+      if (!byId.has(entry.id)) {
+        byId.set(entry.id, entry);
+      }
+    }
+
+    state.puzzleCatalog = sortCatalogById([...byId.values()]);
+
+    if (activeEntry) {
+      state.activePuzzleIndex = state.puzzleCatalog.findIndex((entry) => entry.id === activeEntry.id);
+    }
+    if (homeEntry) {
+      state.homePuzzleIndex = state.puzzleCatalog.findIndex((entry) => entry.id === homeEntry.id);
+    }
+  }
+
+  function schedulePrefetch(direction) {
+    if (state.puzzleCatalog.length === 0) {
+      return;
+    }
+
+    const boundaryId = direction > 0
+      ? state.puzzleCatalog[state.puzzleCatalog.length - 1].id
+      : state.puzzleCatalog[0].id;
+    const adjacentYear = String(Number(boundaryId.slice(0, 4)) + direction);
+
+    if (state.fetchedYears.has(adjacentYear)) {
+      return;
+    }
+    state.fetchedYears.add(adjacentYear);
+
+    fetchYearCatalog(adjacentYear).then((additional) => {
+      if (additional.length === 0) {
+        return;
+      }
+
+      mergeAdditionalEntries(additional);
+      onCatalogExtended();
+    }).catch(() => {});
+  }
+
+  function maybePrefetchAdjacentYear(index) {
+    if (index === state.puzzleCatalog.length - 1) {
+      schedulePrefetch(1);
+    }
+
+    if (index === 0) {
+      schedulePrefetch(-1);
+    }
   }
 
   function getPuzzleStatusText() {
@@ -293,6 +399,10 @@ export function createPuzzleFetcher(options = {}) {
       }
 
       state.puzzleCatalog = sortCatalogById(catalog);
+      // Whatever years actually came back (normally just todayYear, but the
+      // static-file fallback can return every year at once) are already in
+      // hand, so the boundary prefetch above never re-requests them.
+      state.fetchedYears = new Set(state.puzzleCatalog.map((entry) => entry.id.slice(0, 4)));
       const initialIndex = findInitialPuzzleIndex(state.puzzleCatalog);
       if (initialIndex >= 0) {
         state.homePuzzleIndex = initialIndex;
