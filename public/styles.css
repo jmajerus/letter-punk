@@ -1198,6 +1198,8 @@ body.arcade-mode .board-tools {
 
 .help-dialog {
   width: min(560px, 100%);
+  max-height: min(640px, 85vh);
+  overflow-y: auto;
   border-radius: 20px;
   border: 1px solid rgba(255, 226, 167, 0.18);
   background: linear-gradient(180deg, rgba(43, 33, 25, 0.98), rgba(19, 15, 12, 0.98));
@@ -1205,12 +1207,24 @@ body.arcade-mode .board-tools {
   padding: 18px;
 }
 
+/* Sticky within .help-dialog's own scrollport (not .help-actions -- unlike
+   the header, it isn't always the dialog's last child, e.g. boardModal has
+   a share-link section after it, so pinning it to the bottom would strand
+   that trailing content behind a floating button). The negative margin plus
+   matching padding/background is what lets it sit flush with the dialog's
+   top edge (and rounded corners) while scrolled content passes underneath
+   it, rather than leaving a gap or letting text show through. */
 .help-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  position: sticky;
+  top: -18px;
+  z-index: 1;
+  margin: -18px -18px 10px;
+  padding: 18px 18px 10px;
+  background: #2b2119;
 }
 
 .help-close {
