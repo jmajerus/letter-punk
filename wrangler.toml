@@ -29,6 +29,15 @@ ACCOUNT_ID = "eec00739050a8a4cbf359a1dedb8cad3"
 # id = "<your-kv-namespace-id>"
 # preview_id = "<your-kv-preview-id>"
 
+# Optional storage for the Yesterday modal's "Player solutions" pool (a
+# capped, deduplicated list of real solve word-chains per catalog date).
+# Without this binding, /api/solutions always returns [] and the client
+# simply shows no "Player solutions" section -- never an error.
+# [[kv_namespaces]]
+# binding = "SOLUTIONS_KV"
+# id = "<your-kv-namespace-id>"
+# preview_id = "<your-kv-preview-id>"
+
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
 dataset = "letter_punk_events"

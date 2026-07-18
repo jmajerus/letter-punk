@@ -52,7 +52,17 @@ export function trackWordSubmit(outcome, validationSource, word, wordLength, puz
  * @param {'catalog' | 'random' | 'custom'} source
  * @param {number} wordCount  Number of accepted words in the solution.
  * @param {string} puzzleId
+ * @param {string[]} words  The final solution's words, in solve order.
+ *   Captured once, at the exact moment the puzzle is solved, from the
+ *   engine's own foundWords -- so a word tried and then removed via Undo
+ *   Word earlier in the attempt is already gone from it by construction,
+ *   never something a caller needs to filter out here.
  */
-export function trackGameSolved(source, wordCount, puzzleId) {
-  sendEvent('game_solved', { source, wordCount, puzzleId: puzzleId || '' });
+export function trackGameSolved(source, wordCount, puzzleId, words) {
+  sendEvent('game_solved', {
+    source,
+    wordCount,
+    puzzleId: puzzleId || '',
+    words: Array.isArray(words) ? words.map((word) => String(word || '').toLowerCase()) : [],
+  });
 }

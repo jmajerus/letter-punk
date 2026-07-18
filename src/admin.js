@@ -137,11 +137,14 @@ async function fetchStats(env) {
       ORDER BY word_length ASC
     `, env),
 
-    // Last 10 solves with word counts
+    // Last 10 solves, with the actual solution words (in solve order) --
+    // captured once at the moment of solving, so this is always the real
+    // final answer, never a word tried and later removed via Undo Word.
     queryAnalytics(`
       SELECT
         blob3 AS puzzle_id,
         double1 AS word_count,
+        blob4 AS words,
         toDateTime(timestamp) AS solved_at
       FROM ${ANALYTICS_DATASET}
       WHERE blob1 = 'game_solved'
@@ -283,7 +286,7 @@ function renderDashboard(stats, warningMissing) {
     <div>
       <h2>Recent solves</h2>
       <div class="section">
-        ${renderTable(stats?.recentSolves, ['puzzle_id', 'word_count', 'solved_at'])}
+        ${renderTable(stats?.recentSolves, ['puzzle_id', 'word_count', 'words', 'solved_at'])}
       </div>
     </div>
   </div>

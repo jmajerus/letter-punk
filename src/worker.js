@@ -4,14 +4,24 @@ import { getPsaFeedItems } from './psaFeed.js';
 /**
  * Worker entry point.
  *
- * Handles POST /api/event → writes to Analytics Engine.
+ * Handles POST /api/event → writes to Analytics Engine, and (for
+ * game_solved) also stores the solve into a small, capped, deduplicated
+ * KV pool per catalog date (see storePlayerSolution) -- a separate,
+ * purpose-built store for public reads, since Analytics Engine itself is
+ * for aggregate dashboard queries, not per-request client-facing ones.
+ * Handles GET /api/solutions?date=YYYY-MM-DD → reads that pool back, for
+ * the Yesterday modal's "Player solutions" section.
  * All other requests are forwarded to the static asset binding.
  *
  * Analytics schema (all events):
  *   blob1 = event name
  *   blob2 = primary dimension (source or outcome)
  *   blob3 = secondary dimension (puzzleId or validationSource)
- *   blob4 = submitted word (word_submit only)
+ *   blob4 = submitted word (word_submit), or the comma-joined solution
+ *     words in solve order (game_solved) -- captured once, at the moment
+ *     the puzzle is solved, from the engine's own foundWords, so it's the
+ *     actual final answer and never includes a word tried and later
+ *     removed via Undo Word earlier in the same attempt
  *   double1 = numeric value (wordLength or wordCount; 0 when unused)
  *   index = the puzzle's own identity, kept accurate under Analytics
  *     Engine's per-index sampling rather than left generic: a catalog
@@ -151,14 +161,58 @@ function buildDataPoint(event, data) {
 
   if (event === 'game_solved') {
     const wordCount = Number.isFinite(data.wordCount) ? Number(data.wordCount) : 0;
+    const words = Array.isArray(data.words)
+      ? data.words
+        .slice(0, 40)
+        .map((word) => String(word ?? '').toLowerCase().replace(/[^a-z]/g, ''))
+        .filter(Boolean)
+        .join(',')
+        .slice(0, 2000)
+      : '';
     return {
-      blobs: ['game_solved', String(data.source ?? '').slice(0, 32), puzzleId],
+      blobs: ['game_solved', String(data.source ?? '').slice(0, 32), puzzleId, words],
       doubles: [wordCount],
       indexes: [index],
     };
   }
 
   return null;
+}
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const PLAYER_SOLUTIONS_CAP = 20;
+
+// Stores a capped, deduplicated pool of real player solutions per catalog
+// puzzle date, for the "Player solutions" section of the Yesterday modal --
+// a small, purpose-built KV list, not something read back out of Analytics
+// Engine (which is for aggregate dashboard queries, not per-request public
+// reads). Only catalog dates are ever stored, since a custom board's
+// flattened-layout id is never looked up by the read side below. Capped and
+// deduplicated by exact word-chain so write volume stays bounded regardless
+// of traffic, and so the pool reflects genuinely distinct solutions rather
+// than N copies of whichever pairing most players land on -- many board
+// layouts only admit a handful of realistic 2-word answers in the first
+// place, so the pool is naturally self-limiting on its own.
+async function storePlayerSolution(puzzleId, words, env) {
+  if (!env.SOLUTIONS_KV || !ISO_DATE_PATTERN.test(puzzleId) || !Array.isArray(words) || words.length < 2) {
+    return;
+  }
+
+  const key = `solutions:${puzzleId}`;
+  const existing = await env.SOLUTIONS_KV.get(key, { type: 'json' }).catch(() => null);
+  const solutions = Array.isArray(existing) ? existing : [];
+
+  if (solutions.length >= PLAYER_SOLUTIONS_CAP) {
+    return;
+  }
+
+  const joined = words.join(',');
+  if (solutions.some((entry) => Array.isArray(entry) && entry.join(',') === joined)) {
+    return;
+  }
+
+  solutions.push(words);
+  await env.SOLUTIONS_KV.put(key, JSON.stringify(solutions)).catch(() => {});
 }
 
 export default {
@@ -189,6 +243,27 @@ export default {
       });
     }
 
+    // Player-submitted solutions for a catalog date's Yesterday modal.
+    // Returns [] (never an error) whenever SOLUTIONS_KV isn't bound or
+    // nothing's been stored yet for that date — an empty pool just means
+    // the client shows no "Player solutions" section, not a broken one.
+    if (request.method === 'GET' && url.pathname === '/api/solutions') {
+      const date = url.searchParams.get('date') || '';
+      let solutions = [];
+      if (ISO_DATE_PATTERN.test(date) && env.SOLUTIONS_KV) {
+        const stored = await env.SOLUTIONS_KV.get(`solutions:${date}`, { type: 'json' }).catch(() => null);
+        solutions = Array.isArray(stored) ? stored : [];
+      }
+
+      return new Response(JSON.stringify(solutions), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+        },
+      });
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/event') {
       try {
         const body = await request.json();
@@ -198,6 +273,10 @@ export default {
           const dataPoint = buildDataPoint(event, data);
           if (dataPoint && env.ANALYTICS) {
             env.ANALYTICS.writeDataPoint(dataPoint);
+          }
+
+          if (event === 'game_solved') {
+            ctx.waitUntil(storePlayerSolution(String(data.puzzleId ?? ''), data.words, env));
           }
         }
       } catch {

@@ -73,6 +73,8 @@ const closeYesterdayButton = document.getElementById('closeYesterdayBtn');
 const yesterdayGotItButton = document.getElementById('yesterdayGotItBtn');
 const yesterdayPuzzleDateElement = document.getElementById('yesterdayPuzzleDate');
 const yesterdayPuzzleWordsElement = document.getElementById('yesterdayPuzzleWords');
+const playerSolutionsSection = document.getElementById('playerSolutionsSection');
+const playerSolutionsList = document.getElementById('playerSolutionsList');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const boardModal = document.getElementById('boardModal');
@@ -306,6 +308,7 @@ const modalManager = createModalManager({
   boardModal,
   boardTopInput,
   getYesterdayPuzzleData: () => puzzleFetcher.getNavigationState().yesterdayData,
+  loadPlayerSolutions,
   syncSettingsToUi: settings.syncAllToUi,
   prepareBoardModal() {
     fillBoardInputsFromCurrentBoard();
@@ -313,6 +316,55 @@ const modalManager = createModalManager({
     setBoardLinkMessage('');
   },
 });
+
+// Fetched lazily, only when the Yesterday modal actually opens -- not
+// bundled into the main puzzle payload every visitor loads. An empty or
+// missing pool (nothing stored yet for this date, or SOLUTIONS_KV not
+// configured) just leaves the section hidden; this never blocks or delays
+// showing the canonical solution above it.
+async function loadPlayerSolutions(puzzleId) {
+  if (!playerSolutionsSection || !playerSolutionsList) {
+    return;
+  }
+
+  playerSolutionsSection.hidden = true;
+  playerSolutionsList.innerHTML = '';
+
+  if (!puzzleId) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/solutions?date=${encodeURIComponent(puzzleId)}`);
+    if (!response.ok) {
+      return;
+    }
+
+    const solutions = await response.json();
+    if (!Array.isArray(solutions) || solutions.length === 0) {
+      return;
+    }
+
+    // The pool is already deduplicated server-side, so picking any 2 at
+    // random can never show the same chain twice in this list.
+    const picked = [...solutions].sort(() => Math.random() - 0.5).slice(0, 2);
+
+    for (const words of picked) {
+      if (!Array.isArray(words) || words.length === 0) {
+        continue;
+      }
+
+      const item = document.createElement('li');
+      item.textContent = words.join(' → ').toUpperCase();
+      playerSolutionsList.appendChild(item);
+    }
+
+    playerSolutionsSection.hidden = playerSolutionsList.children.length === 0;
+  } catch {
+    // Network hiccup or malformed response -- leave the section hidden,
+    // the same as "nothing stored yet for this date."
+  }
+}
 
 function fillBoardInputsFromCurrentBoard() {
   const board = gameEngine.getBoard();
@@ -1370,7 +1422,9 @@ function initializeGame() {
         trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
         if (solved) {
           const snapshot = gameEngine.getSnapshot();
-          trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId);
+          // foundWords is stored newest-first; reverse for solve order.
+          const solutionWords = [...snapshot.foundWords].reverse().map((entry) => entry.word);
+          trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId, solutionWords);
 
           if (puzzleId && !completedPuzzleIds.has(puzzleId)) {
             recordFinishedGame(puzzleId, true, snapshot.foundWords.length);

@@ -4,8 +4,9 @@
 // open) and trapFocusInModal (keeps Tab cycling inside whichever modal is
 // open, rather than escaping to the page behind it).
 //
-// getYesterdayPuzzleData/syncSettingsToUi/prepareBoardModal are callbacks
-// rather than direct references to puzzleFetcher/settings/the Set Board
+// getYesterdayPuzzleData/loadPlayerSolutions/syncSettingsToUi/
+// prepareBoardModal are callbacks rather than direct references to
+// puzzleFetcher/the /api/solutions fetch/settings/the Set Board
 // input-filling helpers, since those are each one specific thing this
 // module needs from a neighboring concern, not a reason to depend on the
 // whole of it.
@@ -18,6 +19,7 @@ export function createModalManager({
   yesterdayButton,
   yesterdayPuzzleDateElement,
   yesterdayPuzzleWordsElement,
+  loadPlayerSolutions,
   settingsModal,
   settingsButton,
   provenanceBadgesToggle,
@@ -60,6 +62,10 @@ export function createModalManager({
     if (yesterdayPuzzleWordsElement) {
       yesterdayPuzzleWordsElement.textContent = yesterdayData.words.join(' -> ');
     }
+
+    // Fire-and-forget: fills in the "Player solutions" section once the
+    // fetch resolves, but never delays showing the canonical solution above.
+    loadPlayerSolutions?.(yesterdayData.id);
 
     yesterdayModal.hidden = false;
     closeYesterdayButton?.focus();
