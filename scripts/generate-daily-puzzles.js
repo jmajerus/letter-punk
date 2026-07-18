@@ -26,7 +26,10 @@ anything already used anywhere in the catalog.
 Explicit range mode (--from/--to, or --year): rebuilds only the given
 date(s), each of which must already have a puzzle-seeds.json entry. Skips
 the reserved/fill logic above entirely -- use this to rebuild one reserved
-date on demand right after editing it.`)
+date on demand right after editing it.
+
+Prints a short human-readable summary by default; pass --json for the full
+machine-readable one.`)
     .option('--from <YYYY-MM-DD>', 'Start of an explicit date range (needs --to)')
     .option('--to <YYYY-MM-DD>', 'End of an explicit date range (needs --from)')
     .option('--year <YYYY>', 'Rebuild every puzzle-seeds.json entry in this year')
@@ -43,6 +46,7 @@ date on demand right after editing it.`)
     .option('--packed-dictionary <path>', 'Primary runtime dictionary, used to validate fill words', 'public/util/compressed-dictionary.txt')
     .option('--packed-fallback <path>', 'Fallback runtime dictionary, same purpose', 'public/util/compressed-dictionary-fallback.txt')
     .option('--dry-run', 'Preview the result and print the summary without writing', false)
+    .option('--json', 'Print the full machine-readable JSON summary instead of the short human-readable one', false)
     .addHelpText('after', `
 Examples:
   $ node scripts/generate-daily-puzzles.js --dry-run
@@ -65,6 +69,7 @@ Examples:
     packedPrimaryPath: opts.packedDictionary,
     packedFallbackPath: opts.packedFallback,
     dryRun: Boolean(opts.dryRun),
+    json: Boolean(opts.json),
   };
 }
 
@@ -594,6 +599,38 @@ function findNextFillEntry(fillWords, startIndex, ctx) {
   return { entry: null, nextIndex: fillWords.length, rejected };
 }
 
+// The default output: a handful of lines a person can actually read at a
+// glance, no scrolling. Full detail (every rejected word and why, every
+// date touched) is still one flag away via --json, for scripting or when
+// something needs digging into.
+function printCompactSummary(summary) {
+  const lines = [];
+
+  if (summary.mode === 'range') {
+    const span = summary.earliestDate ? ` (${summary.earliestDate} to ${summary.latestDate})` : '';
+    lines.push(`Rebuilt ${summary.updated.length} date(s)${span}.`);
+    if (summary.skipped.length > 0) {
+      lines.push(`Skipped ${summary.skipped.length} date(s) with no puzzle-seeds.json entry.`);
+    }
+  } else {
+    lines.push(`Direction: ${summary.direction}`);
+    lines.push(`Reserved dates applied: ${summary.reservedApplied.length}${summary.reservedSkippedPast.length ? ` (${summary.reservedSkippedPast.length} skipped, already past)` : ''}`);
+    const span = summary.earliestDate ? ` (${summary.earliestDate} to ${summary.latestDate})` : '';
+    lines.push(`Filled ${summary.filled.length} new day(s)${span}.`);
+    if (summary.fillWordsRejected.length > 0) {
+      lines.push(`Rejected ${summary.fillWordsRejected.length} word(s) from ${summary.fillPath} -- rerun with --json to see why.`);
+    }
+    if (summary.fillExhausted) {
+      lines.push(`${summary.fillPath} is exhausted -- add more words to keep filling.`);
+    }
+  }
+
+  lines.push(`Catalog now has ${summary.totalCatalogEntries} puzzles total.`);
+  lines.push(summary.dryRun ? 'Dry run -- nothing written.' : `Written to ${summary.catalogPath}.`);
+
+  console.log(lines.join('\n'));
+}
+
 function finish({
   args, seedsPath, catalogPath, dictionaryPath, blocklistPath, blockedWords, catalogById, extraSummary,
 }) {
@@ -614,7 +651,11 @@ function finish({
     totalCatalogEntries: nextCatalog.length,
   };
 
-  console.log(JSON.stringify(summary, null, 2));
+  if (args.json) {
+    console.log(JSON.stringify(summary, null, 2));
+  } else {
+    printCompactSummary(summary);
+  }
 }
 
 function main() {
