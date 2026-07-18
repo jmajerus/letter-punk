@@ -75,6 +75,15 @@ const yesterdayPuzzleDateElement = document.getElementById('yesterdayPuzzleDate'
 const yesterdayPuzzleWordsElement = document.getElementById('yesterdayPuzzleWords');
 const playerSolutionsSection = document.getElementById('playerSolutionsSection');
 const playerSolutionsList = document.getElementById('playerSolutionsList');
+const revealSolutionModal = document.getElementById('revealSolutionModal');
+const closeRevealSolutionButton = document.getElementById('closeRevealSolutionBtn');
+const revealSolutionTextElement = document.getElementById('revealSolutionText');
+const revealPlayerSolutionsSection = document.getElementById('revealPlayerSolutionsSection');
+const revealPlayerSolutionsLabel = document.getElementById('revealPlayerSolutionsLabel');
+const revealPlayerSolutionsList = document.getElementById('revealPlayerSolutionsList');
+const revealPlayerSolutionsEmptyMessage = document.getElementById('revealPlayerSolutionsEmptyMessage');
+const revealFirstToMatchCountMessage = document.getElementById('revealFirstToMatchCountMessage');
+const revealSolutionCopyButton = document.getElementById('revealSolutionCopyBtn');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const boardModal = document.getElementById('boardModal');
@@ -302,13 +311,19 @@ const modalManager = createModalManager({
   yesterdayButton,
   yesterdayPuzzleDateElement,
   yesterdayPuzzleWordsElement,
+  revealSolutionModal,
+  closeRevealSolutionButton,
+  revealSolutionButton,
+  revealSolutionTextElement,
   settingsModal,
   settingsButton,
   provenanceBadgesToggle,
   boardModal,
   boardTopInput,
   getYesterdayPuzzleData: () => puzzleFetcher.getNavigationState().yesterdayData,
-  loadPlayerSolutions,
+  loadPlayerSolutions: loadYesterdayPlayerSolutions,
+  getRevealSolutionData,
+  loadRevealPlayerSolutions,
   syncSettingsToUi: settings.syncAllToUi,
   prepareBoardModal() {
     fillBoardInputsFromCurrentBoard();
@@ -317,18 +332,48 @@ const modalManager = createModalManager({
   },
 });
 
-// Fetched lazily, only when the Yesterday modal actually opens -- not
-// bundled into the main puzzle payload every visitor loads. An empty or
-// missing pool (nothing stored yet for this date, or SOLUTIONS_KV not
-// configured) just leaves the section hidden; this never blocks or delays
-// showing the canonical solution above it.
-async function loadPlayerSolutions(puzzleId) {
-  if (!playerSolutionsSection || !playerSolutionsList) {
+// Fetched lazily, only when a modal that needs it actually opens -- not
+// bundled into the main puzzle payload every visitor loads. A missing pool
+// (SOLUTIONS_KV not configured, or a custom/random board with no puzzleId)
+// just leaves the section hidden; this never blocks or delays showing the
+// canonical/own-result text alongside it. `excludeWords` filters out a
+// chain that exactly matches it -- used by the Reveal Solution modal so a
+// player is never shown their own just-submitted solution reflected back
+// at them under "Player solutions," only a genuinely different one.
+//
+// `emptyMessage` (Reveal Solution only) covers what "nothing eligible to
+// show" actually means there: since a solve's own write to the pool has
+// almost always already landed by the time this modal is opened (a human
+// clicking a button takes far longer than that request), "every stored
+// entry is mine" and "the pool is empty" are the same situation in
+// practice -- nobody else has solved this one yet -- so both take this
+// branch and get the same congratulatory message instead of just going
+// quiet. The Yesterday modal never passes this, so it keeps its original
+// "just hide" behavior.
+//
+// `firstToMatchCountElement`/`ownWordCount`/`canonicalWordCount` (Reveal
+// Solution only) cover a second, narrower kind of "first": someone else
+// has already solved this puzzle, but nobody yet matched the canonical
+// word count the way this player just did. The message states the actual
+// number (derived from canonicalWordCount, not a hardcoded assumption of
+// what it is) since there's no reason to be coy about it here -- the
+// canonical words are already shown by name elsewhere in this same modal.
+async function loadPlayerSolutions(puzzleId, {
+  section, label, list, emptyElement, excludeWords = [], emptyMessage = null,
+  firstToMatchCountElement = null, ownWordCount = null, canonicalWordCount = null,
+} = {}) {
+  if (!section || !list) {
     return;
   }
 
-  playerSolutionsSection.hidden = true;
-  playerSolutionsList.innerHTML = '';
+  section.hidden = true;
+  list.innerHTML = '';
+  if (emptyElement) {
+    emptyElement.hidden = true;
+  }
+  if (firstToMatchCountElement) {
+    firstToMatchCountElement.hidden = true;
+  }
 
   if (!puzzleId) {
     return;
@@ -336,34 +381,83 @@ async function loadPlayerSolutions(puzzleId) {
 
   try {
     const response = await fetch(`/api/solutions?date=${encodeURIComponent(puzzleId)}`);
-    if (!response.ok) {
+    const solutions = response.ok ? await response.json() : [];
+
+    const ownJoined = excludeWords.map((word) => String(word).toLowerCase()).join(',');
+    const eligible = Array.isArray(solutions)
+      ? solutions.filter((entry) => Array.isArray(entry?.words) && entry.words.join(',') !== ownJoined)
+      : [];
+
+    if (eligible.length === 0) {
+      if (!emptyMessage) {
+        return;
+      }
+
+      if (label) {
+        label.hidden = true;
+      }
+      if (emptyElement) {
+        emptyElement.textContent = emptyMessage;
+        emptyElement.hidden = false;
+      }
+      section.hidden = false;
       return;
     }
 
-    const solutions = await response.json();
-    if (!Array.isArray(solutions) || solutions.length === 0) {
-      return;
+    if (label) {
+      label.hidden = false;
+    }
+
+    let showedFirstToMatchCount = false;
+    if (
+      firstToMatchCountElement
+      && canonicalWordCount != null
+      && ownWordCount === canonicalWordCount
+      && !eligible.some((entry) => entry.words.length === canonicalWordCount)
+    ) {
+      const wordLabel = canonicalWordCount === 1 ? 'word' : 'words';
+      firstToMatchCountElement.textContent = `First to solve this in ${canonicalWordCount} ${wordLabel}!`;
+      firstToMatchCountElement.hidden = false;
+      showedFirstToMatchCount = true;
     }
 
     // The pool is already deduplicated server-side, so picking any 2 at
     // random can never show the same chain twice in this list.
-    const picked = [...solutions].sort(() => Math.random() - 0.5).slice(0, 2);
+    const picked = [...eligible].sort(() => Math.random() - 0.5).slice(0, 2);
 
-    for (const words of picked) {
-      if (!Array.isArray(words) || words.length === 0) {
+    for (const entry of picked) {
+      if (entry.words.length === 0) {
         continue;
       }
 
       const item = document.createElement('li');
-      item.textContent = words.join(' → ').toUpperCase();
-      playerSolutionsList.appendChild(item);
+      item.textContent = entry.words.join(' → ').toUpperCase();
+      list.appendChild(item);
     }
 
-    playerSolutionsSection.hidden = playerSolutionsList.children.length === 0;
+    section.hidden = list.children.length === 0 && !showedFirstToMatchCount;
   } catch {
     // Network hiccup or malformed response -- leave the section hidden,
     // the same as "nothing stored yet for this date."
   }
+}
+
+function loadYesterdayPlayerSolutions(puzzleId) {
+  return loadPlayerSolutions(puzzleId, { section: playerSolutionsSection, list: playerSolutionsList });
+}
+
+function loadRevealPlayerSolutions(puzzleId, ownWords, canonicalWordCount) {
+  return loadPlayerSolutions(puzzleId, {
+    section: revealPlayerSolutionsSection,
+    label: revealPlayerSolutionsLabel,
+    list: revealPlayerSolutionsList,
+    emptyElement: revealPlayerSolutionsEmptyMessage,
+    excludeWords: ownWords,
+    emptyMessage: 'First to solve this puzzle!',
+    firstToMatchCountElement: revealFirstToMatchCountMessage,
+    ownWordCount: Array.isArray(ownWords) ? ownWords.length : null,
+    canonicalWordCount,
+  });
 }
 
 function fillBoardInputsFromCurrentBoard() {
@@ -733,6 +827,16 @@ async function shareResult() {
 // link's actual stated purpose (getting someone without the game
 // bookmarked into their own attempt); the text here already reveals the
 // full solution on its own, so the link no longer needs to carry it too.
+// Shared by revealSolution and getRevealSolutionData so the two never
+// drift apart -- the modal shows exactly what the clipboard copy contains.
+function buildRevealSolutionText(summary) {
+  const url = settings.isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
+  return formatUnmaskedShareText(
+    { ...summary, canonicalWords: getActiveCanonicalWords() },
+    { dateLabel: getActivePuzzleDateLabel(), url },
+  );
+}
+
 async function revealSolution() {
   if (!isBoardFullySolved()) {
     setShareStatusMessage('Solve the board first to reveal your solution.', 'error');
@@ -740,12 +844,7 @@ async function revealSolution() {
   }
 
   const summary = gameEngine.getShareSummary({ includeWords: true });
-  const url = settings.isShareIncludeLinkEnabled() ? buildBlankPuzzleShareUrl() : '';
-
-  const text = formatUnmaskedShareText(
-    { ...summary, canonicalWords: getActiveCanonicalWords() },
-    { dateLabel: getActivePuzzleDateLabel(), url },
-  );
+  const text = buildRevealSolutionText(summary);
 
   if (!navigator.clipboard?.writeText) {
     setShareStatusMessage(`Clipboard write is unavailable. Copy this manually:\n${text}`, 'error');
@@ -758,6 +857,28 @@ async function revealSolution() {
   } catch {
     setShareStatusMessage('Could not copy automatically.', 'error');
   }
+}
+
+// Backs the Reveal Solution modal (see modalManager.js's
+// openRevealSolutionModal): returning null means "not solved yet," the
+// same not-ready gate revealSolution() itself uses, and leaves the
+// existing error message as the only visible effect -- no modal opens.
+// ownWords feeds loadRevealPlayerSolutions' exclusion filter, so a player
+// is never shown their own just-submitted chain back under "Player
+// solutions."
+function getRevealSolutionData() {
+  if (!isBoardFullySolved()) {
+    setShareStatusMessage('Solve the board first to reveal your solution.', 'error');
+    return null;
+  }
+
+  const summary = gameEngine.getShareSummary({ includeWords: true });
+  return {
+    text: buildRevealSolutionText(summary),
+    puzzleId: puzzleFetcher.getActiveCatalogDateId(),
+    ownWords: summary.words,
+    canonicalWordCount: getActiveCanonicalWordCount(),
+  };
 }
 
 // Whitelists solution words for the currently-applied board — a proper
@@ -1091,11 +1212,16 @@ function wireEvents() {
   yesterdayButton?.addEventListener('click', modalManager.openYesterdayModal);
   helpButton?.addEventListener('click', modalManager.openHelpModal);
   shareButton?.addEventListener('click', shareResult);
-  revealSolutionButton?.addEventListener('click', revealSolution);
+  // The button itself just opens the modal now -- the actual clipboard
+  // copy moved to revealSolutionCopyButton inside it (see
+  // modalManager.js's openRevealSolutionModal).
+  revealSolutionButton?.addEventListener('click', modalManager.openRevealSolutionModal);
+  revealSolutionCopyButton?.addEventListener('click', revealSolution);
   closeSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   saveSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   closeYesterdayButton?.addEventListener('click', modalManager.closeYesterdayModal);
   yesterdayGotItButton?.addEventListener('click', modalManager.closeYesterdayModal);
+  closeRevealSolutionButton?.addEventListener('click', modalManager.closeRevealSolutionModal);
   closeHelpButton?.addEventListener('click', modalManager.closeHelpModal);
   gotItButton?.addEventListener('click', modalManager.closeHelpModal);
   closeBoardButton?.addEventListener('click', modalManager.closeBoardModal);
@@ -1124,6 +1250,11 @@ function wireEvents() {
   yesterdayModal?.addEventListener('click', (event) => {
     if (event.target === yesterdayModal) {
       modalManager.closeYesterdayModal();
+    }
+  });
+  revealSolutionModal?.addEventListener('click', (event) => {
+    if (event.target === revealSolutionModal) {
+      modalManager.closeRevealSolutionModal();
     }
   });
 
@@ -1227,6 +1358,11 @@ function wireEvents() {
 
       if (activeModal === yesterdayModal) {
         modalManager.closeYesterdayModal();
+        return;
+      }
+
+      if (activeModal === revealSolutionModal) {
+        modalManager.closeRevealSolutionModal();
         return;
       }
 
@@ -1421,13 +1557,15 @@ function initializeGame() {
       if (!arcadeMode.isActive()) {
         trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
         if (solved) {
-          const snapshot = gameEngine.getSnapshot();
-          // foundWords is stored newest-first; reverse for solve order.
-          const solutionWords = [...snapshot.foundWords].reverse().map((entry) => entry.word);
-          trackGameSolved(pState.puzzleSource, snapshot.foundWords.length, puzzleId, solutionWords);
+          // getShareSummary already computes both the solve-order word list
+          // and completedInFreeChain together -- reusing it here instead of
+          // re-deriving from foundWords keeps this in one place rather than
+          // two slightly different reversals of the same data.
+          const summary = gameEngine.getShareSummary({ includeWords: true });
+          trackGameSolved(pState.puzzleSource, summary.wordCount, puzzleId, summary.words, summary.completedInFreeChain);
 
           if (puzzleId && !completedPuzzleIds.has(puzzleId)) {
-            recordFinishedGame(puzzleId, true, snapshot.foundWords.length);
+            recordFinishedGame(puzzleId, true, summary.wordCount);
             completedPuzzleIds.add(puzzleId);
           }
         }

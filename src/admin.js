@@ -96,7 +96,9 @@ async function queryAnalytics(sql, env) {
 }
 
 async function fetchStats(env) {
-  const [overview, puzzles, wordLengths, recentSolves, acceptedWords, rejectedWords, sourceBreakdown] = await Promise.all([
+  const [
+    overview, puzzles, wordLengths, recentSolves, acceptedWords, rejectedWords, sourceBreakdown, freeChainAdoption,
+  ] = await Promise.all([
     // Totals by event type over last 30 days
     queryAnalytics(`
       SELECT
@@ -137,14 +139,18 @@ async function fetchStats(env) {
       ORDER BY word_length ASC
     `, env),
 
-    // Last 10 solves, with the actual solution words (in solve order) --
-    // captured once at the moment of solving, so this is always the real
-    // final answer, never a word tried and later removed via Undo Word.
+    // Last 10 solves, with the actual solution words (comma-joined, in
+    // solve order) -- captured once at the moment of solving, so this is
+    // always the real final answer, never a word tried and later removed
+    // via Undo Word. One blob (not one-per-word): a real solve can run
+    // past 100 words (see the schema comment at the top of worker.js), so
+    // there's no fixed word-position column to read here.
     queryAnalytics(`
       SELECT
         blob3 AS puzzle_id,
         double1 AS word_count,
         blob4 AS words,
+        double2 AS free_chain,
         toDateTime(timestamp) AS solved_at
       FROM ${ANALYTICS_DATASET}
       WHERE blob1 = 'game_solved'
@@ -195,6 +201,18 @@ async function fetchStats(env) {
       GROUP BY validation_source
       ORDER BY n DESC
     `, env),
+
+    // % of solves played with Free Chain mode on, over last 30 days --
+    // double2 is a plain 0/1 per solve specifically so this is a direct
+    // AVG(), not something requiring the word list to be parsed first.
+    queryAnalytics(`
+      SELECT
+        ROUND(AVG(double2) * 100, 1) AS free_chain_pct,
+        count() AS solve_count
+      FROM ${ANALYTICS_DATASET}
+      WHERE timestamp >= NOW() - INTERVAL '30' DAY
+        AND blob1 = 'game_solved'
+    `, env),
   ]);
 
   return {
@@ -205,6 +223,7 @@ async function fetchStats(env) {
     acceptedWords,
     rejectedWords,
     sourceBreakdown,
+    freeChainAdoption,
   };
 }
 
@@ -234,6 +253,15 @@ function renderTable(rows, columns) {
   return `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+function renderFreeChainAdoption(rows) {
+  const row = rows?.[0];
+  if (!row || row.solve_count == null || Number(row.solve_count) === 0) {
+    return '<p class="empty">No data yet.</p>';
+  }
+
+  return `<p class="stat-line">${escapeHtml(row.free_chain_pct ?? '0')}% of solves (${escapeHtml(row.solve_count)} total) were played with Free Chain mode on.</p>`;
+}
+
 function renderDashboard(stats, warningMissing) {
   const warning = warningMissing
     ? `<div class="warn">⚠ ACCOUNT_ID or API_TOKEN is not configured. <code>wrangler secret put API_TOKEN</code> and add <code>ACCOUNT_ID</code> to wrangler.toml to enable queries.</div>`
@@ -259,6 +287,7 @@ function renderDashboard(stats, warningMissing) {
     tr:hover td { background: #161c23; }
     .section { background: #141a22; border: 1px solid #1e2d3d; border-radius: 10px; padding: 20px; margin-bottom: 20px; overflow-x: auto; }
     .empty { color: #556; margin: 0; font-style: italic; }
+    .stat-line { margin: 0; font-size: 1rem; color: #e8edf2; }
     .warn { background: #2a1f0a; border: 1px solid #7a5010; color: #d4a85f; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: .9rem; }
     .logout { display: inline-block; margin-top: 24px; padding: 8px 18px; background: #1e2530; border: 1px solid #2e3a48; border-radius: 6px; color: #9cc8d5; text-decoration: none; font-size: .85rem; cursor: pointer; }
     .logout:hover { background: #2a3545; }
@@ -276,6 +305,11 @@ function renderDashboard(stats, warningMissing) {
     ${renderTable(stats?.overview, ['event', 'n'])}
   </div>
 
+  <h2>Free Chain adoption</h2>
+  <div class="section">
+    ${renderFreeChainAdoption(stats?.freeChainAdoption)}
+  </div>
+
   <div class="grid">
     <div>
       <h2>Word-length distribution (accepted)</h2>
@@ -286,7 +320,7 @@ function renderDashboard(stats, warningMissing) {
     <div>
       <h2>Recent solves</h2>
       <div class="section">
-        ${renderTable(stats?.recentSolves, ['puzzle_id', 'word_count', 'words', 'solved_at'])}
+        ${renderTable(stats?.recentSolves, ['puzzle_id', 'word_count', 'words', 'free_chain', 'solved_at'])}
       </div>
     </div>
   </div>

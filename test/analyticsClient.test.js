@@ -67,19 +67,24 @@ test('trackWordSubmit defaults a missing validationSource and puzzleId to empty 
   });
 });
 
-test('trackGameSolved posts the game_solved shape, including the solution words in solve order', () => {
-  trackGameSolved('custom', 4, 'ABCDEFGHIJKL', ['CAT', 'Tiger', 'ram']);
+test('trackGameSolved posts the game_solved shape, including the solution words in solve order and completedInFreeChain', () => {
+  trackGameSolved('custom', 4, 'ABCDEFGHIJKL', ['CAT', 'Tiger', 'ram'], true);
   assert.deepEqual(lastBody(), {
     event: 'game_solved',
     data: {
-      source: 'custom', wordCount: 4, puzzleId: 'ABCDEFGHIJKL', words: ['cat', 'tiger', 'ram'],
+      source: 'custom',
+      wordCount: 4,
+      puzzleId: 'ABCDEFGHIJKL',
+      words: ['cat', 'tiger', 'ram'],
+      completedInFreeChain: true,
     },
   });
 });
 
-test('trackGameSolved defaults words to an empty array when omitted or not an array', () => {
+test('trackGameSolved defaults words to an empty array and completedInFreeChain to false when omitted', () => {
   trackGameSolved('custom', 4, 'ABCDEFGHIJKL');
   assert.deepEqual(lastBody().data.words, []);
+  assert.equal(lastBody().data.completedInFreeChain, false);
 });
 
 test('never throws when fetch itself throws synchronously', () => {

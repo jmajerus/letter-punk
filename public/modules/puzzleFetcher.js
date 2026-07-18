@@ -301,6 +301,17 @@ export function createPuzzleFetcher(options = {}) {
     return activeEntry?.id ? compactDateFromId(activeEntry.id) : null;
   }
 
+  // The raw dashed "YYYY-MM-DD" id, for callers that need to match the
+  // catalog's/server's own date format directly (e.g. /api/solutions?date=)
+  // rather than the compact, dash-stripped share-link form above.
+  function getActiveCatalogDateId() {
+    if (state.puzzleSource !== 'catalog' || state.activePuzzleIndex < 0) {
+      return null;
+    }
+
+    return state.puzzleCatalog[state.activePuzzleIndex]?.id || null;
+  }
+
   // Counterpart to playPreviousPuzzle/playNextPuzzle/playTodayPuzzle -- same
   // { ok, error } shape -- for loading a specific dated puzzle by its
   // compact-date url param rather than by relative navigation.
@@ -468,6 +479,7 @@ export function createPuzzleFetcher(options = {}) {
     getNavigationState,
     isActiveCatalogPuzzleToday,
     getActiveCatalogDateParam,
+    getActiveCatalogDateId,
     playPuzzleByDate,
     loadDailyPuzzleCatalog,
     playPreviousPuzzle,

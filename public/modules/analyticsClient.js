@@ -57,12 +57,20 @@ export function trackWordSubmit(outcome, validationSource, word, wordLength, puz
  *   engine's own foundWords -- so a word tried and then removed via Undo
  *   Word earlier in the attempt is already gone from it by construction,
  *   never something a caller needs to filter out here.
+ * @param {boolean} completedInFreeChain  Whether this solve happened with
+ *   Free Chain mode on -- not derivable later from `words` alone (a
+ *   normal-mode solve is always fully chained by construction, so nothing
+ *   about the finished word list distinguishes "chained because forced"
+ *   from "chained anyway although not required"), so it's captured now
+ *   rather than left for a future feature to discover it can't be
+ *   reconstructed.
  */
-export function trackGameSolved(source, wordCount, puzzleId, words) {
+export function trackGameSolved(source, wordCount, puzzleId, words, completedInFreeChain) {
   sendEvent('game_solved', {
     source,
     wordCount,
     puzzleId: puzzleId || '',
     words: Array.isArray(words) ? words.map((word) => String(word || '').toLowerCase()) : [],
+    completedInFreeChain: completedInFreeChain === true,
   });
 }

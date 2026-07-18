@@ -236,21 +236,24 @@ test('getYesterdayPuzzleData is null at the start of the catalog, off catalog, o
   assert.equal(fetcher.getYesterdayPuzzleData(), null, 'not on a catalog puzzle at all');
 });
 
-test('isActiveCatalogPuzzleToday and getActiveCatalogDateParam agree on catalog vs. custom/random', async () => {
+test('isActiveCatalogPuzzleToday, getActiveCatalogDateParam, and getActiveCatalogDateId agree on catalog vs. custom/random', async () => {
   const catalog = [makeEntry(isoDate(-1)), makeEntry(isoDate(0))];
   const { fetcher } = createFetcher(catalog);
   await fetcher.loadDailyPuzzleCatalog();
 
   assert.equal(fetcher.isActiveCatalogPuzzleToday(), true);
   assert.equal(fetcher.getActiveCatalogDateParam(), isoDate(0).replace(/-/g, ''));
+  assert.equal(fetcher.getActiveCatalogDateId(), isoDate(0));
 
   fetcher.playPreviousPuzzle();
   assert.equal(fetcher.isActiveCatalogPuzzleToday(), false);
   assert.equal(fetcher.getActiveCatalogDateParam(), isoDate(-1).replace(/-/g, ''));
+  assert.equal(fetcher.getActiveCatalogDateId(), isoDate(-1));
 
   fetcher.markRandomBoard();
   assert.equal(fetcher.isActiveCatalogPuzzleToday(), false);
   assert.equal(fetcher.getActiveCatalogDateParam(), null);
+  assert.equal(fetcher.getActiveCatalogDateId(), null);
 });
 
 test('playPuzzleByDate applies the matching catalog entry for a valid compact date', async () => {

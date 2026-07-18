@@ -125,7 +125,7 @@
             <input id="shareIncludeLinkToggle" class="settings-checkbox" type="checkbox" />
             <label for="shareIncludeLinkToggle">Include link when sharing</label>
           </div>
-          <p class="help-copy">Off by default, so a shared result stays a clean, Wordle-style summary — no letters, no link. Turn this on to also include a link to a blank copy of the puzzle, so someone who doesn't already have Letter Punk bookmarked can jump straight in and play it themselves.</p>
+          <p class="help-copy">Turn this on to also include a link to a blank copy of the puzzle, so someone who doesn't already have Letter Punk bookmarked can jump straight in and play it themselves.</p>
         </div>
         <div class="settings-option">
           <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board…</button>
@@ -177,6 +177,25 @@
         </div>
         <div class="help-actions">
           <button id="yesterdayGotItBtn" class="primary" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="revealSolutionModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="revealSolutionTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="revealSolutionTitle">Solution</h2>
+          <button id="closeRevealSolutionBtn" class="help-close" type="button" aria-label="Close solution">Close</button>
+        </div>
+        <p id="revealSolutionText" class="reveal-solution-text" aria-live="polite"></p>
+        <div id="revealPlayerSolutionsSection" class="player-solutions" hidden>
+          <p id="revealFirstToMatchCountMessage" class="help-copy player-solutions-empty" aria-live="polite" hidden></p>
+          <p id="revealPlayerSolutionsLabel" class="help-copy player-solutions-label">Player solutions:</p>
+          <ul id="revealPlayerSolutionsList" class="help-list" aria-live="polite"></ul>
+          <p id="revealPlayerSolutionsEmptyMessage" class="help-copy player-solutions-empty" aria-live="polite" hidden></p>
+        </div>
+        <div class="help-actions">
+          <button id="revealSolutionCopyBtn" class="primary" type="button">Copy Solution</button>
         </div>
       </div>
     </div>

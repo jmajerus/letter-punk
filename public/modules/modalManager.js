@@ -1,12 +1,13 @@
-// Owns open/close/focus for the four modals (Help, Yesterday's Puzzle,
-// Settings, Set Board) plus the two cross-modal helpers that don't belong
-// to any one of them: getActiveModal (which one, if any, is currently
-// open) and trapFocusInModal (keeps Tab cycling inside whichever modal is
-// open, rather than escaping to the page behind it).
+// Owns open/close/focus for the five modals (Help, Yesterday's Puzzle,
+// Solution, Settings, Set Board) plus the two cross-modal helpers that
+// don't belong to any one of them: getActiveModal (which one, if any, is
+// currently open) and trapFocusInModal (keeps Tab cycling inside whichever
+// modal is open, rather than escaping to the page behind it).
 //
-// getYesterdayPuzzleData/loadPlayerSolutions/syncSettingsToUi/
-// prepareBoardModal are callbacks rather than direct references to
-// puzzleFetcher/the /api/solutions fetch/settings/the Set Board
+// getYesterdayPuzzleData/loadPlayerSolutions/getRevealSolutionData/
+// loadRevealPlayerSolutions/syncSettingsToUi/prepareBoardModal are
+// callbacks rather than direct references to puzzleFetcher/the
+// /api/solutions fetch/gameEngine's share summary/settings/the Set Board
 // input-filling helpers, since those are each one specific thing this
 // module needs from a neighboring concern, not a reason to depend on the
 // whole of it.
@@ -20,6 +21,12 @@ export function createModalManager({
   yesterdayPuzzleDateElement,
   yesterdayPuzzleWordsElement,
   loadPlayerSolutions,
+  revealSolutionModal,
+  closeRevealSolutionButton,
+  revealSolutionButton,
+  revealSolutionTextElement,
+  getRevealSolutionData,
+  loadRevealPlayerSolutions,
   settingsModal,
   settingsButton,
   provenanceBadgesToggle,
@@ -80,6 +87,38 @@ export function createModalManager({
     yesterdayButton?.focus();
   }
 
+  // getRevealSolutionData returning null means "not solved yet" (or the
+  // modal isn't wired up) -- same not-ready gate as
+  // getYesterdayPuzzleData returning null for openYesterdayModal, just
+  // for a different precondition.
+  function openRevealSolutionModal() {
+    const data = getRevealSolutionData?.();
+    if (!revealSolutionModal || !data) {
+      return;
+    }
+
+    if (revealSolutionTextElement) {
+      revealSolutionTextElement.textContent = data.text;
+    }
+
+    // Fire-and-forget, same as loadPlayerSolutions in openYesterdayModal:
+    // fills in the "Player solutions" section once the fetch resolves, but
+    // never delays showing the just-solved player their own result text.
+    loadRevealPlayerSolutions?.(data.puzzleId, data.ownWords, data.canonicalWordCount);
+
+    revealSolutionModal.hidden = false;
+    closeRevealSolutionButton?.focus();
+  }
+
+  function closeRevealSolutionModal() {
+    if (!revealSolutionModal) {
+      return;
+    }
+
+    revealSolutionModal.hidden = true;
+    revealSolutionButton?.focus();
+  }
+
   function openSettingsModal() {
     if (!settingsModal) {
       return;
@@ -136,6 +175,10 @@ export function createModalManager({
       return yesterdayModal;
     }
 
+    if (revealSolutionModal && !revealSolutionModal.hidden) {
+      return revealSolutionModal;
+    }
+
     if (helpModal && !helpModal.hidden) {
       return helpModal;
     }
@@ -157,6 +200,8 @@ export function createModalManager({
       closeSettingsModal();
     } else if (activeModal === yesterdayModal) {
       closeYesterdayModal();
+    } else if (activeModal === revealSolutionModal) {
+      closeRevealSolutionModal();
     } else if (activeModal === helpModal) {
       closeHelpModal();
     }
@@ -197,6 +242,8 @@ export function createModalManager({
     closeHelpModal,
     openYesterdayModal,
     closeYesterdayModal,
+    openRevealSolutionModal,
+    closeRevealSolutionModal,
     openSettingsModal,
     closeSettingsModal,
     openBoardModal,

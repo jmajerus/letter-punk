@@ -13,16 +13,10 @@ import { getPsaFeedItems } from './psaFeed.js';
  * the Yesterday modal's "Player solutions" section.
  * All other requests are forwarded to the static asset binding.
  *
- * Analytics schema (all events):
+ * Analytics schema, blob1-3 (all events):
  *   blob1 = event name
  *   blob2 = primary dimension (source or outcome)
  *   blob3 = secondary dimension (puzzleId or validationSource)
- *   blob4 = submitted word (word_submit), or the comma-joined solution
- *     words in solve order (game_solved) -- captured once, at the moment
- *     the puzzle is solved, from the engine's own foundWords, so it's the
- *     actual final answer and never includes a word tried and later
- *     removed via Undo Word earlier in the same attempt
- *   double1 = numeric value (wordLength or wordCount; 0 when unused)
  *   index = the puzzle's own identity, kept accurate under Analytics
  *     Engine's per-index sampling rather than left generic: a catalog
  *     puzzle's date id, or a custom board's flattened 12-letter layout
@@ -32,6 +26,35 @@ import { getPsaFeedItems } from './psaFeed.js';
  *     naturally share an index. Only 'random' (a genuinely random board,
  *     e.g. the daily-puzzle catalog being unavailable) has no identity of
  *     its own and falls back to the literal string 'random'.
+ *
+ * word_submit only:
+ *   blob4 = the submitted word
+ *   double1 = word length
+ *
+ * game_solved only -- captured once, at the exact moment the puzzle is
+ * solved, from the engine's own foundWords/getShareSummary, so it's the
+ * actual final answer and never includes a word tried and later removed
+ * via Undo Word earlier in the same attempt:
+ *   blob4 = solution words, comma-joined, in solve order. Deliberately one
+ *     blob, not one-blob-per-word: finding as many words as possible is an
+ *     accepted, encouraged play style here (see Vocabulary Wrangler), not
+ *     an edge case, so a real solve can run past 100 words -- nowhere near
+ *     AE's 20-blob-per-point ceiling. A per-word-position schema would
+ *     either truncate that style's most extreme solves or force an
+ *     arbitrary cutoff whose meaning shifts per row; a single delimited
+ *     field has no such ceiling (still capped defensively at 4800 chars,
+ *     comfortably under AE's ~5KB per-blob limit).
+ *   double1 = word count
+ *   double2 = 1 if solved with Free Chain mode on, 0 otherwise -- its own
+ *     field, not folded into blob4, because it isn't derivable later from
+ *     the words alone: a normal-mode solve is always fully chained by
+ *     construction, so nothing about the finished word list distinguishes
+ *     "chained because forced" from "chained anyway although not
+ *     required." Unlike the word list, this is a single fixed fact per
+ *     solve regardless of word count, so a plain numeric column is the
+ *     right shape for it -- directly aggregatable (AVG(double2) = % of
+ *     solves done in Free Chain mode) in a way a value packed into a
+ *     string never is.
  */
 
 const ALLOWED_EVENTS = new Set(['puzzle_load', 'word_submit', 'game_solved']);
@@ -163,15 +186,15 @@ function buildDataPoint(event, data) {
     const wordCount = Number.isFinite(data.wordCount) ? Number(data.wordCount) : 0;
     const words = Array.isArray(data.words)
       ? data.words
-        .slice(0, 40)
         .map((word) => String(word ?? '').toLowerCase().replace(/[^a-z]/g, ''))
         .filter(Boolean)
         .join(',')
-        .slice(0, 2000)
+        .slice(0, 4800)
       : '';
+
     return {
       blobs: ['game_solved', String(data.source ?? '').slice(0, 32), puzzleId, words],
-      doubles: [wordCount],
+      doubles: [wordCount, data.completedInFreeChain === true ? 1 : 0],
       indexes: [index],
     };
   }
@@ -183,17 +206,24 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const PLAYER_SOLUTIONS_CAP = 20;
 
 // Stores a capped, deduplicated pool of real player solutions per catalog
-// puzzle date, for the "Player solutions" section of the Yesterday modal --
-// a small, purpose-built KV list, not something read back out of Analytics
-// Engine (which is for aggregate dashboard queries, not per-request public
-// reads). Only catalog dates are ever stored, since a custom board's
-// flattened-layout id is never looked up by the read side below. Capped and
-// deduplicated by exact word-chain so write volume stays bounded regardless
-// of traffic, and so the pool reflects genuinely distinct solutions rather
-// than N copies of whichever pairing most players land on -- many board
-// layouts only admit a handful of realistic 2-word answers in the first
-// place, so the pool is naturally self-limiting on its own.
-async function storePlayerSolution(puzzleId, words, env) {
+// puzzle date, for the "Player solutions" section of the Yesterday/Reveal
+// Solution modals -- a small, purpose-built KV list, not something read
+// back out of Analytics Engine (which is for aggregate dashboard queries,
+// not per-request public reads). Only catalog dates are ever stored, since
+// a custom board's flattened-layout id is never looked up by the read side
+// below. Capped and deduplicated by exact word-chain so write volume stays
+// bounded regardless of traffic, and so the pool reflects genuinely
+// distinct solutions rather than N copies of whichever pairing most
+// players land on -- many board layouts only admit a handful of realistic
+// 2-word answers in the first place, so the pool is naturally
+// self-limiting on its own.
+//
+// Each entry is { words, completedInFreeChain }, not a bare word array --
+// completedInFreeChain isn't derivable later from the words themselves (a
+// normal-mode solve is always fully chained by construction, so nothing
+// about the finished word list reveals whether chaining was optional), so
+// it's captured at the one point it's actually known.
+async function storePlayerSolution(puzzleId, words, completedInFreeChain, env) {
   if (!env.SOLUTIONS_KV || !ISO_DATE_PATTERN.test(puzzleId) || !Array.isArray(words) || words.length < 2) {
     return;
   }
@@ -207,11 +237,11 @@ async function storePlayerSolution(puzzleId, words, env) {
   }
 
   const joined = words.join(',');
-  if (solutions.some((entry) => Array.isArray(entry) && entry.join(',') === joined)) {
+  if (solutions.some((entry) => Array.isArray(entry?.words) && entry.words.join(',') === joined)) {
     return;
   }
 
-  solutions.push(words);
+  solutions.push({ words, completedInFreeChain: completedInFreeChain === true });
   await env.SOLUTIONS_KV.put(key, JSON.stringify(solutions)).catch(() => {});
 }
 
@@ -276,7 +306,7 @@ export default {
           }
 
           if (event === 'game_solved') {
-            ctx.waitUntil(storePlayerSolution(String(data.puzzleId ?? ''), data.words, env));
+            ctx.waitUntil(storePlayerSolution(String(data.puzzleId ?? ''), data.words, data.completedInFreeChain, env));
           }
         }
       } catch {
