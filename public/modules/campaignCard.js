@@ -20,6 +20,12 @@
  * per-entry duration, so the time to see every entry once stays roughly
  * constant (TARGET_FULL_ROTATION_DAYS) as entries are added, instead of
  * the full cycle just quietly getting longer every time this list grows.
+ *
+ * A small arrow button beside the card lets a player step forward through
+ * CAMPAIGNS by hand -- for someone who remembers playing one of these
+ * (Harmony Square, say) but never bookmarked it, without having to wait out
+ * the date-based rotation. Manual browsing overrides the rotation for the
+ * rest of the session, the same session-only scope as dismissing.
  */
 import { CAMPAIGNS } from './campaignCardData.js';
 
@@ -32,16 +38,23 @@ const DAY_MS = 86_400_000;
 // instead of stretching the full cycle out to 6 days.
 const TARGET_FULL_ROTATION_DAYS = 5;
 
-export function createCampaignCard({ containerElement }) {
+export function createCampaignCard({ containerElement, rowElement, nextButtonElement }) {
   let dismissedThisSession = false;
+  // Set once the player manually advances via the next-campaign button, and
+  // overrides the date-based rotation for the rest of this session -- same
+  // session-only scope as dismissedThisSession, so browsing to a different
+  // entry to re-find something isn't a preference that outlives this visit.
+  let manualIndex = null;
 
-  function pickCampaign() {
+  function currentIndex() {
     if (CAMPAIGNS.length === 0) {
-      return null;
+      return -1;
+    }
+    if (manualIndex !== null) {
+      return manualIndex;
     }
     const rotationIntervalMs = (TARGET_FULL_ROTATION_DAYS * DAY_MS) / CAMPAIGNS.length;
-    const rotationIndex = Math.floor(Date.now() / rotationIntervalMs);
-    return CAMPAIGNS[rotationIndex % CAMPAIGNS.length];
+    return Math.floor(Date.now() / rotationIntervalMs) % CAMPAIGNS.length;
   }
 
   function render() {
@@ -49,10 +62,13 @@ export function createCampaignCard({ containerElement }) {
       return;
     }
 
-    const campaign = dismissedThisSession ? null : pickCampaign();
+    const index = dismissedThisSession ? -1 : currentIndex();
+    const campaign = index >= 0 ? CAMPAIGNS[index] : null;
 
     if (!campaign) {
-      containerElement.hidden = true;
+      if (rowElement) {
+        rowElement.hidden = true;
+      }
       containerElement.removeAttribute('href');
       containerElement.innerHTML = '';
       return;
@@ -86,10 +102,31 @@ export function createCampaignCard({ containerElement }) {
     });
 
     containerElement.append(eyebrow, headline, cta, dismissButton);
-    containerElement.hidden = false;
+    if (rowElement) {
+      rowElement.hidden = false;
+    }
+    // Pointless with only one entry to cycle to -- hidden rather than
+    // disabled, since a disabled-but-visible arrow would invite a click
+    // that can't do anything.
+    if (nextButtonElement) {
+      nextButtonElement.hidden = CAMPAIGNS.length <= 1;
+    }
   }
 
   function init() {
+    // Self-wired, same as the dismiss button above -- the next-campaign
+    // arrow's behavior is entirely internal to this module's own state
+    // (CAMPAIGNS, manualIndex), so there's nothing for app.js's wireEvents
+    // to usefully mediate.
+    nextButtonElement?.addEventListener('click', () => {
+      const index = currentIndex();
+      if (index < 0) {
+        return;
+      }
+      manualIndex = (index + 1) % CAMPAIGNS.length;
+      render();
+    });
+
     render();
   }
 

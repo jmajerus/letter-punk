@@ -896,22 +896,54 @@ button {
 /* Sibling of .panel-art (not nested inside it) on purpose -- .panel-art's
    own innerHTML is fully replaced whenever the pipe-bearing easter egg
    (re)initializes, which would silently wipe this out if it lived inside
-   that same container. */
-.campaign-card {
+   that same container. Wraps the card itself plus the next-campaign arrow
+   (campaignCard.js) so the two lay out side by side via flexbox instead of
+   needing separate absolute-position math for the arrow. */
+.campaign-card-row {
   position: absolute;
   left: 10px;
   bottom: 10px;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* min() keeps 410px as the ideal width but stops it overflowing
+     .panel-art-wrap on narrower desktop widths just above the 1080px
+     breakpoint below, where the panel column hasn't hit full-width yet.
+     410 (was 360, before the next-campaign arrow took its own slice of the
+     row) -- sized so the text column below stays wide enough that these
+     ~50-58 character headlines wrap to the same 2 lines across every
+     entry, instead of some tipping into a 3rd line right at the boundary
+     and visibly shifting the arrow (vertically centered, and the row is
+     bottom-anchored) up or down depending on which entry is showing. */
+  width: min(410px, calc(100% - 20px));
+}
+
+.campaign-card-row[hidden] {
+  display: none;
+}
+
+.campaign-card {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  column-gap: 16px;
+  /* Trimmed from 16px alongside the icon shrink below -- both give the
+     text column back some of the width the next-campaign arrow took from
+     the row (see campaign-card-row's width comment). */
+  column-gap: 10px;
   row-gap: 4px;
-  /* min() keeps 360px as the ideal width but stops it overflowing
-     .panel-art-wrap on narrower desktop widths just above the 1080px
-     breakpoint below, where the panel column hasn't hit full-width yet. */
-  width: min(360px, calc(100% - 20px));
-  padding: 12px 32px 12px 10px;
+  /* Fills whatever room the row has left next to the arrow button;
+     min-width: 0 lets it actually shrink there instead of overflowing,
+     since flex items default to their content's natural minimum width. */
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Right padding trimmed from 32px to 28px -- still clears the absolutely
+     positioned dismiss button (top: 4px; right: 6px), just less of it.
+     Left padding trimmed from 10px to 2px, same 8px cut as the icon size
+     above -- both grow the text column further, since column 1 (the icon)
+     is sized to its own fixed width regardless of how much padding sits
+     before it. */
+  padding: 12px 28px 12px 2px;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(36, 27, 21, 0.94), rgba(20, 15, 11, 0.97));
@@ -919,21 +951,20 @@ button {
   text-decoration: none;
 }
 
-.campaign-card[hidden] {
-  display: none;
-}
-
 /* Its own dedicated column, not inline with the eyebrow text -- sized and
    positioned so it reads as a pipe-fitting motif for "this branches off
    the main game," not as a stand-in logo for whichever org/game the
-   eyebrow happens to name. */
+   eyebrow happens to name. Trimmed from 64px alongside the column-gap trim
+   above, for the same reason: give the text column back some width -- kept
+   to a modest 8px reduction (56px) rather than shrinking it further, so the
+   icon stays visually prominent. */
 .campaign-card::before {
   content: "";
   grid-column: 1;
   grid-row: 1 / -1;
   align-self: center;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   background: url("assets/pipe-branch.svg") center / contain no-repeat;
 }
 
@@ -1408,7 +1439,7 @@ body.arcade-mode .board-tools {
     min-height: 0;
   }
 
-  .campaign-card {
+  .campaign-card-row {
     position: static;
     width: auto;
   }

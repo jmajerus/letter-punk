@@ -59,6 +59,8 @@ const freeChainToggle = document.getElementById('freeChainToggle');
 const freeChainBadgeElement = document.getElementById('freeChainBadge');
 const psaBannerElement = document.getElementById('psaBanner');
 const campaignCardElement = document.getElementById('campaignCard');
+const campaignCardRowElement = document.getElementById('campaignCardRow');
+const campaignCardNextButton = document.getElementById('campaignCardNextBtn');
 const helpModal = document.getElementById('helpModal');
 const yesterdayModal = document.getElementById('yesterdayModal');
 const yesterdayTitleElement = document.getElementById('yesterdayTitle');
@@ -235,6 +237,8 @@ const psaBanner = createPsaBanner({
 // one-click permanent opt-out would undercut that on first contact.
 const campaignCard = createCampaignCard({
   containerElement: campaignCardElement,
+  rowElement: campaignCardRowElement,
+  nextButtonElement: campaignCardNextButton,
 });
 
 // The known reference solution for the currently-applied board, if any.
