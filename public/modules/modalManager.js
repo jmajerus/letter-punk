@@ -70,7 +70,7 @@ export function createModalManager({
       yesterdayPuzzleWordsElement.textContent = yesterdayData.words.join(' -> ');
     }
 
-    // Fire-and-forget: fills in the "Player solutions" section once the
+    // Fire-and-forget: fills in the "Community solves" section once the
     // fetch resolves, but never delays showing the canonical solution above.
     loadPlayerSolutions?.(yesterdayData.id);
 
@@ -102,7 +102,7 @@ export function createModalManager({
     }
 
     // Fire-and-forget, same as loadPlayerSolutions in openYesterdayModal:
-    // fills in the "Player solutions" section once the fetch resolves, but
+    // fills in the "Community solves" section once the fetch resolves, but
     // never delays showing the just-solved player their own result text.
     loadRevealPlayerSolutions?.(data.puzzleId, data.ownWords, data.canonicalWordCount);
 
