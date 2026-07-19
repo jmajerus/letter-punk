@@ -75,7 +75,7 @@ Once solved, a second button, **Reveal Solution**, appears next to your Accepted
 - Reduced-motion setting that preserves readability while limiting animation.
 - Keyboard/focus-aware modal behavior with focus trapping and escape-to-close support.
 - Accessibility helpers including skip link, ARIA live regions, and non-color letter-state cues.
-- A small awareness card near the pipe artwork, on by default, linking to one real, current *educational* page or game — currently ICRC's Rules of War, WHO's page on fighting online misinformation, Poynter's AI literacy hub, and two free games that build resistance to manipulation, "Bad Vaxx" (vaccine misinformation) and "Harmony Square" (political disinformation) — not a donation ask, rotating as the list grows, dismissible, no sponsored content or borrowed logos, just a link to real work.
+- A small awareness card near the pipe artwork, on by default, linking to one real, current *educational* page or game — currently ICRC's Rules of War, WHO's page on fighting online misinformation, Poynter's AI literacy hub, CCDH's "Spot the Fake" AI-image literacy tool, and two free games that build resistance to manipulation, "Bad Vaxx" (vaccine misinformation) and "Harmony Square" (political disinformation) — not a donation ask, rotating as the list grows, dismissible, no sponsored content or borrowed logos, just a link to real work.
 
 ## Learn More
 
