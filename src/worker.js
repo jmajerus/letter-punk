@@ -300,6 +300,7 @@ export default {
         date: data.date,
         puzzleNumber: data.puzzleNumber,
         par: data.par,
+        solutionWords: data.solutionWords,
       }), {
         status: 200,
         headers: {

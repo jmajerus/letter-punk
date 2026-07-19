@@ -28,7 +28,7 @@ const USER_AGENT = 'LetterPunkImport/1.0 (+https://letter-punk.jmajerus.workers.
 // `\"` -> `"` first turns it into an ordinary JSON substring a small regex
 // can pull directly, rather than parsing the surrounding Flight/array
 // format.
-const XFIRE_DATA_PATTERN = /"puzzleDate":"(\d{4}-\d{2}-\d{2})","puzzleNumber":(\d+),"source":"[^"]*","sides":\[("[A-Z]{2,4}"(?:,"[A-Z]{2,4}"){3})\],"par":(\d+)/;
+const XFIRE_DATA_PATTERN = /"puzzleDate":"(\d{4}-\d{2}-\d{2})","puzzleNumber":(\d+),"source":"[^"]*","sides":\[("[A-Z]{2,4}"(?:,"[A-Z]{2,4}"){3})\],"par":(\d+)(?:,"solutionWords":\[("[A-Z]+"(?:,"[A-Z]+")*)\])?/;
 
 function extractFromXfire(html) {
   const normalized = html.replace(/\\"/g, '"');
@@ -37,13 +37,19 @@ function extractFromXfire(html) {
     return null;
   }
 
-  const [, date, puzzleNumber, sidesRaw, par] = match;
+  const [, date, puzzleNumber, sidesRaw, par, solutionWordsRaw] = match;
   const sides = sidesRaw.split(',').map((entry) => entry.trim().replace(/^"|"$/g, ''));
   if (sides.length !== 4 || sides.some((side) => side.length < 2)) {
     return null;
   }
 
-  return { date, puzzleNumber: Number(puzzleNumber), par: Number(par), sides };
+  const solutionWords = solutionWordsRaw
+    ? solutionWordsRaw.split(',').map((entry) => entry.trim().replace(/^"|"$/g, ''))
+    : null;
+
+  return {
+    date, puzzleNumber: Number(puzzleNumber), par: Number(par), sides, solutionWords,
+  };
 }
 
 // gameletterboxed.com's WordPress plugin inlines its config as a
@@ -51,8 +57,8 @@ function extractFromXfire(html) {
 // body -- decoding each such data URI and looking for the one that contains
 // `dailyPuzzle` sidesteps needing to know which of several data: URIs on the
 // page (there's an unrelated one for a scroll-animation library) is the
-// right one. No puzzle number or par is available from this source, only
-// date + sides.
+// right one. No puzzle number, par, or solution words are available from
+// this source, only date + sides.
 const GAMELETTERBOXED_DATA_URI_PATTERN = /data:text\/javascript;base64,([A-Za-z0-9+/=]+)/g;
 
 function extractFromGameLetterBoxed(html) {
@@ -87,7 +93,9 @@ function extractFromGameLetterBoxed(html) {
       continue;
     }
 
-    return { date: daily.date, puzzleNumber: null, par: null, sides };
+    return {
+      date: daily.date, puzzleNumber: null, par: null, sides, solutionWords: null,
+    };
   }
 
   return null;
@@ -128,7 +136,7 @@ async function fetchFromSources() {
 /**
  * @param {Record<string, unknown>} env
  * @param {{ waitUntil?: (p: Promise<unknown>) => void }} [ctx]
- * @returns {Promise<{date: string, puzzleNumber: number | null, par: number | null, sides: string[]} | null>}
+ * @returns {Promise<{date: string, puzzleNumber: number | null, par: number | null, sides: string[], solutionWords: string[] | null} | null>}
  */
 export async function getTodaysLetterBoxedBoard(env, ctx) {
   const today = new Date().toISOString().slice(0, 10);

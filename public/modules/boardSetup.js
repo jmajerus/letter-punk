@@ -123,12 +123,20 @@ export function createBoardSetup({
       boardPasteInput.value = '';
     }
 
-    if (solutionWordsInput) {
-      solutionWordsInput.value = getCanonicalWords().join(' ');
-    }
-
     const pState = puzzleFetcher.getState();
     boardIsImportedLetterBoxed = pState.puzzleSource === 'custom' && Boolean(pState.customBoardIsLetterBoxedImport);
+
+    // Never pre-fill the real answer back into this field for an imported
+    // Letter Boxed board -- unlike Generate From Words (where these are
+    // always words the player themselves typed in), an imported board's
+    // canonicalWords is the actual NYT solution, which the player hasn't
+    // necessarily seen yet. Showing it here on a routine modal reopen would
+    // spoil it well outside the existing, deliberately explicit Reveal
+    // Solution path.
+    if (solutionWordsInput) {
+      solutionWordsInput.value = boardIsImportedLetterBoxed ? '' : getCanonicalWords().join(' ');
+    }
+
     setBoardInputMessage('');
   }
 
@@ -138,6 +146,12 @@ export function createBoardSetup({
   // Deliberately doesn't auto-apply: the player still reviews and clicks
   // Apply Board themselves, same as every other way of getting letters
   // into these fields.
+  //
+  // When the source provides it (xfire only, not the gameletterboxed
+  // fallback), the real solution words come along too and are set as
+  // canonicalWords -- quietly, the same way Generate From Words does, so
+  // Reveal Solution/Share/word-count comparisons can use the actual NYT
+  // answer without ever displaying it up front (see prepareBoardModal).
   async function importTodaysLetterBoxedBoard() {
     setBoardInputMessage("Fetching today's board…");
 
@@ -156,6 +170,7 @@ export function createBoardSetup({
 
     fillBoardInputs(payload.board);
     boardIsImportedLetterBoxed = true;
+    setCanonicalWords(payload.solutionWords || []);
     const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed board";
     setBoardInputMessage(`Imported ${puzzleLabel} (${payload.date}). Click Apply Board to play it.`, 'success');
   }
@@ -322,11 +337,18 @@ export function createBoardSetup({
     trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
     modalManager.closeBoardModal();
     const boardLabel = boardIsImportedLetterBoxed ? "today's Letter Boxed board" : 'custom board';
-    setMessage(
-      overrideWords.length > 0
-        ? `Applied ${boardLabel}. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`
-        : `Applied ${boardLabel}. Route away.`,
-    );
+    let message = `Applied ${boardLabel}. Route away.`;
+    if (overrideWords.length > 0) {
+      // Naming the override words is safe for a player-typed Generate From
+      // Words board (they're the player's own words), but an imported
+      // Letter Boxed board's overrides are the real NYT answer -- named
+      // here, this would spoil it well outside the explicit Reveal
+      // Solution path, so this case stays generic instead.
+      message = boardIsImportedLetterBoxed
+        ? `Applied ${boardLabel}. Its solution needed a one-time dictionary allowance to stay solvable here. Route away.`
+        : `Applied ${boardLabel}. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`;
+    }
+    setMessage(message);
   }
 
   // One-click main-screen counterpart to Import Today's Letter Boxed: fetches
@@ -357,7 +379,11 @@ export function createBoardSetup({
     }
 
     settings.clearFreeChainSessionOverride();
-    setCanonicalWords([]);
+    // Set quietly, same as importTodaysLetterBoxedBoard -- never displayed
+    // up front, only used for Reveal Solution/Share/word-count comparisons
+    // against the real NYT answer (see prepareBoardModal's spoiler guard
+    // and applyBoardFromInputs' generic override message).
+    setCanonicalWords(payload.solutionWords || []);
     puzzleFetcher.markCustomBoard({ isLetterBoxedImport: true });
     gameEngine.applyBoardDefinition(parsed.board);
     await applySolutionWordOverrides(getCanonicalWords());
