@@ -14,6 +14,10 @@ Letter Punk is inspired by NYT's Letter Boxed but is an original project: its ow
 - **Original visual design** — a steampunk aesthetic (brass, copper, pipes, gauges) rather than NYT's presentation.
 - **Original wording** — help text, instructions, and UI copy written independently.
 
+## Importing today's real board
+
+The "Letter Boxed" button and Set Board's "Import Today's Letter Boxed" option fetch the day's real board layout (12 letters, 4 sides) from third-party hints pages. This pulls in only the bare letter arrangement — a fact, not a creative expression — never NYT's actual source code, visual design, or written copy; it's the same category of thing a player could already do by hand-typing a board they saw somewhere else via Set Board's paste/manual-entry tools. Same reasoning as above, just automated.
+
 ## What's actually new here
 
 Letter Punk keeps the same core chaining rule as Letter Boxed (each letter must come from a different side of the board than the one before it), but adds double-letter support: tap a letter twice in a row to double it, which makes previously-impossible words like *LOOK* or *BEEKEEPER* playable. That's a deliberate design choice, not a workaround — see the "Why Letter Punk Exists" section of the [README](README.md) for the full reasoning. As far as this project's own research turned up, no other Letter-Boxed-style game implements this specific mechanic.
