@@ -18,8 +18,23 @@ const { Command } = require('commander');
 const repoRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(repoRoot, 'public');
 
-const PRIMARY_PACKED_PATH = path.join(publicDir, 'util', 'compressed-dictionary.txt');
-const FALLBACK_PACKED_PATH = path.join(publicDir, 'util', 'compressed-dictionary-fallback.txt');
+// One entry per packed dictionary this reports on. Adding a future tier
+// (compile-dict.js's packTier counterpart) means one more entry here, not
+// another hand-copied load/check/print block.
+const DICTIONARY_TIERS = [
+  { key: 'primary', label: 'primary dictionary', packedPath: path.join(publicDir, 'util', 'compressed-dictionary.txt') },
+  { key: 'fallback', label: 'fallback dictionary', packedPath: path.join(publicDir, 'util', 'compressed-dictionary-fallback.txt') },
+  { key: 'common', label: 'common words', packedPath: path.join(publicDir, 'util', 'compressed-dictionary-common.txt') },
+  {
+    key: 'commonSimplistic', label: 'common words (simplistic)', packedPath: path.join(publicDir, 'util', 'compressed-dictionary-common-simplistic.txt'), note: "Random Puzzle's default seed/companion pool",
+  },
+  { key: 'properNouns', label: 'proper nouns', packedPath: path.join(publicDir, 'util', 'compressed-dictionary-proper-nouns.txt') },
+  {
+    key: 'properNounsSimplistic', label: 'proper nouns (simplistic)', packedPath: path.join(publicDir, 'util', 'compressed-dictionary-proper-nouns-simplistic.txt'), note: 'not yet used by any runtime feature',
+  },
+];
+const PRIMARY_PACKED_PATH = DICTIONARY_TIERS[0].packedPath;
+
 const BLOCKLIST_PATH = path.join(publicDir, 'data', 'dictionary-blocklist.txt');
 const OVERRIDES_PATH = path.join(publicDir, 'data', 'dictionary-overrides.txt');
 const STALENESS_SOURCE_PATHS = [
@@ -27,6 +42,7 @@ const STALENESS_SOURCE_PATHS = [
   OVERRIDES_PATH,
   path.join(publicDir, 'data', 'en_US.dic'),
   path.join(publicDir, 'data', '3of6game.txt'),
+  path.join(publicDir, 'data', 'word-frequency-top10k.txt'),
 ];
 
 function loadPTrieClass() {
@@ -47,6 +63,14 @@ function loadTrie(PTrie, packedPath) {
     return null;
   }
   return new PTrie(fs.readFileSync(packedPath, 'utf8'));
+}
+
+function loadTiers(PTrie) {
+  const tries = {};
+  for (const tier of DICTIONARY_TIERS) {
+    tries[tier.key] = loadTrie(PTrie, tier.packedPath);
+  }
+  return tries;
 }
 
 function loadWordSet(filePath) {
@@ -71,21 +95,24 @@ function oldestMtime(paths) {
   return existing.length === 0 ? 0 : Math.min(...existing.map((p) => fs.statSync(p).mtimeMs));
 }
 
-function checkWord(word, { primaryTrie, fallbackTrie, blockedWords, overrideWords }) {
+function checkWord(word, tries, blockedWords, overrideWords) {
   const display = word.trim().toUpperCase();
   const lookupWord = display.toLowerCase();
 
-  const inPrimary = Boolean(primaryTrie && primaryTrie.isWord(lookupWord));
-  const inFallback = Boolean(fallbackTrie && fallbackTrie.isWord(lookupWord));
+  const membership = {};
+  for (const tier of DICTIONARY_TIERS) {
+    membership[tier.key] = Boolean(tries[tier.key] && tries[tier.key].isWord(lookupWord));
+  }
+
   const isBlocked = blockedWords.has(display);
   const isOverride = overrideWords.has(display);
-  const isPacked = inPrimary || inFallback;
+  const isPacked = membership.primary || membership.fallback;
 
   let verdict;
   if (isPacked && isBlocked) {
     verdict = 'ACCEPTED, but INCONSISTENT — on the blocklist yet still packed. Run `npm run build:dictionary`.';
   } else if (isPacked) {
-    const source = inPrimary && inFallback ? 'both dictionaries' : inPrimary ? 'the primary dictionary' : 'the fallback dictionary';
+    const source = membership.primary && membership.fallback ? 'both dictionaries' : membership.primary ? 'the primary dictionary' : 'the fallback dictionary';
     verdict = `ACCEPTED (found in ${source})`;
   } else if (isBlocked) {
     verdict = 'REJECTED (blocked)';
@@ -94,8 +121,21 @@ function checkWord(word, { primaryTrie, fallbackTrie, blockedWords, overrideWord
   }
 
   return {
-    word: display, inPrimary, inFallback, isBlocked, isOverride, verdict,
+    word: display, membership, isBlocked, isOverride, verdict,
   };
+}
+
+function printResult(result) {
+  const LABEL_WIDTH = 28;
+  console.log(result.word);
+  for (const tier of DICTIONARY_TIERS) {
+    const note = tier.note ? ` (${tier.note})` : '';
+    console.log(`  ${tier.label.padEnd(LABEL_WIDTH)} : ${result.membership[tier.key] ? 'yes' : 'no'}${note}`);
+  }
+  console.log(`  ${'blocklist'.padEnd(LABEL_WIDTH)} : ${result.isBlocked ? 'yes' : 'no'}`);
+  console.log(`  ${'overrides'.padEnd(LABEL_WIDTH)} : ${result.isOverride ? 'yes' : 'no'}`);
+  console.log(`  ${'verdict'.padEnd(LABEL_WIDTH)} : ${result.verdict}`);
+  console.log('');
 }
 
 function main() {
@@ -116,10 +156,9 @@ Examples:
   const words = program.args;
 
   const PTrie = loadPTrieClass();
-  const primaryTrie = loadTrie(PTrie, PRIMARY_PACKED_PATH);
-  const fallbackTrie = loadTrie(PTrie, FALLBACK_PACKED_PATH);
+  const tries = loadTiers(PTrie);
 
-  if (!primaryTrie) {
+  if (!tries.primary) {
     console.error(`Primary packed dictionary not found at ${path.relative(repoRoot, PRIMARY_PACKED_PATH)}. Run \`npm run build:dictionary\` first.`);
     process.exit(1);
   }
@@ -127,24 +166,14 @@ Examples:
   const blockedWords = loadWordSet(BLOCKLIST_PATH);
   const overrideWords = loadWordSet(OVERRIDES_PATH);
 
-  const packedMtime = oldestMtime([PRIMARY_PACKED_PATH, FALLBACK_PACKED_PATH]);
+  const packedMtime = oldestMtime(DICTIONARY_TIERS.map((tier) => tier.packedPath));
   const sourceMtime = newestMtime(STALENESS_SOURCE_PATHS);
   if (sourceMtime > packedMtime) {
     console.warn('⚠ The packed dictionaries look older than dictionary-blocklist.txt/overrides/sources. Results below may be stale — run `npm run build:dictionary` first.\n');
   }
 
   for (const rawWord of words) {
-    const result = checkWord(rawWord, {
-      primaryTrie, fallbackTrie, blockedWords, overrideWords,
-    });
-
-    console.log(result.word);
-    console.log(`  primary dictionary   : ${result.inPrimary ? 'yes' : 'no'}`);
-    console.log(`  fallback dictionary  : ${result.inFallback ? 'yes' : 'no'}`);
-    console.log(`  blocklist            : ${result.isBlocked ? 'yes' : 'no'}`);
-    console.log(`  overrides            : ${result.isOverride ? 'yes' : 'no'}`);
-    console.log(`  verdict              : ${result.verdict}`);
-    console.log('');
+    printResult(checkWord(rawWord, tries, blockedWords, overrideWords));
   }
 }
 

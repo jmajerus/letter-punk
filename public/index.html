@@ -40,6 +40,7 @@
             <p class="section-label">Accepted words</p>
             <div id="foundWords" class="found-words" aria-label="Accepted words list" aria-live="polite" aria-relevant="additions text"></div>
             <div class="share-actions">
+              <button id="hintBtn" class="secondary" type="button" hidden>Hint</button>
               <button id="shareBtn" class="primary" type="button" aria-label="Share your result" hidden>Share</button>
               <button id="revealSolutionBtn" class="secondary" type="button" hidden>Reveal Solution</button>
             </div>
@@ -181,6 +182,28 @@
         </div>
         <div class="help-actions">
           <button id="yesterdayGotItBtn" class="primary" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hintModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="hintTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="hintTitle">Need a nudge?</h2>
+          <button id="closeHintBtn" class="help-close" type="button" aria-label="Close hints">Close</button>
+        </div>
+        <p class="help-copy">Reveal as much or as little as you want -- each step shows more than the last.</p>
+        <div class="hint-tier">
+          <button id="hintShapeBtn" class="secondary" type="button">Show word count &amp; lengths</button>
+          <p id="hintShapeText" class="help-copy" aria-live="polite" hidden></p>
+        </div>
+        <div class="hint-tier">
+          <button id="hintLettersBtn" class="secondary" type="button">Show start &amp; end letters</button>
+          <p id="hintLettersText" class="help-copy" aria-live="polite" hidden></p>
+        </div>
+        <div class="hint-tier">
+          <button id="hintWordsBtn" class="secondary" type="button">Show full solution</button>
+          <p id="hintWordsText" class="help-copy" aria-live="polite" hidden></p>
         </div>
       </div>
     </div>

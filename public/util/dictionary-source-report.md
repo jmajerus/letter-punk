@@ -1,17 +1,17 @@
 # Dictionary Source Diff Report
 
-Generated: 2026-07-10T03:02:21.615Z
+Generated: 2026-07-19T20:26:27.611Z
 
 ## Summary
 
 | Metric | Value |
 | --- | ---: |
 | Primary source | public/data/en_US.dic |
-| Primary words | 88565 |
+| Primary words | 88574 |
 | Primary-only words | 30351 |
-| Shared words | 58214 |
+| Shared words | 58223 |
 | Fallback source | public/data/3of6game.txt |
-| Fallback words | 61380 |
+| Fallback words | 61389 |
 | Fallback-only words | 3166 |
 
 ## Primary-Only Preview (+)

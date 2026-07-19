@@ -20,6 +20,7 @@ import {
 import { createSettings } from './modules/settings.js';
 import { createModalManager } from './modules/modalManager.js';
 import { createPuzzleProgress } from './modules/puzzleProgress.js';
+import { createHintPanel } from './modules/hintPanel.js';
 import { createBoardSetup } from './modules/boardSetup.js';
 
 const boardElement = document.getElementById('board');
@@ -29,6 +30,7 @@ const messageElement = document.getElementById('message');
 const dictionarySourceIndicatorElement = document.getElementById('dictionarySourceIndicator');
 const foundWordsElement = document.getElementById('foundWords');
 const revealSolutionButton = document.getElementById('revealSolutionBtn');
+const hintButton = document.getElementById('hintBtn');
 // Shared by Share and Reveal Solution -- both live together in the
 // Accepted Words card now, so one status area (matching the existing
 // Copy Blank Link/Copy Progress Link precedent in Set Board) is clearer
@@ -79,6 +81,14 @@ const revealPlayerSolutionsList = document.getElementById('revealPlayerSolutions
 const revealPlayerSolutionsEmptyMessage = document.getElementById('revealPlayerSolutionsEmptyMessage');
 const revealFirstToMatchCountMessage = document.getElementById('revealFirstToMatchCountMessage');
 const revealSolutionCopyButton = document.getElementById('revealSolutionCopyBtn');
+const hintModal = document.getElementById('hintModal');
+const closeHintButton = document.getElementById('closeHintBtn');
+const hintShapeButton = document.getElementById('hintShapeBtn');
+const hintShapeText = document.getElementById('hintShapeText');
+const hintLettersButton = document.getElementById('hintLettersBtn');
+const hintLettersText = document.getElementById('hintLettersText');
+const hintWordsButton = document.getElementById('hintWordsBtn');
+const hintWordsText = document.getElementById('hintWordsText');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const boardModal = document.getElementById('boardModal');
@@ -309,6 +319,19 @@ const modalManager = createModalManager({
     boardSetup.prepareBoardModal();
     setBoardLinkMessage('');
   },
+  hintModal,
+  closeHintButton,
+  hintButton,
+});
+
+const hintPanel = createHintPanel({
+  getActiveCanonicalWords,
+  hintShapeButton,
+  hintShapeText,
+  hintLettersButton,
+  hintLettersText,
+  hintWordsButton,
+  hintWordsText,
 });
 
 // Fetched lazily, only when a modal that needs it actually opens -- not
@@ -510,6 +533,14 @@ function renderShareActionsVisibility(snapshot) {
   if (revealSolutionButton) {
     revealSolutionButton.hidden = !isSolved;
   }
+  // Hint's own visibility runs the opposite direction from Share/Reveal
+  // Solution above (available *before* solved, not after) and has a second
+  // precondition neither of those need: a hint is only worth offering when
+  // there's actually a known canonical solution to hint at (a Random
+  // Letters board, a pasted board, or hand-typed letters have none).
+  if (hintButton) {
+    hintButton.hidden = isSolved || getActiveCanonicalWords().length === 0;
+  }
   if (!isSolved) {
     setShareStatusMessage('');
   }
@@ -632,6 +663,12 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   if (boardSignature !== lastRenderedBoardSignature) {
     renderer.renderBoard(snapshot.board);
     lastRenderedBoardSignature = boardSignature;
+    // A hint tier revealed for one board has no business staying revealed
+    // once a genuinely different one is on screen -- this is the one place
+    // that's already true regardless of which of the many ways a board can
+    // change (catalog nav, custom apply, import, Random Puzzle, a shared
+    // link, arcade replay) actually triggered it.
+    hintPanel.resetHints();
   }
 
   renderer.renderCurrentWord(currentWordElement, snapshot.tokens);
@@ -972,6 +1009,8 @@ function wireEvents() {
   // modalManager.js's openRevealSolutionModal).
   revealSolutionButton?.addEventListener('click', modalManager.openRevealSolutionModal);
   revealSolutionCopyButton?.addEventListener('click', revealSolution);
+  hintButton?.addEventListener('click', modalManager.openHintModal);
+  closeHintButton?.addEventListener('click', modalManager.closeHintModal);
   closeSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   saveSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   closeYesterdayButton?.addEventListener('click', modalManager.closeYesterdayModal);
@@ -1013,6 +1052,11 @@ function wireEvents() {
   revealSolutionModal?.addEventListener('click', (event) => {
     if (event.target === revealSolutionModal) {
       modalManager.closeRevealSolutionModal();
+    }
+  });
+  hintModal?.addEventListener('click', (event) => {
+    if (event.target === hintModal) {
+      modalManager.closeHintModal();
     }
   });
 
@@ -1114,6 +1158,11 @@ function wireEvents() {
 
       if (activeModal === revealSolutionModal) {
         modalManager.closeRevealSolutionModal();
+        return;
+      }
+
+      if (activeModal === hintModal) {
+        modalManager.closeHintModal();
         return;
       }
 
@@ -1419,6 +1468,7 @@ function initializeGame() {
   pipeEasterEgg.init();
   psaBanner.init();
   campaignCard.init();
+  hintPanel.init();
 
   settings.syncMotionPreferenceToUi();
   settings.syncProvenanceBadgesPreferenceToUi();

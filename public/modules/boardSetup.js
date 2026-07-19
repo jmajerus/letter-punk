@@ -192,6 +192,15 @@ export function createBoardSetup({
   // an imported Letter Boxed board (see prepareBoardModal's guard above and
   // applyBoardFromInputs' generic override message below) -- the player
   // hasn't seen these words either.
+  //
+  // Both dictionary calls pass commonWordsOnly: true -- the primary
+  // dictionary carries ~10k proper nouns (place/personal names like
+  // "ELDERSBURG") that a player typing their own Generate From Words seed
+  // would notice and could choose to avoid, but nobody reviews these words
+  // before they become the hidden answer here, so the search is restricted
+  // to a dedicated, frequency-filtered common-words dictionary (see
+  // dictionaryValidator.js's COMMON_WORDS_SIMPLISTIC_SOURCE) to keep the
+  // result recognizable.
   const MAX_RANDOM_PUZZLE_SEED_ATTEMPTS = 8;
 
   async function generateRandomPuzzle() {
@@ -199,13 +208,13 @@ export function createBoardSetup({
 
     for (let attempt = 0; attempt < MAX_RANDOM_PUZZLE_SEED_ATTEMPTS; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
-      const seed = await dictionaryValidator.getRandomSeedWord();
+      const seed = await dictionaryValidator.getRandomSeedWord({ commonWordsOnly: true });
       if (!seed) {
         break;
       }
 
       // eslint-disable-next-line no-await-in-loop
-      const companionResult = await dictionaryValidator.findCompanionWord(seed);
+      const companionResult = await dictionaryValidator.findCompanionWord(seed, { commonWordsOnly: true });
       if (companionResult.error) {
         continue;
       }
@@ -229,7 +238,7 @@ export function createBoardSetup({
       });
       boardKind = 'random-puzzle';
       setCanonicalWords(words);
-      setBoardInputMessage('Generated a random puzzle. Review and Apply Board.', 'success');
+      setBoardInputMessage('Generated a random puzzle. Click Apply Board to play it.', 'success');
       return;
     }
 

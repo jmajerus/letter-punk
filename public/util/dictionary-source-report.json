@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-07-10T03:02:21.615Z",
+  "generatedAt": "2026-07-19T20:26:27.611Z",
   "primary": {
     "source": "public/data/en_US.dic",
-    "wordCount": 88565,
+    "wordCount": 88574,
     "uniqueWordCount": 30351,
     "uniqueWords": [
       "AAA",
@@ -30360,7 +30360,7 @@
   },
   "fallback": {
     "source": "public/data/3of6game.txt",
-    "wordCount": 61380,
+    "wordCount": 61389,
     "uniqueWordCount": 3166,
     "uniqueWords": [
       "ABDOMINALS",
@@ -33531,5 +33531,5 @@
       "ZINGS"
     ]
   },
-  "sharedWordCount": 58214
+  "sharedWordCount": 58223
 }

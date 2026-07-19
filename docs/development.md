@@ -102,6 +102,15 @@ Rebuild the packed dictionary with `npm run build:dictionary`. Each rebuild also
 
 Check whether a specific word is recognized, blocked, or overridden with `npm run check-word -- WORD [WORD...]` — it reads the same packed dictionaries and blocklist the live game uses, and warns if the packed dictionaries look older than their sources.
 
+**Four smaller derived dictionaries** exist specifically for Random Puzzle's fully-automated seed/companion picking (`dictionaryValidator.js`'s `getRandomSeedWord`/`findCompanionWord` with `commonWordsOnly: true`) — none of them ever touch `validateWord`/normal gameplay, and all four are regenerated automatically by `npm run build:dictionary`. "Common" and "not a proper noun" are different axes (plenty of proper nouns are commonly known, and plenty of non-proper-noun words are obscure), and "common" and "well-known" are a further, third axis (a word can be recognized by both dictionaries and still be rare), so each of these applies its own filter deliberately rather than treating one as a proxy for another:
+
+- `compressed-dictionary-common.txt`: the intersection of the primary and fallback dictionaries, restricted to primary words with at least one non-proper-noun origin — recognizably common *and* not traced back to a capitalized Hunspell entry. That capitalization signal only exists in `en_US.dic` itself; `compile-dict.js`'s `readHunspellDic` captures it *before* `normalizeWord()`'s uppercasing destroys it for everything downstream — without this, the primary dictionary's ~10k proper nouns (place/personal names like "Eldersburg") would surface in Random Puzzle just as easily as any other word, with nobody in the loop to notice before it becomes the puzzle's hidden answer.
+- `compressed-dictionary-proper-nouns.txt`: the complement of the above — every primary word whose only origin was a capitalized entry. Not read by any runtime function yet; exists so the set can be inspected before deciding whether a proper-noun-inclusive Random Puzzle variant is worth building.
+- `compressed-dictionary-common-simplistic.txt`: `compressed-dictionary-common.txt` intersected with `public/data/word-frequency-top10k.txt` (a frequency-ranked list of the 10k most common English words derived from Google's Trillion Word Corpus — see `public/data/README_word-frequency-top10k.txt` for the full provenance/license). This is what Random Puzzle actually draws from by default now — the plain common tier still has its own share of obscure-but-technically-common words (rare derived forms, archaic terms) that this tightens further.
+- `compressed-dictionary-proper-nouns-simplistic.txt`: the proper-nouns tier intersected with the same frequency list — "KENNEDY" and "PARIS" survive, "ELDERSBURG" doesn't. Not read by any runtime function yet, same reasoning as the plain proper-nouns tier above.
+
+Each "simplistic" file is a genuine subset of its parent tier by construction (derived by intersecting, not independently curated) — a word appearing in a simplistic tier always implies membership in the tier it was derived from, so nothing needs to check or record that separately. `npm run check-word` reports a word's membership across all six dictionaries (primary, fallback, and all four derived tiers).
+
 Recommended dictionary layering:
 
 - `public/data/en_US.dic` plus `public/data/en_US.aff`: preferred broad base dictionary with real Hunspell affix expansion.
@@ -109,6 +118,7 @@ Recommended dictionary layering:
 - `public/data/3of6game.txt`: compatibility fallback that is packed separately and checked alongside the primary dictionary at runtime.
 - `public/data/dictionary-overrides.txt`: small allowlist for temporary or project-specific additions.
 - `public/data/dictionary-blocklist.txt`: denylist for words you decide are poor fits for gameplay. Subtracted from the packed dictionaries (`npm run build:dictionary`) *and* excluded from daily-puzzle companion-word selection (`npm run build:puzzles`) — one file, both build steps.
+- `public/data/word-frequency-top10k.txt`: frequency-ranked word list used only to derive the two "simplistic" tiers above — see `public/data/README_word-frequency-top10k.txt` for source/license.
 
 For the reasoning behind the dual-dictionary approach itself, see [Dual Dictionary Validation for Word-Chain Games](dual-dictionary-validation.md).
 

@@ -1,8 +1,8 @@
-// Owns open/close/focus for the five modals (Help, Yesterday's Puzzle,
-// Solution, Settings, Set Board) plus the two cross-modal helpers that
-// don't belong to any one of them: getActiveModal (which one, if any, is
-// currently open) and trapFocusInModal (keeps Tab cycling inside whichever
-// modal is open, rather than escaping to the page behind it).
+// Owns open/close/focus for the six modals (Help, Yesterday's Puzzle,
+// Solution, Settings, Set Board, Hints) plus the two cross-modal helpers
+// that don't belong to any one of them: getActiveModal (which one, if any,
+// is currently open) and trapFocusInModal (keeps Tab cycling inside
+// whichever modal is open, rather than escaping to the page behind it).
 //
 // getYesterdayPuzzleData/loadPlayerSolutions/getRevealSolutionData/
 // loadRevealPlayerSolutions/syncSettingsToUi/prepareBoardModal are
@@ -35,6 +35,9 @@ export function createModalManager({
   getYesterdayPuzzleData,
   syncSettingsToUi,
   prepareBoardModal,
+  hintModal,
+  closeHintButton,
+  hintButton,
 }) {
   function openHelpModal() {
     if (!helpModal) {
@@ -162,6 +165,24 @@ export function createModalManager({
     settingsButton?.focus();
   }
 
+  function openHintModal() {
+    if (!hintModal) {
+      return;
+    }
+
+    hintModal.hidden = false;
+    closeHintButton?.focus();
+  }
+
+  function closeHintModal() {
+    if (!hintModal) {
+      return;
+    }
+
+    hintModal.hidden = true;
+    hintButton?.focus();
+  }
+
   function getActiveModal() {
     if (boardModal && !boardModal.hidden) {
       return boardModal;
@@ -177,6 +198,10 @@ export function createModalManager({
 
     if (revealSolutionModal && !revealSolutionModal.hidden) {
       return revealSolutionModal;
+    }
+
+    if (hintModal && !hintModal.hidden) {
+      return hintModal;
     }
 
     if (helpModal && !helpModal.hidden) {
@@ -202,6 +227,8 @@ export function createModalManager({
       closeYesterdayModal();
     } else if (activeModal === revealSolutionModal) {
       closeRevealSolutionModal();
+    } else if (activeModal === hintModal) {
+      closeHintModal();
     } else if (activeModal === helpModal) {
       closeHelpModal();
     }
@@ -248,6 +275,8 @@ export function createModalManager({
     closeSettingsModal,
     openBoardModal,
     closeBoardModal,
+    openHintModal,
+    closeHintModal,
     getActiveModal,
     closeActiveModalIfAny,
     trapFocusInModal,

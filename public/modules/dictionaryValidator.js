@@ -7,6 +7,50 @@ export const PACKED_DICTIONARY_SOURCES = [
   { key: 'fallback-packed-dawg', url: 'util/compressed-dictionary-fallback.txt', optional: true },
 ];
 
+// Four smaller packed dictionaries, all entirely separate from
+// PACKED_DICTIONARY_SOURCES above -- none of them touch validateWord/
+// isBlocked, so normal gameplay word acceptance is completely unaffected.
+// All built at compile-dict.js time, and all optional (getRandomSeedWord/
+// findCompanionWord already treat "not available" as a normal outcome, not
+// an error).
+//
+// COMMON_WORDS_SOURCE is the intersection of the primary and fallback
+// dictionaries, restricted to primary words with at least one
+// non-proper-noun origin (see readHunspellDic there): "common" and "not a
+// proper noun" are different axes -- a word can be common and a proper
+// noun (many are), or uncommon and not a proper noun -- so this applies
+// both filters deliberately rather than treating one as a proxy for the
+// other. Proper-noun-ness can only be determined at compile time, before
+// normalizeWord() uppercases everything and destroys the source
+// capitalization signal that makes it knowable in the first place (see
+// e.g. "Eldersburg," a small Maryland city, which the primary dictionary
+// alone would otherwise happily surface as just another valid word).
+//
+// PROPER_NOUNS_SOURCE is the complement: primary words whose only origin
+// was a capitalized (proper noun) entry. Not currently read by any
+// function here -- kept available for whenever a proper-noun-inclusive
+// Random Puzzle variant is worth building, not before.
+//
+// COMMON_WORDS_SIMPLISTIC_SOURCE and PROPER_NOUNS_SIMPLISTIC_SOURCE are
+// each their own source's intersection with a frequency-ranked list of the
+// 10k most common English words (see
+// public/data/README_word-frequency-top10k.txt for provenance/license) --
+// "ELDERSBURG" passes the plain proper-nouns filter above but not this one;
+// "KENNEDY" passes both. Genuine subsets by construction (derived by
+// intersecting, not independently curated), so a word appearing in a
+// simplistic tier always implies membership in the tier it was derived
+// from -- nothing here needs to check or record that separately.
+//
+// getRandomSeedWord and findCompanionWord's commonWordsOnly option draws
+// from COMMON_WORDS_SIMPLISTIC_SOURCE by default, for callers (Random
+// Puzzle) that generate a board's hidden answer with no human review in
+// the loop -- unlike Generate From Words, where the player already chose
+// the seed themselves and can judge an unusual companion on sight.
+export const COMMON_WORDS_SOURCE = { key: 'common-packed-dawg', url: 'util/compressed-dictionary-common.txt', optional: true };
+export const COMMON_WORDS_SIMPLISTIC_SOURCE = { key: 'common-simplistic-packed-dawg', url: 'util/compressed-dictionary-common-simplistic.txt', optional: true };
+export const PROPER_NOUNS_SOURCE = { key: 'proper-nouns-packed-dawg', url: 'util/compressed-dictionary-proper-nouns.txt', optional: true };
+export const PROPER_NOUNS_SIMPLISTIC_SOURCE = { key: 'proper-nouns-simplistic-packed-dawg', url: 'util/compressed-dictionary-proper-nouns-simplistic.txt', optional: true };
+
 export const DEFAULT_BLOCKLIST_URL = 'data/dictionary-blocklist.txt';
 
 export function getValidationSourceLabel(sourceKey) {
@@ -60,6 +104,11 @@ export function summarizeValidationSources(matchedSources) {
 export function createDictionaryValidator(options = {}) {
   const {
     sources = PACKED_DICTIONARY_SOURCES,
+    // The tighter, frequency-filtered tier by default (see the block
+    // comment above COMMON_WORDS_SIMPLISTIC_SOURCE) -- COMMON_WORDS_SOURCE
+    // itself is still exported for anything that wants the broader tier
+    // deliberately.
+    commonWordsSource = COMMON_WORDS_SIMPLISTIC_SOURCE,
     fallbackApiUrl = '',
     blocklistUrl = DEFAULT_BLOCKLIST_URL,
     fetchImpl = fetch,
@@ -69,6 +118,14 @@ export function createDictionaryValidator(options = {}) {
   const packedDictionaryPromises = new Map();
   const validationCache = new Map();
   let blocklistPromise = null;
+
+  // Shared by findCompanionWord and getRandomSeedWord's commonWordsOnly
+  // option -- both need exactly this same "which source(s) to search"
+  // resolution, nothing else about the two functions overlaps enough to
+  // merge further.
+  function resolveSearchSources(commonWordsOnly) {
+    return commonWordsOnly ? [commonWordsSource] : sources;
+  }
 
   // Words explicitly whitelisted for the currently-applied custom board
   // (see app.js: solution words used to generate a board are added here
@@ -279,13 +336,19 @@ export function createDictionaryValidator(options = {}) {
    * candidates via the already-loaded packed dictionaries' prefix search
    * rather than a separate plain-text word list fetch.
    *
+   * commonWordsOnly restricts the search to commonWordsSource (the
+   * simplistic common-words tier by default -- see
+   * COMMON_WORDS_SIMPLISTIC_SOURCE above) -- off by default so a player
+   * typing their own seed into Generate From Words still gets the full
+   * dictionary's candidates, same as always.
+   *
    * Returned shortest to longest. This function has no way to know
    * whether a candidate's own internal letter sequence can actually fit
    * some valid 4-side board layout (that's generateBoardFromSolutionWords's
    * job, and it can fail for a given pair) — callers should be prepared to
    * try more than one candidate, not just the first.
    */
-  async function findCompanionWord(seedWord) {
+  async function findCompanionWord(seedWord, { commonWordsOnly = false } = {}) {
     const seed = String(seedWord || '').trim().toLowerCase();
     if (seed.length < 3) {
       return { error: 'Seed word must be at least 3 letters.' };
@@ -298,8 +361,9 @@ export function createDictionaryValidator(options = {}) {
     const seedLast = seed[seed.length - 1];
     const blockedWords = await loadBlocklist();
     const candidateWords = new Set();
+    const searchSources = resolveSearchSources(commonWordsOnly);
 
-    for (const source of sources) {
+    for (const source of searchSources) {
       // eslint-disable-next-line no-await-in-loop
       const trie = await loadPackedDictionary(source);
       if (!trie) {
@@ -340,18 +404,26 @@ export function createDictionaryValidator(options = {}) {
    * Letters are tried in random order, falling through to the next only if
    * a given letter's pool turns up empty after filtering -- true for none
    * of the 26 letters in practice, but cheap to guard against.
+   *
+   * commonWordsOnly restricts the search to commonWordsSource (the
+   * simplistic common-words tier by default -- see
+   * COMMON_WORDS_SIMPLISTIC_SOURCE above) -- excludes proper nouns,
+   * anything not shared with the fallback dictionary, and anything outside
+   * the top 10k most frequent English words, e.g. "ELDERSBURG" (a proper
+   * noun) and any oddity the broader common tier alone still carries.
    */
-  async function getRandomSeedWord() {
+  async function getRandomSeedWord({ commonWordsOnly = false } = {}) {
     const blockedWords = await loadBlocklist();
     const letters = [...ALPHABET];
     for (let index = letters.length - 1; index > 0; index -= 1) {
       const swapIndex = Math.floor(Math.random() * (index + 1));
       [letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]];
     }
+    const searchSources = resolveSearchSources(commonWordsOnly);
 
     for (const letter of letters) {
       const candidateWords = new Set();
-      for (const source of sources) {
+      for (const source of searchSources) {
         // eslint-disable-next-line no-await-in-loop
         const trie = await loadPackedDictionary(source);
         if (!trie) {

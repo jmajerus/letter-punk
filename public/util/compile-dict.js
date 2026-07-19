@@ -9,8 +9,13 @@ const preferredSourcePath = path.join(repoRoot, 'public', 'data', 'scowl.txt');
 const fallbackSourcePath = path.join(repoRoot, 'public', 'data', '3of6game.txt');
 const overridesPath = path.join(repoRoot, 'public', 'data', 'dictionary-overrides.txt');
 const blocklistPath = path.join(repoRoot, 'public', 'data', 'dictionary-blocklist.txt');
+const wordFrequencyPath = path.join(repoRoot, 'public', 'data', 'word-frequency-top10k.txt');
 const primaryOutputPath = path.join(__dirname, 'compressed-dictionary.txt');
 const fallbackOutputPath = path.join(__dirname, 'compressed-dictionary-fallback.txt');
+const commonOutputPath = path.join(__dirname, 'compressed-dictionary-common.txt');
+const commonSimplisticOutputPath = path.join(__dirname, 'compressed-dictionary-common-simplistic.txt');
+const properNounOutputPath = path.join(__dirname, 'compressed-dictionary-proper-nouns.txt');
+const properNounSimplisticOutputPath = path.join(__dirname, 'compressed-dictionary-proper-nouns-simplistic.txt');
 const reportOutputPath = path.join(__dirname, 'dictionary-source-report.json');
 const markdownReportOutputPath = path.join(__dirname, 'dictionary-source-report.md');
 
@@ -196,13 +201,14 @@ function readPlainWordList(filePath) {
 
 function readHunspellDic(filePath) {
 	if (!fs.existsSync(filePath)) {
-		return [];
+		return { words: [], commonWords: [] };
 	}
 
 	const affData = parseAffFile(preferredHunspellAffPath);
 	const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
 	const startIndex = /^\d+$/.test((lines[0] || '').trim()) ? 1 : 0;
 	const words = new Set();
+	const commonWords = new Set();
 
 	for (const rawLine of lines.slice(startIndex)) {
 		const line = rawLine.trim();
@@ -211,6 +217,18 @@ function readHunspellDic(filePath) {
 		}
 
 		const [basePart, flagPart = ''] = line.split('/');
+		// Hunspell/SCOWL convention: a base entry starting with a lowercase
+		// letter is ordinary vocabulary; one starting uppercase is a proper
+		// noun (place name, personal name, etc. -- e.g. "Eldersburg"). This is
+		// the only point in the pipeline where that's still knowable, since
+		// normalizeWord()'s uppercasing below destroys the distinction for
+		// everything downstream (including the main packed dictionary, which
+		// deliberately keeps proper nouns -- a player may want to spell one
+		// mid-chain). A word with *any* lowercase-origin entry elsewhere in
+		// the file still counts as common (e.g. "bill" the verb vs "Bill" the
+		// name both normalize to BILL) -- only ones with no common origin at
+		// all are excluded from commonWords.
+		const isCommonOrigin = /^[a-z]/.test(basePart.trim());
 		const baseWord = normalizeWord(basePart);
 		if (!/^[A-Z]{3,}$/.test(baseWord)) {
 			continue;
@@ -224,11 +242,14 @@ function readHunspellDic(filePath) {
 		for (const expandedWord of expandHunspellEntry(baseWord, flags, affData)) {
 			if (/^[A-Z]{3,}$/.test(expandedWord)) {
 				words.add(expandedWord);
+				if (isCommonOrigin) {
+					commonWords.add(expandedWord);
+				}
 			}
 		}
 	}
 
-	return [...words];
+	return { words: [...words], commonWords: [...commonWords] };
 }
 
 function readBaseWords(filePath) {
@@ -236,7 +257,12 @@ function readBaseWords(filePath) {
 		return readHunspellDic(filePath);
 	}
 
-	return readPlainWordList(filePath);
+	// Plain word-list sources (3of6game.txt) carry no capitalization signal
+	// either way -- already lowercase, and empirically free of place/personal
+	// names (see dictionary-source-report.md) -- so every word from one of
+	// these is common-origin by construction.
+	const words = readPlainWordList(filePath);
+	return { words, commonWords: words };
 }
 
 function mergeDictionaryWords(baseWords, overrideWords, blockedWords) {
@@ -255,6 +281,24 @@ function writePackedDictionary(words, outputPath) {
 	const packedString = trie.pack();
 
 	fs.writeFileSync(outputPath, packedString);
+}
+
+// Every tier below (primary, fallback, and the four common/proper-noun
+// derivatives) ends the same way: pack it, then report where it landed and
+// how big it is. Pulled out once so adding a future tier is a single call
+// instead of another copy-pasted pack+log+log block to keep in sync.
+function packTier(label, words, outputPath) {
+	writePackedDictionary(words, outputPath);
+	console.log(`${label} dictionary packed at ${path.relative(repoRoot, outputPath)}.`);
+	console.log(`${label} words packed: ${words.length}`);
+	return words;
+}
+
+function removeStaleTier(outputPath, label) {
+	if (fs.existsSync(outputPath)) {
+		fs.rmSync(outputPath);
+		console.log(`Removed stale ${label} dictionary at ${path.relative(repoRoot, outputPath)}.`);
+	}
 }
 
 function writeSourceReport(primarySourcePath, primaryWords, fallbackSourcePath, fallbackWords = []) {
@@ -379,31 +423,79 @@ if (!fs.existsSync(primarySourcePath)) {
 
 const overrideWords = readPlainWordList(overridesPath);
 const blockedWords = new Set(readPlainWordList(blocklistPath));
-const primaryWords = mergeDictionaryWords(readBaseWords(primarySourcePath), overrideWords, blockedWords);
+// Frequency-ranked word list (see public/data/README_word-frequency-top10k.txt
+// for source/license) used to derive the "simplistic" tiers below --
+// intersections of the common/proper-noun sets with this list, not
+// independently curated, so a word appearing in a simplistic tier always
+// implies it's also in the (broader) tier it was derived from. No need to
+// separately record or check that -- it's structurally guaranteed, not
+// just usually true.
+const frequencyWords = new Set(readPlainWordList(wordFrequencyPath));
+const primaryBase = readBaseWords(primarySourcePath);
+const primaryWords = mergeDictionaryWords(primaryBase.words, overrideWords, blockedWords);
+// Hand-vetted overrides (dictionary-overrides.txt) count as common-origin
+// too -- they're legitimate words Hunspell's affix expansion just missed,
+// not proper nouns -- so they're merged in here the same way they are into
+// primaryWords above.
+const primaryCommonWords = new Set(mergeDictionaryWords(primaryBase.commonWords, overrideWords, blockedWords));
 
-writePackedDictionary(primaryWords, primaryOutputPath);
-console.log(`Primary dictionary packed at ${path.relative(repoRoot, primaryOutputPath)}.`);
+packTier('Primary', primaryWords, primaryOutputPath);
 console.log(`Primary source: ${path.relative(repoRoot, primarySourcePath)}`);
-console.log(`Primary words packed: ${primaryWords.length}`);
+
+// Proper nouns dictionary: the complement of primaryCommonWords within
+// primaryWords -- every word whose only origin in the primary source was a
+// capitalized (proper noun) Hunspell entry. Not currently used by any
+// runtime code path (dictionaryValidator.js has no reader for it yet) --
+// this exists so the set can actually be inspected before deciding whether
+// it's worth building a player-facing feature on top of ("include proper
+// nouns" as a Random Puzzle option). Computed unconditionally, unlike the
+// common-words file below, since it depends only on the primary source.
+const properNounWords = primaryWords.filter((word) => !primaryCommonWords.has(word));
+packTier('Proper nouns', properNounWords, properNounOutputPath);
+
+// "Simplistic" (well-known) subset of the proper nouns above -- restricted
+// to the top-10k most frequent English words, e.g. "KENNEDY" and "PARIS"
+// survive, "ELDERSBURG" doesn't. Same reasoning as commonSimplisticWords
+// below: a strict subset by construction, computed unconditionally since,
+// like properNounWords itself, it depends only on the primary source plus
+// the frequency list, not the fallback dictionary.
+const properNounSimplisticWords = properNounWords.filter((word) => frequencyWords.has(word));
+packTier('Simplistic proper nouns', properNounSimplisticWords, properNounSimplisticOutputPath);
 
 if (primarySourcePath !== fallbackSourcePath && fs.existsSync(fallbackSourcePath)) {
-	const fallbackWords = mergeDictionaryWords(readBaseWords(fallbackSourcePath), overrideWords, blockedWords);
-	writePackedDictionary(fallbackWords, fallbackOutputPath);
+	const fallbackBase = readBaseWords(fallbackSourcePath);
+	const fallbackWords = mergeDictionaryWords(fallbackBase.words, overrideWords, blockedWords);
+	packTier('Fallback', fallbackWords, fallbackOutputPath);
+	console.log(`Fallback source: ${path.relative(repoRoot, fallbackSourcePath)}`);
 	const report = writeSourceReport(primarySourcePath, primaryWords, fallbackSourcePath, fallbackWords);
 	writeMarkdownSourceReport(report);
-	console.log(`Fallback dictionary packed at ${path.relative(repoRoot, fallbackOutputPath)}.`);
-	console.log(`Fallback source: ${path.relative(repoRoot, fallbackSourcePath)}`);
-	console.log(`Fallback words packed: ${fallbackWords.length}`);
 	console.log(`Dictionary source report written to ${path.relative(repoRoot, reportOutputPath)}.`);
 	console.log(`Dictionary markdown diff report written to ${path.relative(repoRoot, markdownReportOutputPath)}.`);
-} else if (fs.existsSync(fallbackOutputPath)) {
-	fs.rmSync(fallbackOutputPath);
-	const report = writeSourceReport(primarySourcePath, primaryWords, null, []);
-	writeMarkdownSourceReport(report);
-	console.log(`Removed stale fallback dictionary at ${path.relative(repoRoot, fallbackOutputPath)}.`);
-	console.log(`Dictionary source report written to ${path.relative(repoRoot, reportOutputPath)}.`);
-	console.log(`Dictionary markdown diff report written to ${path.relative(repoRoot, markdownReportOutputPath)}.`);
+
+	// "Common words" dictionary for Random Puzzle's fully-automated
+	// seed/companion picking (see dictionaryValidator.js's
+	// COMMON_WORDS_SOURCE) -- the intersection of primary and fallback,
+	// restricted to primary words with at least one non-proper-noun origin.
+	// A genuine third file rather than a runtime filter over the other two:
+	// proper-noun-ness is only knowable here, before normalizeWord()'s
+	// uppercasing destroys the source casing signal that makes it knowable
+	// at all -- see readHunspellDic above.
+	const fallbackWordSet = new Set(fallbackWords);
+	const commonWords = primaryWords.filter((word) => primaryCommonWords.has(word) && fallbackWordSet.has(word));
+	packTier('Common', commonWords, commonOutputPath);
+
+	// "Simplistic" (very common) subset of commonWords above -- restricted to
+	// the top-10k most frequent English words. This, not the broader common
+	// tier, is what Random Puzzle actually draws from by default now (see
+	// dictionaryValidator.js's COMMON_WORDS_SIMPLISTIC_SOURCE) -- commonWords
+	// alone still has plenty of its own obscure-but-technically-common
+	// entries (rare derived forms, archaic terms) that this tightens further.
+	const commonSimplisticWords = commonWords.filter((word) => frequencyWords.has(word));
+	packTier('Simplistic common', commonSimplisticWords, commonSimplisticOutputPath);
 } else {
+	removeStaleTier(fallbackOutputPath, 'fallback');
+	removeStaleTier(commonOutputPath, 'common-words');
+	removeStaleTier(commonSimplisticOutputPath, 'simplistic common-words');
 	const report = writeSourceReport(primarySourcePath, primaryWords, null, []);
 	writeMarkdownSourceReport(report);
 	console.log(`Dictionary source report written to ${path.relative(repoRoot, reportOutputPath)}.`);

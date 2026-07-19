@@ -9,11 +9,18 @@ import {
 
 const PRIMARY_URL = 'util/compressed-dictionary.txt';
 const FALLBACK_URL = 'util/compressed-dictionary-fallback.txt';
+const COMMON_URL = 'util/compressed-dictionary-common.txt';
 
 const SOURCES = [
   { key: 'primary-packed-dawg', url: PRIMARY_URL },
   { key: 'fallback-packed-dawg', url: FALLBACK_URL, optional: true },
 ];
+
+// commonWordsOnly draws from a genuinely separate third source (see
+// dictionaryValidator.js's COMMON_WORDS_SOURCE), not a filter over
+// SOURCES above -- tests that exercise it must override commonWordsSource
+// explicitly and provide its own fake dictionary content.
+const COMMON_SOURCE = { key: 'common-packed-dawg', url: COMMON_URL, optional: true };
 
 // Fake packed-trie runtime: "packed" text is just a JSON array of words.
 function fakePTrieFactory() {
@@ -274,6 +281,35 @@ test('findCompanionWord searches across both dictionary sources', async () => {
   assert.deepEqual(result.candidates, [VALID_COMPANION_A]);
 });
 
+test('findCompanionWord with commonWordsOnly searches only the common-words source, not primary/fallback', async () => {
+  // Reproduces the actual bug: a primary-only candidate (standing in for a
+  // proper noun like "ELDERSBURG" that the primary dictionary carries but
+  // the common-words dictionary doesn't) must never surface here.
+  const { validator, calls } = createValidator(
+    {
+      [PRIMARY_URL]: [VALID_COMPANION_A],
+      [FALLBACK_URL]: [VALID_COMPANION_A, VALID_COMPANION_B],
+      [COMMON_URL]: [VALID_COMPANION_B],
+    },
+    { commonWordsSource: COMMON_SOURCE },
+  );
+
+  const result = await validator.findCompanionWord(COMPANION_SEED, { commonWordsOnly: true });
+  assert.deepEqual(result.candidates, [VALID_COMPANION_B]);
+  assert.ok(!calls.includes(PRIMARY_URL), 'commonWordsOnly must not touch the primary dictionary at all');
+  assert.ok(!calls.includes(FALLBACK_URL), 'commonWordsOnly must not touch the fallback dictionary at all');
+});
+
+test('findCompanionWord defaults to searching both sources when commonWordsOnly is omitted', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: [VALID_COMPANION_A],
+    [FALLBACK_URL]: [],
+  });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED);
+  assert.deepEqual(result.candidates, [VALID_COMPANION_A], 'Generate From Words must keep searching the full dictionary by default');
+});
+
 test('findCompanionWord never includes a blocklisted candidate', async () => {
   const fetchImpl = async (url) => {
     if (url === PRIMARY_URL) {
@@ -347,6 +383,44 @@ test('getRandomSeedWord searches across both dictionary sources', async () => {
 
   const seed = await validator.getRandomSeedWord();
   assert.equal(seed, 'KNOWN');
+});
+
+test('getRandomSeedWord with commonWordsOnly searches only the common-words source, not primary/fallback', async () => {
+  // "unknown" stands in for a primary/fallback word (e.g. a proper noun
+  // like "ELDERSBURG") that must never surface here; "known" is the only
+  // word available in the dedicated common-words source.
+  const { validator, calls } = createValidator(
+    {
+      [PRIMARY_URL]: ['unknown'],
+      [FALLBACK_URL]: ['unknown'],
+      [COMMON_URL]: ['known'],
+    },
+    { commonWordsSource: COMMON_SOURCE },
+  );
+
+  for (let i = 0; i < 10; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const seed = await validator.getRandomSeedWord({ commonWordsOnly: true });
+    assert.equal(seed, 'KNOWN');
+  }
+  assert.ok(!calls.includes(PRIMARY_URL), 'commonWordsOnly must not touch the primary dictionary at all');
+  assert.ok(!calls.includes(FALLBACK_URL), 'commonWordsOnly must not touch the fallback dictionary at all');
+});
+
+test('commonWordsOnly defaults to the simplistic common-words source when commonWordsSource is not overridden', async () => {
+  // No commonWordsSource override here -- confirms createDictionaryValidator's
+  // actual default (COMMON_WORDS_SIMPLISTIC_SOURCE), not just that an
+  // explicitly-provided source works.
+  const SIMPLISTIC_URL = 'util/compressed-dictionary-common-simplistic.txt';
+  const { validator, calls } = createValidator({
+    [PRIMARY_URL]: [],
+    [FALLBACK_URL]: [],
+    [SIMPLISTIC_URL]: ['known'],
+  });
+
+  const seed = await validator.getRandomSeedWord({ commonWordsOnly: true });
+  assert.equal(seed, 'KNOWN');
+  assert.ok(calls.includes(SIMPLISTIC_URL), 'must fetch the default simplistic source when no override is given');
 });
 
 test('getRandomSeedWord never returns a word shorter than 3 letters', async () => {

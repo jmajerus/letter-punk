@@ -1321,6 +1321,14 @@ body.arcade-mode .board-tools {
   justify-content: end;
 }
 
+.hint-tier {
+  margin-top: 14px;
+}
+
+.hint-tier .help-copy {
+  margin-top: 8px;
+}
+
 .settings-option {
   border: 1px solid rgba(205, 216, 226, 0.24);
   border-radius: 14px;
