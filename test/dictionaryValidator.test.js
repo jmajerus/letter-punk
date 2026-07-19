@@ -335,6 +335,68 @@ test('findCompanionWord reports an error when no candidate satisfies the letter 
   assert.match(result.error, /No companion word found/);
 });
 
+test('getRandomSeedWord returns a valid word from the packed dictionary', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: ['known'], [FALLBACK_URL]: [] });
+
+  const seed = await validator.getRandomSeedWord();
+  assert.equal(seed, 'KNOWN');
+});
+
+test('getRandomSeedWord searches across both dictionary sources', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: ['known'] });
+
+  const seed = await validator.getRandomSeedWord();
+  assert.equal(seed, 'KNOWN');
+});
+
+test('getRandomSeedWord never returns a word shorter than 3 letters', async () => {
+  // "ab" starts with 'a' and would otherwise be a candidate for that
+  // letter -- only "known" survives the length filter, regardless of
+  // which of the 26 letters happens to be tried first.
+  const { validator } = createValidator({ [PRIMARY_URL]: ['ab', 'known'], [FALLBACK_URL]: [] });
+
+  const seed = await validator.getRandomSeedWord();
+  assert.equal(seed, 'KNOWN');
+});
+
+test('getRandomSeedWord never returns a word with 12 or more unique letters', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: ['abcdefghijkl', 'known'], [FALLBACK_URL]: [] });
+
+  const seed = await validator.getRandomSeedWord();
+  assert.equal(seed, 'KNOWN');
+});
+
+test('getRandomSeedWord never returns a blocklisted word', async () => {
+  const fetchImpl = async (url) => {
+    if (url === PRIMARY_URL) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(['known', 'karma']) };
+    }
+    if (url === FALLBACK_URL) {
+      return { ok: true, status: 200, text: async () => JSON.stringify([]) };
+    }
+    if (url === DEFAULT_BLOCKLIST_URL) {
+      return { ok: true, status: 200, text: async () => 'KARMA\n' };
+    }
+    return { ok: false, status: 404 };
+  };
+  const validator = createDictionaryValidator({ sources: SOURCES, fetchImpl, ptrieFactory: fakePTrieFactory });
+
+  // Selection among survivors is random, so check across several calls
+  // rather than trusting a single draw to expose a broken filter.
+  for (let i = 0; i < 10; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const seed = await validator.getRandomSeedWord();
+    assert.notEqual(seed, 'KARMA');
+  }
+});
+
+test('getRandomSeedWord returns null rather than throwing when no dictionary words are available at all', async () => {
+  const { validator } = createValidator({ [PRIMARY_URL]: [], [FALLBACK_URL]: [] });
+
+  const seed = await validator.getRandomSeedWord();
+  assert.equal(seed, null);
+});
+
 test('getValidationSourceLabel maps known source keys to display labels', () => {
   assert.equal(getValidationSourceLabel('primary-packed-dawg'), 'Primary');
   assert.equal(getValidationSourceLabel('fallback-packed-dawg'), 'Fallback');

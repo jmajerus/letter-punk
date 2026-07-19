@@ -90,6 +90,8 @@ const boardBottomInput = document.getElementById('boardBottomInput');
 const boardLeftInput = document.getElementById('boardLeftInput');
 const boardPasteInput = document.getElementById('boardPasteInput');
 const importLetterBoxedButton = document.getElementById('importLetterBoxedBtn');
+const randomPuzzleButton = document.getElementById('randomPuzzleBtn');
+const randomLettersButton = document.getElementById('randomLettersBtn');
 const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
 const solutionWordsInput = document.getElementById('solutionWordsInput');
@@ -980,6 +982,8 @@ function wireEvents() {
   closeBoardButton?.addEventListener('click', modalManager.closeBoardModal);
   applyBoardButton?.addEventListener('click', boardSetup.applyBoardFromInputs);
   importLetterBoxedButton?.addEventListener('click', boardSetup.importTodaysLetterBoxedBoard);
+  randomPuzzleButton?.addEventListener('click', boardSetup.generateRandomPuzzle);
+  randomLettersButton?.addEventListener('click', boardSetup.generateRandomLetters);
   pasteClipboardButton?.addEventListener('click', boardSetup.pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', boardSetup.parsePastedBoardText);
   generateBoardButton?.addEventListener('click', boardSetup.generateBoardFromWordsInput);

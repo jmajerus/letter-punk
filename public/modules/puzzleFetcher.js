@@ -73,14 +73,17 @@ export function createPuzzleFetcher(options = {}) {
     activePuzzleIndex: -1,
     homePuzzleIndex: -1,
     puzzleSource: 'random',
-    // Set only via markCustomBoard's isLetterBoxedImport option -- narrows
-    // getPuzzleStatusText's generic 'Custom Puzzle' down to 'Letter Boxed
-    // Daily Puzzle' specifically for a board pulled in via the Set Board
-    // modal's import button, without touching puzzleSource itself (still
-    // 'custom' either way, so analytics indexing, share-link flattening,
-    // etc. -- everything keyed off puzzleSource === 'custom' -- stays
-    // exactly as it was).
-    customBoardIsLetterBoxedImport: false,
+    // Set only via markCustomBoard's kind option -- narrows
+    // getPuzzleStatusText's generic 'Custom Puzzle' down to something more
+    // specific (currently 'letterboxed-import' -> "Today's Letter Boxed",
+    // 'random-puzzle' -> 'Random Puzzle') for a board whose canonicalWords
+    // came from somewhere other than the player's own typing, without
+    // touching puzzleSource itself (still 'custom' either way, so analytics
+    // indexing, share-link flattening, etc. -- everything keyed off
+    // puzzleSource === 'custom' -- stays exactly as it was). null for a
+    // plain custom board (pasted, generated from the player's own words, or
+    // hand-typed).
+    customBoardKind: null,
     // Years already requested from the server (successfully or not), so the
     // year-boundary prefetch below never re-asks for the same year twice.
     fetchedYears: new Set(),
@@ -90,7 +93,7 @@ export function createPuzzleFetcher(options = {}) {
     state.puzzleSource = source;
     state.activePuzzleIndex = puzzleIndex;
     if (source !== 'custom') {
-      state.customBoardIsLetterBoxedImport = false;
+      state.customBoardKind = null;
     }
   }
 
@@ -262,7 +265,13 @@ export function createPuzzleFetcher(options = {}) {
     }
 
     if (state.puzzleSource === 'custom') {
-      return state.customBoardIsLetterBoxedImport ? "Today's Letter Boxed" : 'Custom Puzzle';
+      if (state.customBoardKind === 'letterboxed-import') {
+        return "Today's Letter Boxed";
+      }
+      if (state.customBoardKind === 'random-puzzle') {
+        return 'Random Puzzle';
+      }
+      return 'Custom Puzzle';
     }
 
     return 'Random board';
@@ -475,8 +484,8 @@ export function createPuzzleFetcher(options = {}) {
     return { ok: true };
   }
 
-  function markCustomBoard({ isLetterBoxedImport = false } = {}) {
-    state.customBoardIsLetterBoxedImport = Boolean(isLetterBoxedImport);
+  function markCustomBoard({ kind = null } = {}) {
+    state.customBoardKind = kind;
     setPuzzleContext('custom');
   }
 

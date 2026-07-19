@@ -325,10 +325,62 @@ export function createDictionaryValidator(options = {}) {
     return { candidates };
   }
 
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  /**
+   * Picks a random valid seed word for the fully-automated Random Puzzle
+   * flow (see boardSetup.js's generateRandomPuzzle) -- there's no bundled
+   * word list to sample from client-side, only the packed dictionaries'
+   * PTrie structures, which support enumerating every word under a given
+   * prefix (the same primitive findCompanionWord already uses) but not
+   * picking one at random directly. Enumerating a single random starting
+   * letter's worth of words (same scale findCompanionWord already pulls
+   * for a seed's last letter) and picking randomly from that pool keeps
+   * this from ever loading the entire dictionary into memory at once.
+   * Letters are tried in random order, falling through to the next only if
+   * a given letter's pool turns up empty after filtering -- true for none
+   * of the 26 letters in practice, but cheap to guard against.
+   */
+  async function getRandomSeedWord() {
+    const blockedWords = await loadBlocklist();
+    const letters = [...ALPHABET];
+    for (let index = letters.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]];
+    }
+
+    for (const letter of letters) {
+      const candidateWords = new Set();
+      for (const source of sources) {
+        // eslint-disable-next-line no-await-in-loop
+        const trie = await loadPackedDictionary(source);
+        if (!trie) {
+          continue;
+        }
+        for (const word of trie.completions(letter.toLowerCase())) {
+          candidateWords.add(word);
+        }
+      }
+
+      const candidates = [...candidateWords].filter((word) => (
+        word.length >= 3
+        && toLetterSet(word).size < 12
+        && !blockedWords.has(word.toUpperCase())
+      ));
+
+      if (candidates.length > 0) {
+        return candidates[Math.floor(Math.random() * candidates.length)].toUpperCase();
+      }
+    }
+
+    return null;
+  }
+
   return {
     validateWord,
     isBlocked,
     findCompanionWord,
+    getRandomSeedWord,
     addSessionOverride,
     clearSessionOverrides,
     clearCache() {

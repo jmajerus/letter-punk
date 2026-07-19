@@ -1,4 +1,5 @@
 import {
+  buildBoard,
   normalizeSideInput,
   boardFromInputValues,
   parseBoardText,
@@ -81,15 +82,18 @@ export function createBoardSetup({
   solutionWordsInput,
   boardInputMessageElement,
 }) {
-  // Tracks whether the board sitting in the side inputs right now is
-  // exactly what Import Today's Letter Boxed fetched, so Apply Board can
-  // label it "Today's Letter Boxed" instead of the generic 'Custom
-  // Puzzle' (see puzzleFetcher's markCustomBoard). Synced from the puzzle
-  // actually in play whenever the modal opens (prepareBoardModal), then
-  // cleared by anything that replaces the inputs with something else --
-  // Parse Pasted Text, Generate From Words, or hand-editing a side directly
-  // (see the input listeners below).
-  let boardIsImportedLetterBoxed = false;
+  // Tracks where the board sitting in the side inputs right now actually
+  // came from -- null (plain: pasted, generated from the player's own
+  // words, hand-typed, or Random Letters), 'letterboxed-import' (Import
+  // Today's Letter Boxed), or 'random-puzzle' (Random Puzzle). Passed
+  // straight through to puzzleFetcher's markCustomBoard on Apply, which
+  // uses it to label the status something more specific than the generic
+  // 'Custom Puzzle'. Synced from the puzzle actually in play whenever the
+  // modal opens (prepareBoardModal), then cleared by anything that replaces
+  // the inputs with something else -- Parse Pasted Text, Generate From
+  // Words, Random Letters, or hand-editing a side directly (see the input
+  // listeners below).
+  let boardKind = null;
 
   function setBoardInputMessage(text, kind = '') {
     if (!boardInputMessageElement) {
@@ -124,17 +128,17 @@ export function createBoardSetup({
     }
 
     const pState = puzzleFetcher.getState();
-    boardIsImportedLetterBoxed = pState.puzzleSource === 'custom' && Boolean(pState.customBoardIsLetterBoxedImport);
+    boardKind = pState.puzzleSource === 'custom' ? pState.customBoardKind : null;
 
-    // Never pre-fill the real answer back into this field for an imported
-    // Letter Boxed board -- unlike Generate From Words (where these are
-    // always words the player themselves typed in), an imported board's
-    // canonicalWords is the actual NYT solution, which the player hasn't
-    // necessarily seen yet. Showing it here on a routine modal reopen would
-    // spoil it well outside the existing, deliberately explicit Reveal
-    // Solution path.
+    // Never pre-fill the real answer back into this field for a board whose
+    // canonicalWords didn't come from the player's own typing (an imported
+    // Letter Boxed board, or a Random Puzzle) -- unlike Generate From Words,
+    // where these are always words the player themselves typed in, those
+    // two hold a real solution the player hasn't necessarily seen yet.
+    // Showing it here on a routine modal reopen would spoil it well outside
+    // the existing, deliberately explicit Reveal Solution path.
     if (solutionWordsInput) {
-      solutionWordsInput.value = boardIsImportedLetterBoxed ? '' : getCanonicalWords().join(' ');
+      solutionWordsInput.value = boardKind ? '' : getCanonicalWords().join(' ');
     }
 
     setBoardInputMessage('');
@@ -169,10 +173,89 @@ export function createBoardSetup({
     }
 
     fillBoardInputs(payload.board);
-    boardIsImportedLetterBoxed = true;
+    boardKind = 'letterboxed-import';
     setCanonicalWords(payload.solutionWords || []);
     const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed board";
     setBoardInputMessage(`Imported ${puzzleLabel} (${payload.date}). Click Apply Board to play it.`, 'success');
+  }
+
+  // Fully automated: picks a random seed word (dictionaryValidator's
+  // getRandomSeedWord) and a companion for it via the same pipeline Generate
+  // From Words uses for a single-word seed, so the resulting board comes
+  // with a genuine reference solution -- unlike Random Letters below, which
+  // has no known answer at all. Retries with a fresh random seed, rather
+  // than surfacing an error, if a given seed has no companion or none of
+  // its candidates produce a valid layout: there's no player-chosen seed to
+  // blame here, so quietly trying again is the right default, not an error
+  // message about a word the player never typed or saw. The seed/companion
+  // themselves are set as canonicalWords quietly, same spoiler handling as
+  // an imported Letter Boxed board (see prepareBoardModal's guard above and
+  // applyBoardFromInputs' generic override message below) -- the player
+  // hasn't seen these words either.
+  const MAX_RANDOM_PUZZLE_SEED_ATTEMPTS = 8;
+
+  async function generateRandomPuzzle() {
+    setBoardInputMessage('Generating a random puzzle…');
+
+    for (let attempt = 0; attempt < MAX_RANDOM_PUZZLE_SEED_ATTEMPTS; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const seed = await dictionaryValidator.getRandomSeedWord();
+      if (!seed) {
+        break;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const companionResult = await dictionaryValidator.findCompanionWord(seed);
+      if (companionResult.error) {
+        continue;
+      }
+
+      const companion = pickBalancedCompanion(seed.toUpperCase(), companionResult.candidates);
+      if (!companion) {
+        continue;
+      }
+
+      const words = [seed.toUpperCase(), companion.toUpperCase()];
+      const generated = generateBoardFromSolutionWords(words);
+      if (generated.error) {
+        continue;
+      }
+
+      fillBoardInputs({
+        top: generated.board[0].letters.join(''),
+        right: generated.board[1].letters.join(''),
+        bottom: generated.board[2].letters.join(''),
+        left: generated.board[3].letters.join(''),
+      });
+      boardKind = 'random-puzzle';
+      setCanonicalWords(words);
+      setBoardInputMessage('Generated a random puzzle. Review and Apply Board.', 'success');
+      return;
+    }
+
+    setBoardInputMessage("Couldn't generate a random puzzle right now. Try again, or use Random Letters below.", 'error');
+  }
+
+  // buildBoard() is the same generator used for the placeholder board before
+  // the daily catalog (or a shared link) loads at boot -- this just exposes
+  // it as something a player can deliberately ask for again, same
+  // fill-then-Apply flow as every other way of getting letters into these
+  // fields. Unlike Random Puzzle above, there's no known reference solution
+  // for these letters at all (not even a hidden one) -- just a random
+  // arrangement, not guaranteed easy or even to admit a short solve -- so
+  // this lives in Advanced alongside the other build-it-yourself tools,
+  // not next to Random Puzzle.
+  function generateRandomLetters() {
+    const board = buildBoard();
+    fillBoardInputs({
+      top: board[0].letters.join(''),
+      right: board[1].letters.join(''),
+      bottom: board[2].letters.join(''),
+      left: board[3].letters.join(''),
+    });
+    boardKind = null;
+    setCanonicalWords([]);
+    setBoardInputMessage('Generated random letters. Review and Apply Board.', 'success');
   }
 
   async function pasteBoardFromClipboard() {
@@ -200,7 +283,7 @@ export function createBoardSetup({
     }
 
     fillBoardInputs(parsed.values);
-    boardIsImportedLetterBoxed = false;
+    boardKind = null;
     setBoardInputMessage('Parsed board text into side inputs.', 'success');
   }
 
@@ -266,7 +349,7 @@ export function createBoardSetup({
       bottom: generated.board[2].letters.join(''),
       left: generated.board[3].letters.join(''),
     });
-    boardIsImportedLetterBoxed = false;
+    boardKind = null;
 
     // Persists across modal opens/closes until a different puzzle is
     // actually loaded (see the puzzleFetcher applyBoard callback).
@@ -329,22 +412,28 @@ export function createBoardSetup({
     // status text) synchronously and immediately, so marking the context
     // first is the only way the status shown right after Apply is correct
     // on the first render instead of one interaction behind.
-    puzzleFetcher.markCustomBoard({ isLetterBoxedImport: boardIsImportedLetterBoxed });
+    puzzleFetcher.markCustomBoard({ kind: boardKind });
     gameEngine.applyBoardDefinition(parsed.board);
 
     const overrideWords = await applySolutionWordOverrides(getCanonicalWords());
 
     trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
     modalManager.closeBoardModal();
-    const boardLabel = boardIsImportedLetterBoxed ? "today's Letter Boxed board" : 'custom board';
+    let boardLabel = 'custom board';
+    if (boardKind === 'letterboxed-import') {
+      boardLabel = "today's Letter Boxed board";
+    } else if (boardKind === 'random-puzzle') {
+      boardLabel = 'random puzzle';
+    }
     let message = `Applied ${boardLabel}. Route away.`;
     if (overrideWords.length > 0) {
       // Naming the override words is safe for a player-typed Generate From
       // Words board (they're the player's own words), but an imported
-      // Letter Boxed board's overrides are the real NYT answer -- named
-      // here, this would spoil it well outside the explicit Reveal
-      // Solution path, so this case stays generic instead.
-      message = boardIsImportedLetterBoxed
+      // Letter Boxed board or a Random Puzzle's overrides are a real
+      // solution the player hasn't seen -- named here, this would spoil it
+      // well outside the explicit Reveal Solution path, so either case
+      // stays generic instead.
+      message = boardKind
         ? `Applied ${boardLabel}. Its solution needed a one-time dictionary allowance to stay solvable here. Route away.`
         : `Applied ${boardLabel}. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`;
     }
@@ -384,7 +473,7 @@ export function createBoardSetup({
     // against the real NYT answer (see prepareBoardModal's spoiler guard
     // and applyBoardFromInputs' generic override message).
     setCanonicalWords(payload.solutionWords || []);
-    puzzleFetcher.markCustomBoard({ isLetterBoxedImport: true });
+    puzzleFetcher.markCustomBoard({ kind: 'letterboxed-import' });
     gameEngine.applyBoardDefinition(parsed.board);
     await applySolutionWordOverrides(getCanonicalWords());
 
@@ -393,13 +482,13 @@ export function createBoardSetup({
     setMessage(`Loaded ${puzzleLabel}. Route away.`, 'success');
   }
 
-  // Hand-editing any side after an import breaks the "this is exactly
-  // today's Letter Boxed board" claim, same as Parse/Generate replacing it
-  // outright.
+  // Hand-editing any side after an import or Random Puzzle breaks the
+  // "this is exactly that fetched/generated board" claim, same as
+  // Parse/Generate/Random Letters replacing it outright.
   for (const input of [boardTopInput, boardRightInput, boardBottomInput, boardLeftInput]) {
     input?.addEventListener('input', () => {
       input.value = normalizeSideInput(input.value);
-      boardIsImportedLetterBoxed = false;
+      boardKind = null;
       setBoardInputMessage('');
     });
   }
@@ -407,6 +496,8 @@ export function createBoardSetup({
   return {
     prepareBoardModal,
     importTodaysLetterBoxedBoard,
+    generateRandomPuzzle,
+    generateRandomLetters,
     pasteBoardFromClipboard,
     parsePastedBoardText,
     generateBoardFromWordsInput,

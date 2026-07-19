@@ -213,14 +213,18 @@ test('markCustomBoard and markRandomBoard reset the puzzle source and clear the 
   assert.equal(fetcher.getPuzzleStatusText(), 'Random board');
 });
 
-test('markCustomBoard with isLetterBoxedImport labels the status distinctly, and clears on the next plain custom board', async () => {
+test('markCustomBoard with kind labels the status distinctly, and clears on the next plain custom board', async () => {
   const catalog = [makeEntry(isoDate(0))];
   const { fetcher } = createFetcher(catalog);
   await fetcher.loadDailyPuzzleCatalog();
 
-  fetcher.markCustomBoard({ isLetterBoxedImport: true });
+  fetcher.markCustomBoard({ kind: 'letterboxed-import' });
   assert.equal(fetcher.getState().puzzleSource, 'custom');
   assert.equal(fetcher.getPuzzleStatusText(), "Today's Letter Boxed");
+
+  fetcher.markCustomBoard({ kind: 'random-puzzle' });
+  assert.equal(fetcher.getState().puzzleSource, 'custom');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Random Puzzle');
 
   fetcher.markCustomBoard();
   assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
