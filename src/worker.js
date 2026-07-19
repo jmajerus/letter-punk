@@ -1,5 +1,6 @@
 import { handleAdmin } from './admin.js';
 import { getPsaFeedItems } from './psaFeed.js';
+import { getTodaysLetterBoxedBoard } from './letterboxedImport.js';
 
 /**
  * Worker entry point.
@@ -10,7 +11,7 @@ import { getPsaFeedItems } from './psaFeed.js';
  * purpose-built store for public reads, since Analytics Engine itself is
  * for aggregate dashboard queries, not per-request client-facing ones.
  * Handles GET /api/solutions?date=YYYY-MM-DD → reads that pool back, for
- * the Yesterday modal's "Player solutions" section.
+ * the Yesterday modal's "Community solves" section.
  * All other requests are forwarded to the static asset binding.
  *
  * Analytics schema, blob1-3 (all events):
@@ -206,7 +207,7 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const PLAYER_SOLUTIONS_CAP = 20;
 
 // Stores a capped, deduplicated pool of real player solutions per catalog
-// puzzle date, for the "Player solutions" section of the Yesterday/Reveal
+// puzzle date, for the "Community solves" section of the Yesterday/Reveal
 // Solution modals -- a small, purpose-built KV list, not something read
 // back out of Analytics Engine (which is for aggregate dashboard queries,
 // not per-request public reads). Only catalog dates are ever stored, since
@@ -218,11 +219,17 @@ const PLAYER_SOLUTIONS_CAP = 20;
 // 2-word answers in the first place, so the pool is naturally
 // self-limiting on its own.
 //
-// Each entry is { words, completedInFreeChain }, not a bare word array --
-// completedInFreeChain isn't derivable later from the words themselves (a
-// normal-mode solve is always fully chained by construction, so nothing
-// about the finished word list reveals whether chaining was optional), so
-// it's captured at the one point it's actually known.
+// Each entry is { words, freeChain }, not a bare word array -- freeChain
+// isn't derivable later from the words themselves (a normal-mode solve is
+// always fully chained by construction, so nothing about the finished word
+// list reveals whether chaining was optional), so it's captured at the one
+// point it's actually known. Stored under the short name `freeChain` rather
+// than the `completedInFreeChain` name used everywhere else in the
+// codebase purely for KV-string readability -- this is the one place the
+// field is serialized to raw JSON text a human might actually read (the
+// KV dashboard, a debugging curl), and nothing reads this key back by name
+// on the client (see loadPlayerSolutions in app.js, which only ever touches
+// entry.words), so the shorter name costs nothing.
 async function storePlayerSolution(puzzleId, words, completedInFreeChain, env) {
   if (!env.SOLUTIONS_KV || !ISO_DATE_PATTERN.test(puzzleId) || !Array.isArray(words) || words.length < 2) {
     return;
@@ -241,7 +248,7 @@ async function storePlayerSolution(puzzleId, words, completedInFreeChain, env) {
     return;
   }
 
-  solutions.push({ words, completedInFreeChain: completedInFreeChain === true });
+  solutions.push({ words, freeChain: completedInFreeChain === true });
   await env.SOLUTIONS_KV.put(key, JSON.stringify(solutions)).catch(() => {});
 }
 
@@ -273,10 +280,39 @@ export default {
       });
     }
 
+    // Today's real NYT Letter Boxed board layout, for the Set Board modal's
+    // import button (see src/letterboxedImport.js for where this data comes
+    // from and why). Returns 502 -- never a board -- when the upstream
+    // source is unavailable or its markup no longer matches; the client
+    // falls back to manual entry rather than treating this as fatal.
+    if (request.method === 'GET' && url.pathname === '/api/import/letterboxed') {
+      const data = await getTodaysLetterBoxedBoard(env, ctx);
+      if (!data) {
+        return new Response(JSON.stringify({ error: "Couldn't fetch today's Letter Boxed board. Try again later, or enter it manually below." }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+
+      const [top, right, bottom, left] = data.sides;
+      return new Response(JSON.stringify({
+        board: { top, right, bottom, left },
+        date: data.date,
+        puzzleNumber: data.puzzleNumber,
+        par: data.par,
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
     // Player-submitted solutions for a catalog date's Yesterday modal.
     // Returns [] (never an error) whenever SOLUTIONS_KV isn't bound or
     // nothing's been stored yet for that date — an empty pool just means
-    // the client shows no "Player solutions" section, not a broken one.
+    // the client shows no "Community solves" section, not a broken one.
     if (request.method === 'GET' && url.pathname === '/api/solutions') {
       const date = url.searchParams.get('date') || '';
       let solutions = [];

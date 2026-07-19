@@ -172,7 +172,7 @@
         <p id="yesterdayPuzzleDate" class="help-copy"></p>
         <p id="yesterdayPuzzleWords" class="yesterday-solution" aria-live="polite"></p>
         <div id="playerSolutionsSection" class="player-solutions" hidden>
-          <p class="help-copy player-solutions-label">Player solutions:</p>
+          <p class="help-copy player-solutions-label">Community solves:</p>
           <ul id="playerSolutionsList" class="help-list" aria-live="polite"></ul>
         </div>
         <div class="help-actions">
@@ -190,7 +190,7 @@
         <p id="revealSolutionText" class="reveal-solution-text" aria-live="polite"></p>
         <div id="revealPlayerSolutionsSection" class="player-solutions" hidden>
           <p id="revealFirstToMatchCountMessage" class="help-copy player-solutions-empty" aria-live="polite" hidden></p>
-          <p id="revealPlayerSolutionsLabel" class="help-copy player-solutions-label">Player solutions:</p>
+          <p id="revealPlayerSolutionsLabel" class="help-copy player-solutions-label">Community solves:</p>
           <ul id="revealPlayerSolutionsList" class="help-list" aria-live="polite"></ul>
           <p id="revealPlayerSolutionsEmptyMessage" class="help-copy player-solutions-empty" aria-live="polite" hidden></p>
         </div>
@@ -203,10 +203,13 @@
     <div id="boardModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="boardTitle" hidden>
       <div class="help-dialog">
         <div class="help-header">
-          <h2 id="boardTitle">Set Daily Board</h2>
+          <h2 id="boardTitle">Set Board</h2>
           <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close board setup">Close</button>
         </div>
         <p class="help-copy">Paste the current puzzle letters. Use 3 letters per side (for example: CRT), or 12 letters clockwise from upper-left with no spaces.</p>
+        <div class="board-paste-actions">
+          <button id="importLetterBoxedBtn" class="secondary" type="button">Import Today's Letter Boxed</button>
+        </div>
         <label class="board-input-label" for="boardPasteInput">Pasted board text (optional)</label>
         <textarea id="boardPasteInput" class="board-input board-paste" rows="3" placeholder='Examples:\n{"top":"ABC","right":"DEF","bottom":"GHI","left":"JKL"}\nTOP: ABC RIGHT: DEF BOTTOM: GHI LEFT: JKL\nABCDEFGHIJKL (clockwise from upper-left)'></textarea>
         <div class="board-paste-actions">

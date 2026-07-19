@@ -206,11 +206,24 @@ test('markCustomBoard and markRandomBoard reset the puzzle source and clear the 
   fetcher.markCustomBoard();
   assert.deepEqual(fetcher.getState().puzzleSource, 'custom');
   assert.equal(fetcher.getState().activePuzzleIndex, -1);
-  assert.equal(fetcher.getPuzzleStatusText(), 'Custom board');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
 
   fetcher.markRandomBoard();
   assert.equal(fetcher.getState().puzzleSource, 'random');
   assert.equal(fetcher.getPuzzleStatusText(), 'Random board');
+});
+
+test('markCustomBoard with isLetterBoxedImport labels the status distinctly, and clears on the next plain custom board', async () => {
+  const catalog = [makeEntry(isoDate(0))];
+  const { fetcher } = createFetcher(catalog);
+  await fetcher.loadDailyPuzzleCatalog();
+
+  fetcher.markCustomBoard({ isLetterBoxedImport: true });
+  assert.equal(fetcher.getState().puzzleSource, 'custom');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Letter Boxed Daily Puzzle');
+
+  fetcher.markCustomBoard();
+  assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
 });
 
 test('getYesterdayPuzzleData returns the previous entry\'s canonical words, uppercased', async () => {

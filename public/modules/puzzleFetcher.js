@@ -73,6 +73,14 @@ export function createPuzzleFetcher(options = {}) {
     activePuzzleIndex: -1,
     homePuzzleIndex: -1,
     puzzleSource: 'random',
+    // Set only via markCustomBoard's isLetterBoxedImport option -- narrows
+    // getPuzzleStatusText's generic 'Custom Puzzle' down to 'Letter Boxed
+    // Daily Puzzle' specifically for a board pulled in via the Set Board
+    // modal's import button, without touching puzzleSource itself (still
+    // 'custom' either way, so analytics indexing, share-link flattening,
+    // etc. -- everything keyed off puzzleSource === 'custom' -- stays
+    // exactly as it was).
+    customBoardIsLetterBoxedImport: false,
     // Years already requested from the server (successfully or not), so the
     // year-boundary prefetch below never re-asks for the same year twice.
     fetchedYears: new Set(),
@@ -81,6 +89,9 @@ export function createPuzzleFetcher(options = {}) {
   function setPuzzleContext(source, puzzleIndex = -1) {
     state.puzzleSource = source;
     state.activePuzzleIndex = puzzleIndex;
+    if (source !== 'custom') {
+      state.customBoardIsLetterBoxedImport = false;
+    }
   }
 
   function findTodayPuzzleIndex(catalog = state.puzzleCatalog) {
@@ -251,7 +262,7 @@ export function createPuzzleFetcher(options = {}) {
     }
 
     if (state.puzzleSource === 'custom') {
-      return 'Custom board';
+      return state.customBoardIsLetterBoxedImport ? 'Letter Boxed Daily Puzzle' : 'Custom Puzzle';
     }
 
     return 'Random board';
@@ -464,7 +475,8 @@ export function createPuzzleFetcher(options = {}) {
     return { ok: true };
   }
 
-  function markCustomBoard() {
+  function markCustomBoard({ isLetterBoxedImport = false } = {}) {
+    state.customBoardIsLetterBoxedImport = Boolean(isLetterBoxedImport);
     setPuzzleContext('custom');
   }
 

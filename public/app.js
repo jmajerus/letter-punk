@@ -94,6 +94,7 @@ const boardRightInput = document.getElementById('boardRightInput');
 const boardBottomInput = document.getElementById('boardBottomInput');
 const boardLeftInput = document.getElementById('boardLeftInput');
 const boardPasteInput = document.getElementById('boardPasteInput');
+const importLetterBoxedButton = document.getElementById('importLetterBoxedBtn');
 const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
 const solutionWordsInput = document.getElementById('solutionWordsInput');
@@ -277,6 +278,15 @@ const campaignCard = createCampaignCard({
 // freely delete/redo words and still be rated against it.
 let canonicalWords = [];
 
+// Tracks whether the board sitting in the Set Board modal's side inputs
+// right now is exactly what Import Today's Letter Boxed fetched, so Apply
+// Board can label it 'Letter Boxed Daily Puzzle' instead of the generic
+// 'Custom Puzzle' (see puzzleFetcher's markCustomBoard). Synced from the
+// puzzle actually in play whenever the modal opens (fillBoardInputsFromCurrentBoard),
+// then cleared by anything that replaces the inputs with something else --
+// Parse Pasted Text, Generate From Words, or hand-editing a side directly.
+let boardIsImportedLetterBoxed = false;
+
 // Setter form of the above, for modules (puzzleReplay.js, arcadeMode.js)
 // that need to update it without owning the variable themselves.
 function setCanonicalWords(words) {
@@ -339,7 +349,7 @@ const modalManager = createModalManager({
 // canonical/own-result text alongside it. `excludeWords` filters out a
 // chain that exactly matches it -- used by the Reveal Solution modal so a
 // player is never shown their own just-submitted solution reflected back
-// at them under "Player solutions," only a genuinely different one.
+// at them under "Community solves," only a genuinely different one.
 //
 // `emptyMessage` (Reveal Solution only) covers what "nothing eligible to
 // show" actually means there: since a solve's own write to the pool has
@@ -468,6 +478,9 @@ function fillBoardInputsFromCurrentBoard() {
     bottom: board[2]?.letters.join('') || '',
     left: board[3]?.letters.join('') || '',
   });
+
+  const pState = puzzleFetcher.getState();
+  boardIsImportedLetterBoxed = pState.puzzleSource === 'custom' && Boolean(pState.customBoardIsLetterBoxedImport);
 
   if (boardPasteInput) {
     boardPasteInput.value = '';
@@ -918,17 +931,23 @@ async function applyBoardFromInputs() {
   }
 
   settings.clearFreeChainSessionOverride();
+  // markCustomBoard runs before applyBoardDefinition, not after: the engine
+  // fires its onStateChange callback (which reads puzzleFetcher's status
+  // text) synchronously and immediately, so marking the context first is
+  // the only way the status shown right after Apply is correct on the
+  // first render instead of one interaction behind.
+  puzzleFetcher.markCustomBoard({ isLetterBoxedImport: boardIsImportedLetterBoxed });
   gameEngine.applyBoardDefinition(parsed.board);
-  puzzleFetcher.markCustomBoard();
 
   const overrideWords = await applySolutionWordOverrides(canonicalWords);
 
   trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
   modalManager.closeBoardModal();
+  const boardLabel = boardIsImportedLetterBoxed ? "today's Letter Boxed board" : 'custom board';
   setMessage(
     overrideWords.length > 0
-      ? `Applied custom board. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`
-      : 'Applied custom board. Route away.',
+      ? `Applied ${boardLabel}. ${overrideWords.join(' and ')} will always be accepted while solving it. Route away.`
+      : `Applied ${boardLabel}. Route away.`,
   );
 }
 
@@ -1040,6 +1059,7 @@ async function generateBoardFromWordsInput() {
     bottom: generated.board[2].letters.join(''),
     left: generated.board[3].letters.join(''),
   });
+  boardIsImportedLetterBoxed = false;
 
   // Persists across modal opens/closes until a different puzzle is
   // actually loaded (see the puzzleFetcher applyBoard callback).
@@ -1129,6 +1149,33 @@ async function copyShareLink({ includeProgress }) {
   }
 }
 
+// Fetches today's real NYT Letter Boxed board (via the server-side
+// /api/import/letterboxed route -- see src/letterboxedImport.js) and fills
+// it into the side inputs, exactly like Parse Pasted Text does. Deliberately
+// doesn't auto-apply: the player still reviews and clicks Apply Board
+// themselves, same as every other way of getting letters into these fields.
+async function importTodaysLetterBoxedBoard() {
+  setBoardInputMessage("Fetching today's board…");
+
+  let payload = null;
+  try {
+    const response = await fetch('/api/import/letterboxed');
+    payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.board) {
+      setBoardInputMessage(payload?.error || "Couldn't fetch today's board. Enter it manually below.", 'error');
+      return;
+    }
+  } catch {
+    setBoardInputMessage("Couldn't fetch today's board. Enter it manually below.", 'error');
+    return;
+  }
+
+  fillBoardInputs(payload.board);
+  boardIsImportedLetterBoxed = true;
+  const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed board";
+  setBoardInputMessage(`Imported ${puzzleLabel} (${payload.date}). Click Apply Board to play it.`, 'success');
+}
+
 async function pasteBoardFromClipboard() {
   if (!navigator.clipboard?.readText) {
     setBoardInputMessage('Clipboard read is unavailable in this browser context.', 'error');
@@ -1154,6 +1201,7 @@ function parsePastedBoardText() {
   }
 
   fillBoardInputs(parsed.values);
+  boardIsImportedLetterBoxed = false;
   setBoardInputMessage('Parsed board text into side inputs.', 'success');
 }
 
@@ -1226,9 +1274,18 @@ function wireEvents() {
   gotItButton?.addEventListener('click', modalManager.closeHelpModal);
   closeBoardButton?.addEventListener('click', modalManager.closeBoardModal);
   applyBoardButton?.addEventListener('click', applyBoardFromInputs);
+  importLetterBoxedButton?.addEventListener('click', importTodaysLetterBoxedBoard);
   pasteClipboardButton?.addEventListener('click', pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', parsePastedBoardText);
   generateBoardButton?.addEventListener('click', generateBoardFromWordsInput);
+  // Hand-editing any side after an import breaks the "this is exactly
+  // today's Letter Boxed board" claim, same as Parse/Generate replacing it
+  // outright.
+  for (const input of [boardTopInput, boardRightInput, boardBottomInput, boardLeftInput]) {
+    input?.addEventListener('input', () => {
+      boardIsImportedLetterBoxed = false;
+    });
+  }
   copyBlankLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: false }));
   copyProgressLinkButton?.addEventListener('click', () => copyShareLink({ includeProgress: true }));
 
@@ -1556,7 +1613,13 @@ function initializeGame() {
       // thousands of duplicate "solve" events a day for a demo, not a play.
       if (!arcadeMode.isActive()) {
         trackWordSubmit(outcome, validationSource, word, wordLength, puzzleId);
-        if (solved) {
+        // justCompleted, not solved -- solved stays true for every word
+        // submitted after the board first fills (continued Free Chain
+        // play), and each game_solved event costs a KV read+write server
+        // side (see storePlayerSolution). Gating on justCompleted caps
+        // that at one write per completion, however long a Vocabulary
+        // Wrangler session runs afterward, instead of one per extra word.
+        if (justCompleted) {
           // getShareSummary already computes both the solve-order word list
           // and completedInFreeChain together -- reusing it here instead of
           // re-deriving from foundWords keeps this in one place rather than
