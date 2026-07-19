@@ -262,7 +262,7 @@ export function createPuzzleFetcher(options = {}) {
     }
 
     if (state.puzzleSource === 'custom') {
-      return state.customBoardIsLetterBoxedImport ? 'Letter Boxed Daily Puzzle' : 'Custom Puzzle';
+      return state.customBoardIsLetterBoxedImport ? "Today's Letter Boxed" : 'Custom Puzzle';
     }
 
     return 'Random board';

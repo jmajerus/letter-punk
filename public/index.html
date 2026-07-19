@@ -84,6 +84,7 @@
               <button id="todayPuzzleBtn" class="secondary today-puzzle-btn" type="button" aria-label="Return to today's puzzle">Today's Puzzle</button>
               <button id="nextPuzzleBtn" class="secondary puzzle-nav-arrow" type="button" aria-label="Play next puzzle">&gt;</button>
             </div>
+            <button id="playLetterBoxedBtn" class="secondary today-puzzle-btn" type="button" aria-label="Play today's real Letter Boxed board">Letter Boxed</button>
             <button id="resetBtn" class="secondary reset-btn" type="button" aria-label="Reset this puzzle">Reset</button>
             <button id="clearBtn" class="secondary" aria-label="Delete current word">Undo Word</button>
             <button id="undoBtn" class="secondary" aria-label="Delete last character">Undo Letter</button>
@@ -206,34 +207,37 @@
           <h2 id="boardTitle">Set Board</h2>
           <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close board setup">Close</button>
         </div>
-        <p class="help-copy">Paste the current puzzle letters. Use 3 letters per side (for example: CRT), or 12 letters clockwise from upper-left with no spaces.</p>
+        <p class="help-copy">Import today's board below, or open Advanced to paste board text, generate one from solution words, or type the letters in yourself.</p>
         <div class="board-paste-actions">
           <button id="importLetterBoxedBtn" class="secondary" type="button">Import Today's Letter Boxed</button>
         </div>
-        <label class="board-input-label" for="boardPasteInput">Pasted board text (optional)</label>
-        <textarea id="boardPasteInput" class="board-input board-paste" rows="3" placeholder='Examples:\n{"top":"ABC","right":"DEF","bottom":"GHI","left":"JKL"}\nTOP: ABC RIGHT: DEF BOTTOM: GHI LEFT: JKL\nABCDEFGHIJKL (clockwise from upper-left)'></textarea>
-        <div class="board-paste-actions">
-          <button id="pasteClipboardBtn" class="secondary" type="button">Paste Clipboard</button>
-          <button id="parseBoardPasteBtn" class="secondary" type="button">Parse Pasted Text</button>
-        </div>
-        <label class="board-input-label" for="solutionWordsInput">Generate from solution words (optional)</label>
-        <input id="solutionWordsInput" class="board-input" type="text" placeholder="SEEDWORD (or: WORDONE WORDTWO)" />
-        <div class="board-paste-actions">
-          <button id="generateBoardBtn" class="secondary" type="button">Generate From Words</button>
-        </div>
-        <div class="board-input-grid">
-          <label class="board-input-label" for="boardTopInput">Top</label>
-          <input id="boardTopInput" class="board-input" type="text" maxlength="8" placeholder="CRT" />
+        <details class="board-advanced">
+          <summary>Advanced: paste, generate, or type letters in by hand</summary>
+          <label class="board-input-label" for="boardPasteInput">Pasted board text (optional)</label>
+          <textarea id="boardPasteInput" class="board-input board-paste" rows="3" placeholder='Examples:\n{"top":"ABC","right":"DEF","bottom":"GHI","left":"JKL"}\nTOP: ABC RIGHT: DEF BOTTOM: GHI LEFT: JKL\nABCDEFGHIJKL (clockwise from upper-left)'></textarea>
+          <div class="board-paste-actions">
+            <button id="pasteClipboardBtn" class="secondary" type="button">Paste Clipboard</button>
+            <button id="parseBoardPasteBtn" class="secondary" type="button">Parse Pasted Text</button>
+          </div>
+          <label class="board-input-label" for="solutionWordsInput">Generate from solution words (optional)</label>
+          <input id="solutionWordsInput" class="board-input" type="text" placeholder="SEEDWORD (or: WORDONE WORDTWO)" />
+          <div class="board-paste-actions">
+            <button id="generateBoardBtn" class="secondary" type="button">Generate From Words</button>
+          </div>
+          <div class="board-input-grid">
+            <label class="board-input-label" for="boardTopInput">Top</label>
+            <input id="boardTopInput" class="board-input" type="text" maxlength="8" placeholder="CRT" />
 
-          <label class="board-input-label" for="boardRightInput">Right</label>
-          <input id="boardRightInput" class="board-input" type="text" maxlength="8" placeholder="OAE" />
+            <label class="board-input-label" for="boardRightInput">Right</label>
+            <input id="boardRightInput" class="board-input" type="text" maxlength="8" placeholder="OAE" />
 
-          <label class="board-input-label" for="boardBottomInput">Bottom</label>
-          <input id="boardBottomInput" class="board-input" type="text" maxlength="8" placeholder="LNS" />
+            <label class="board-input-label" for="boardBottomInput">Bottom</label>
+            <input id="boardBottomInput" class="board-input" type="text" maxlength="8" placeholder="LNS" />
 
-          <label class="board-input-label" for="boardLeftInput">Left</label>
-          <input id="boardLeftInput" class="board-input" type="text" maxlength="8" placeholder="DIM" />
-        </div>
+            <label class="board-input-label" for="boardLeftInput">Left</label>
+            <input id="boardLeftInput" class="board-input" type="text" maxlength="8" placeholder="DIM" />
+          </div>
+        </details>
         <div id="boardInputMessage" class="message" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="help-actions">
           <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>

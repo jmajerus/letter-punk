@@ -1356,6 +1356,29 @@ body.arcade-mode .board-tools {
   outline-offset: 1px;
 }
 
+.board-advanced {
+  margin-top: 14px;
+  border: 1px solid rgba(205, 216, 226, 0.24);
+  border-radius: 14px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(36, 44, 51, 0.9), rgba(24, 29, 34, 0.9));
+}
+
+.board-advanced summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.board-advanced[open] summary {
+  margin-bottom: 10px;
+}
+
+.board-advanced summary::marker {
+  color: var(--muted);
+}
+
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: 1fr;

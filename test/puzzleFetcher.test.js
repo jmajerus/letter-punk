@@ -220,7 +220,7 @@ test('markCustomBoard with isLetterBoxedImport labels the status distinctly, and
 
   fetcher.markCustomBoard({ isLetterBoxedImport: true });
   assert.equal(fetcher.getState().puzzleSource, 'custom');
-  assert.equal(fetcher.getPuzzleStatusText(), 'Letter Boxed Daily Puzzle');
+  assert.equal(fetcher.getPuzzleStatusText(), "Today's Letter Boxed");
 
   fetcher.markCustomBoard();
   assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
