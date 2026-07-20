@@ -7,7 +7,7 @@ import {
   generateBoardFromSolutionWords,
   findChainBreaks,
 } from './buildLogic.js';
-import { COMMON_WORDS_SOURCE } from './dictionaryValidator.js';
+import { COMMON_WORDS_SOURCE, GENERATION_DICTIONARY_OPTIONS } from './dictionaryValidator.js';
 
 // A candidate list sorted shortest-to-longest gives us any percentile for
 // free by index. The raw dictionary's length distribution is dominated by
@@ -82,20 +82,75 @@ export function createBoardSetup({
   boardPasteInput,
   solutionWordsInput,
   boardInputMessageElement,
+  controlledPuzzleDictionariesElement,
+  generateControlledPuzzleButton,
 }) {
   // Tracks where the board sitting in the side inputs right now actually
-  // came from -- null (plain: pasted, generated from the player's own
-  // words, hand-typed, or Random Letters), 'letterboxed-import' (Import
-  // Today's Letter Boxed), 'random-puzzle' (Random Puzzle), or
-  // 'simple-puzzle' (Simple Puzzle). Passed straight through to
+  // came from -- null (plain, player-authored: pasted, generated from the
+  // player's own words, or hand-typed), 'letterboxed-import' (Import
+  // Today's Letter Boxed), 'random-puzzle' (Random Puzzle), 'simple-puzzle'
+  // (Simple Puzzle), 'controlled-puzzle' (Controlled Puzzle), or
+  // 'random-letters' (Random Letters). Passed straight through to
   // puzzleFetcher's markCustomBoard on Apply, which uses it to label the
-  // status something more specific than the generic 'Custom Puzzle'.
-  // Synced from the puzzle actually in play whenever the modal opens
-  // (prepareBoardModal), then cleared by anything that replaces the inputs
-  // with something else -- Parse Pasted Text, Generate From Words, Random
-  // Letters, or hand-editing a side directly (see the input listeners
-  // below).
+  // status something more specific than the generic 'Custom Puzzle' --
+  // 'random-letters' maps to 'Random board' specifically, the same label
+  // the pre-catalog-load placeholder/fallback already uses, since both are
+  // the identical buildBoard() generator with no canonical solution;
+  // "Custom Puzzle" is reserved for boards the player actually authored
+  // themselves (pasted/typed), even when those also happen to have no
+  // known solution. Synced from the puzzle actually in play whenever the
+  // modal opens (prepareBoardModal), then cleared by anything that
+  // replaces the inputs with something else -- Parse Pasted Text, Generate
+  // From Words, Random Letters, or hand-editing a side directly (see the
+  // input listeners below).
   let boardKind = null;
+
+  // Only meaningful alongside boardKind === 'controlled-puzzle' -- which
+  // GENERATION_DICTIONARY_OPTIONS keys were actually checked for the board
+  // currently in the inputs, so applyBoardFromInputs can pass it through
+  // to puzzleFetcher.markCustomBoard (and from there, into a share link --
+  // see shareLink.js). Reset to [] everywhere boardKind gets reset to
+  // something other than 'controlled-puzzle'.
+  let boardDictionaryKeys = [];
+
+  // Populated once, not per modal-open -- the six checkboxes are static
+  // (GENERATION_DICTIONARY_OPTIONS never changes at runtime), and unlike
+  // boardKind above, which tier(s) a player last checked is left sticky
+  // across modal opens rather than reset, so re-opening Set Board to tweak
+  // one box doesn't lose the rest of a selection.
+  if (controlledPuzzleDictionariesElement) {
+    controlledPuzzleDictionariesElement.innerHTML = '';
+    for (const option of GENERATION_DICTIONARY_OPTIONS) {
+      const row = document.createElement('div');
+      row.className = 'settings-toggle-row';
+
+      const checkboxId = `controlledDict-${option.key}`;
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = checkboxId;
+      checkbox.className = 'settings-checkbox';
+      checkbox.dataset.dictionaryKey = option.key;
+
+      const label = document.createElement('label');
+      label.setAttribute('for', checkboxId);
+      label.textContent = option.label;
+
+      row.append(checkbox, label);
+      controlledPuzzleDictionariesElement.append(row);
+    }
+
+    // Delegated on the container rather than one listener per checkbox --
+    // the Generate button only makes sense once at least one dictionary is
+    // checked, same reasoning as any other form with a meaningless empty
+    // submission.
+    controlledPuzzleDictionariesElement.addEventListener('change', () => {
+      if (!generateControlledPuzzleButton) {
+        return;
+      }
+      const anyChecked = controlledPuzzleDictionariesElement.querySelector('input[type="checkbox"]:checked') !== null;
+      generateControlledPuzzleButton.disabled = !anyChecked;
+    });
+  }
 
   function setBoardInputMessage(text, kind = '') {
     if (!boardInputMessageElement) {
@@ -131,6 +186,7 @@ export function createBoardSetup({
 
     const pState = puzzleFetcher.getState();
     boardKind = pState.puzzleSource === 'custom' ? pState.customBoardKind : null;
+    boardDictionaryKeys = boardKind === 'controlled-puzzle' ? (pState.customBoardDictionaryKeys || []) : [];
 
     // Never pre-fill the real answer back into this field for a board whose
     // canonicalWords didn't come from the player's own typing (an imported
@@ -176,6 +232,7 @@ export function createBoardSetup({
 
     fillBoardInputs(payload.board);
     boardKind = 'letterboxed-import';
+    boardDictionaryKeys = [];
     setCanonicalWords(payload.solutionWords || []);
     const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed board";
     setBoardInputMessage(`Imported ${puzzleLabel} (${payload.date}). Click Apply Board to play it.`, 'success');
@@ -195,19 +252,28 @@ export function createBoardSetup({
   // applyBoardFromInputs' generic override message below) -- the player
   // hasn't seen these words either.
   //
-  // Shared by Random Puzzle and Simple Puzzle below, which differ only in
-  // which curated dictionary tier they draw from -- both dictionary calls
-  // pass commonWordsOnly: true regardless, since the primary dictionary
-  // carries ~10k proper nouns (place/personal names like "ELDERSBURG") that
-  // a player typing their own Generate From Words seed would notice and
-  // could choose to avoid, but nobody reviews these words before they
-  // become the hidden answer here.
+  // Shared by Random Puzzle, Simple Puzzle, and Controlled Puzzle below,
+  // which differ only in which dictionary tier(s) they draw from -- all
+  // three pass commonWordsOnly: true regardless, since the primary
+  // dictionary carries ~10k proper nouns (place/personal names like
+  // "ELDERSBURG") that a player typing their own Generate From Words seed
+  // would notice and could choose to avoid, but nobody reviews these words
+  // before they become the hidden answer here.
   const MAX_AUTOMATIC_PUZZLE_SEED_ATTEMPTS = 8;
+  // Controlled Puzzle's own ceiling, higher than the above -- a
+  // player-chosen selection can be far sparser than Random/Simple Puzzle's
+  // own curated defaults (e.g. Proper Nouns (simplistic) alone is ~1,100
+  // words), so it gets more attempts before giving up. Each attempt is a
+  // cheap in-memory trie lookup once the packed dictionaries are cached,
+  // so this stays well under a second even at the higher ceiling.
+  const MAX_CONTROLLED_PUZZLE_SEED_ATTEMPTS = 20;
 
-  async function generateAutomaticPuzzle({ label, kind, source }) {
+  async function generateAutomaticPuzzle({
+    label, kind, source, maxAttempts = MAX_AUTOMATIC_PUZZLE_SEED_ATTEMPTS, dictionaryKeys = [],
+  }) {
     setBoardInputMessage(`Generating a ${label} puzzle…`);
 
-    for (let attempt = 0; attempt < MAX_AUTOMATIC_PUZZLE_SEED_ATTEMPTS; attempt += 1) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
       const seed = await dictionaryValidator.getRandomSeedWord({ commonWordsOnly: true, commonWordsSource: source });
       if (!seed) {
@@ -238,6 +304,7 @@ export function createBoardSetup({
         left: generated.board[3].letters.join(''),
       });
       boardKind = kind;
+      boardDictionaryKeys = kind === 'controlled-puzzle' ? dictionaryKeys : [];
       setCanonicalWords(words);
       setBoardInputMessage(`Generated a ${label} puzzle. Click Apply Board to play it.`, 'success');
       return;
@@ -263,15 +330,54 @@ export function createBoardSetup({
     return generateAutomaticPuzzle({ label: 'simple', kind: 'simple-puzzle', source: undefined });
   }
 
+  // Unlike Random/Simple Puzzle's own fixed tier, the player explicitly
+  // picks which dictionary(ies) to draw from -- resolveSearchSources
+  // (dictionaryValidator.js) unions every checked source together the same
+  // way the default Primary+Fallback path already unions two. A selection
+  // this sparse (a lone tier, or two small ones together) is exactly why
+  // this gets its own higher MAX_CONTROLLED_PUZZLE_SEED_ATTEMPTS above
+  // rather than sharing Random/Simple Puzzle's ceiling.
+  function generateControlledPuzzle() {
+    if (!controlledPuzzleDictionariesElement) {
+      return undefined;
+    }
+
+    const checkedBoxes = controlledPuzzleDictionariesElement.querySelectorAll('input[type="checkbox"]:checked');
+    const selectedKeys = new Set([...checkedBoxes].map((box) => box.dataset.dictionaryKey));
+    const selectedOptions = GENERATION_DICTIONARY_OPTIONS.filter((option) => selectedKeys.has(option.key));
+    const selectedSources = selectedOptions.map((option) => option.source);
+
+    // Defensive only -- generateControlledPuzzleButton is disabled
+    // whenever nothing is checked (see the change listener above), so this
+    // shouldn't be reachable in normal use.
+    if (selectedSources.length === 0) {
+      setBoardInputMessage('Pick at least one dictionary first.', 'error');
+      return undefined;
+    }
+
+    return generateAutomaticPuzzle({
+      label: 'controlled',
+      kind: 'controlled-puzzle',
+      source: selectedSources,
+      maxAttempts: MAX_CONTROLLED_PUZZLE_SEED_ATTEMPTS,
+      // GENERATION_DICTIONARY_OPTIONS order, not checkbox DOM/click order --
+      // deterministic regardless of which boxes happened to be clicked in
+      // which sequence, so the same selection always produces the same
+      // status text and share-link encoding.
+      dictionaryKeys: selectedOptions.map((option) => option.key),
+    });
+  }
+
   // buildBoard() is the same generator used for the placeholder board before
   // the daily catalog (or a shared link) loads at boot -- this just exposes
   // it as something a player can deliberately ask for again, same
   // fill-then-Apply flow as every other way of getting letters into these
-  // fields. Unlike Random Puzzle/Simple Puzzle above, there's no known
+  // fields. Unlike Random/Simple/Controlled Puzzle above, there's no known
   // reference solution for these letters at all (not even a hidden one) --
   // just a random arrangement, not guaranteed easy or even to admit a short
   // solve -- so this lives in Advanced alongside the other
-  // build-it-yourself tools, not next to Random Puzzle/Simple Puzzle.
+  // build-it-yourself tools, not next to the three generated-puzzle
+  // buttons.
   function generateRandomLetters() {
     const board = buildBoard();
     fillBoardInputs({
@@ -280,7 +386,17 @@ export function createBoardSetup({
       bottom: board[2].letters.join(''),
       left: board[3].letters.join(''),
     });
-    boardKind = null;
+    // Distinct from the null (plain custom) boards below -- this is the
+    // exact same buildBoard() generator the "Random board" status already
+    // names for the pre-catalog-load placeholder/fallback (see
+    // puzzleFetcher.js's getPuzzleStatusText), so it gets the same label
+    // rather than the generic "Custom Puzzle" a player-authored board
+    // (pasted or hand-typed) gets. A hand-typed board with no solution
+    // words also has no canonical solution, same as this one -- but it's
+    // deliberately player-chosen, not randomly generated, so it stays
+    // "Custom Puzzle" rather than borrowing this label.
+    boardKind = 'random-letters';
+    boardDictionaryKeys = [];
     setCanonicalWords([]);
     setBoardInputMessage('Generated random letters. Review and Apply Board.', 'success');
   }
@@ -311,6 +427,7 @@ export function createBoardSetup({
 
     fillBoardInputs(parsed.values);
     boardKind = null;
+    boardDictionaryKeys = [];
     setBoardInputMessage('Parsed board text into side inputs.', 'success');
   }
 
@@ -377,6 +494,7 @@ export function createBoardSetup({
       left: generated.board[3].letters.join(''),
     });
     boardKind = null;
+    boardDictionaryKeys = [];
 
     // Persists across modal opens/closes until a different puzzle is
     // actually loaded (see the puzzleFetcher applyBoard callback).
@@ -439,7 +557,7 @@ export function createBoardSetup({
     // status text) synchronously and immediately, so marking the context
     // first is the only way the status shown right after Apply is correct
     // on the first render instead of one interaction behind.
-    puzzleFetcher.markCustomBoard({ kind: boardKind });
+    puzzleFetcher.markCustomBoard({ kind: boardKind, dictionaryKeys: boardDictionaryKeys });
     gameEngine.applyBoardDefinition(parsed.board);
 
     const overrideWords = await applySolutionWordOverrides(getCanonicalWords());
@@ -453,6 +571,10 @@ export function createBoardSetup({
       boardLabel = 'random puzzle';
     } else if (boardKind === 'simple-puzzle') {
       boardLabel = 'simple puzzle';
+    } else if (boardKind === 'controlled-puzzle') {
+      boardLabel = 'controlled puzzle';
+    } else if (boardKind === 'random-letters') {
+      boardLabel = 'random board';
     }
     let message = `Applied ${boardLabel}. Route away.`;
     if (overrideWords.length > 0) {
@@ -518,6 +640,7 @@ export function createBoardSetup({
     input?.addEventListener('input', () => {
       input.value = normalizeSideInput(input.value);
       boardKind = null;
+      boardDictionaryKeys = [];
       setBoardInputMessage('');
     });
   }
@@ -527,6 +650,7 @@ export function createBoardSetup({
     importTodaysLetterBoxedBoard,
     generateRandomPuzzle,
     generateSimplePuzzle,
+    generateControlledPuzzle,
     generateRandomLetters,
     pasteBoardFromClipboard,
     parsePastedBoardText,

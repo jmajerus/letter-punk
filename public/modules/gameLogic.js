@@ -14,6 +14,21 @@ export function createGameEngine(options) {
     summarizeValidationSources,
     getCanonicalCharacterCount,
     getCanonicalWordCount,
+    // Full dictionary-tier picture for an accepted word (e.g.
+    // ['primary', 'fallback', 'common']) -- see app.js's own implementation,
+    // wired to dictionaryValidator.js's getDictionaryTierKeys. Called once
+    // per accepted word, unconditionally (provenance tracking is always on
+    // -- see dictionaryValidator.js's own doc comment on
+    // getDictionaryTierKeys for why). Powers both the provenance modal's
+    // full badge set (boardRenderer.js reads it straight from
+    // state.foundWords) and the Cataloger title below.
+    getDictionaryTierKeys,
+    // Which of GENERATION_DICTIONARY_OPTIONS' keys count as "on theme" for
+    // the puzzle currently in play -- only non-empty for a Controlled
+    // Puzzle (see app.js's own implementation). Synchronous and read fresh
+    // each time a title needs computing, not cached, since it has to
+    // reflect whatever puzzle is *currently* active.
+    getThemeDictionaryKeys,
     onStateChange,
     onMessage,
     onInvalidLetter,
@@ -380,6 +395,22 @@ export function createGameEngine(options) {
     return state.completedUnderFreeChain === true && isFullyChained(foundWords);
   }
 
+  // True only when every accepted word's own dictionaryTierKeys overlaps
+  // this puzzle's theme keys -- all-or-nothing, the same character as
+  // hasNoStartEndOverlap above, not partial credit for "most of them."
+  // getThemeDictionaryKeys returns [] for any puzzle that isn't a
+  // Controlled Puzzle (see app.js's own implementation), which makes
+  // themeKeys.length === 0 naturally ineligible below without a separate
+  // "is this actually a Controlled Puzzle" check here.
+  function isEligibleForCataloger(foundWords) {
+    const themeKeys = typeof getThemeDictionaryKeys === 'function' ? getThemeDictionaryKeys() : [];
+    if (themeKeys.length === 0 || foundWords.length === 0) {
+      return false;
+    }
+
+    return foundWords.every((entry) => entry.dictionaryTierKeys?.some((key) => themeKeys.includes(key)));
+  }
+
   // Total letters typed so far: every accepted word plus the word
   // currently under construction — a live running count, not just the
   // final tally shown once the board is solved.
@@ -438,6 +469,13 @@ export function createGameEngine(options) {
       titles.push('Union Plumber');
     } else if (hasNoStartEndOverlap(state.foundWords)) {
       titles.push('Solo Plumber');
+    }
+
+    // Independent of both the character-count title and Solo/Union Plumber
+    // above -- a Controlled Puzzle solve can earn any combination of all
+    // three, since each measures a different axis of the same solve.
+    if (isEligibleForCataloger(state.foundWords)) {
+      titles.push('Cataloger');
     }
 
     const summary = {
@@ -682,11 +720,30 @@ export function createGameEngine(options) {
     const validationSummary = summarizeValidationSources(validation.matchedSources);
     state.lastValidationSummary = validationSummary.detail;
 
+    // Full dictionary-tier picture for this word, independent of (and in
+    // addition to) validationSummary above -- that's specifically about
+    // gameplay acceptance (Primary/Fallback/API/session-override, still
+    // what the live word-builder indicator uses); this is "which of the
+    // six actual dictionaries is it in," for the provenance modal and
+    // Cataloger. An API or session-override word was never checked against
+    // a real packed dictionary at all (API means local dictionaries were
+    // unreachable; session-override means the word wasn't found in any of
+    // them, which is why it needed the override), so those two badges are
+    // used directly rather than asking getDictionaryTierKeys a question it
+    // has no way to answer.
+    let dictionaryTierKeys;
+    if (validationSummary.badge === 'API') {
+      dictionaryTierKeys = ['api'];
+    } else if (validationSummary.badge === 'Custom') {
+      dictionaryTierKeys = ['custom'];
+    } else {
+      dictionaryTierKeys = typeof getDictionaryTierKeys === 'function' ? await getDictionaryTierKeys(word) : [];
+    }
+
     state.foundWords.unshift({
       word,
       length,
-      validationBadge: validationSummary.badge,
-      validationDetail: validationSummary.detail,
+      dictionaryTierKeys,
     });
 
     const wasAlreadyComplete = state.usedLetters.size === lettersToSide.size;
@@ -719,6 +776,7 @@ export function createGameEngine(options) {
       word,
       solved,
       justCompleted,
+      dictionaryTierKeys,
     });
 
     if (solved) {
@@ -730,6 +788,13 @@ export function createGameEngine(options) {
       // should delete it directly rather than backing into the word that
       // just completed the board.
       state.starterLocked = false;
+      // Same bug class as the two clears above, at the other end of a
+      // word's life: with the builder now empty, there's no word left on
+      // screen for "Accepted by ..." to describe. Left set, it would sit
+      // there indefinitely -- including when navigating back through an
+      // already-solved daily puzzle, since progress restoration replays
+      // saved words through this exact same path (see puzzleReplay.js).
+      state.lastValidationSummary = '';
       emitStateChange();
       const playerCharacterCount = state.foundWords.reduce((total, entry) => total + entry.length, 0);
       const canonicalCharacterCount = Number(
@@ -753,6 +818,15 @@ export function createGameEngine(options) {
           ? " Solo Plumber: every word stood on its own, no letter doing double duty as one word's ending and another's beginning."
           : '';
 
+      // A third, fully independent axis from both of the above -- a
+      // Controlled Puzzle solve can pick up any combination of a
+      // character-count title, a Plumber title, and this one. Empty string
+      // for every puzzle except Controlled Puzzle, same as the two above
+      // being empty when their own condition doesn't hold.
+      const catalogerStyleSuffix = isEligibleForCataloger(state.foundWords)
+        ? ' Cataloger: every word you found came from this puzzle\'s own dictionary selection, not just whichever one happened to accept it.'
+        : '';
+
       const characterCountTitleKey = getCharacterCountTitleKey(playerCharacterCount, canonicalCharacterCount);
       if (characterCountTitleKey) {
         const prefix = `Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters.`;
@@ -767,7 +841,7 @@ export function createGameEngine(options) {
         // themselves was told.
         if (!isWordCountAtOrUnderCanonical(state.foundWords.length, canonicalWordCount)) {
           emitMessage(
-            `${prefix} The reference solution does it in ${canonicalWordCount} — see if you can trim it down.${overlapStyleSuffix}`,
+            `${prefix} The reference solution does it in ${canonicalWordCount} — see if you can trim it down.${overlapStyleSuffix}${catalogerStyleSuffix}`,
             'success',
           );
           return;
@@ -785,31 +859,31 @@ export function createGameEngine(options) {
           const landing = absDelta === 0
             ? 'you landed exactly on the canonical count!'
             : 'you landed within one character of the canonical count!';
-          emitMessage(`${prefix} Dead Reckoner: ${landing}${overlapStyleSuffix}`, 'success');
+          emitMessage(`${prefix} Dead Reckoner: ${landing}${overlapStyleSuffix}${catalogerStyleSuffix}`, 'success');
           return;
         }
 
         if (characterCountTitleKey === 'efficiency-engineer') {
           emitMessage(
-            `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!${overlapStyleSuffix}`,
+            `${prefix} Efficiency Engineer: you came in ${absDelta} characters under the canonical ${canonicalCharacterCount}-character solution!${overlapStyleSuffix}${catalogerStyleSuffix}`,
             'success',
           );
           return;
         }
 
         emitMessage(
-          `${prefix} Vocabulary Wrangler: that's ${absDelta} characters longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!${overlapStyleSuffix}`,
+          `${prefix} Vocabulary Wrangler: that's ${absDelta} characters longer than the canonical ${canonicalCharacterCount}-character solution — nice work weaving in extra letters!${overlapStyleSuffix}${catalogerStyleSuffix}`,
           'success',
         );
         return;
       }
 
       if (state.foundWords.length <= 2) {
-        emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Outstanding solve!${overlapStyleSuffix}`, 'success');
+        emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Outstanding solve!${overlapStyleSuffix}${catalogerStyleSuffix}`, 'success');
         return;
       }
 
-      emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Great solve.${overlapStyleSuffix}`, 'success');
+      emitMessage(`Solved in ${state.foundWords.length} words using ${playerCharacterCount} characters. Great solve.${overlapStyleSuffix}${catalogerStyleSuffix}`, 'success');
       return;
     }
 

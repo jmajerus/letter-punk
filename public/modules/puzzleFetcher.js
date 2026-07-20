@@ -2,6 +2,8 @@
  * Puzzle fetcher owns daily puzzle catalog state and navigation semantics.
  * Board application is delegated to the provided applyBoard callback.
  */
+import { GENERATION_DICTIONARY_OPTIONS } from './dictionaryValidator.js';
+
 const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
 
 function boardFromPuzzleEntry(entry) {
@@ -56,6 +58,28 @@ function idFromCompactDate(compactDate) {
   return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
 }
 
+const DICTIONARY_SHORT_LABEL_BY_KEY = new Map(
+  GENERATION_DICTIONARY_OPTIONS.map((option) => [option.key, option.shortLabel]),
+);
+
+// Built fresh from the raw dictionaryKeys every call, never persisted --
+// deliberately, so changing this wording (or the >2 threshold) later never
+// requires re-encoding an already-shared link (see shareLink.js's own doc
+// comment on boardKind/dictionaryKeys for the same reasoning applied to
+// the URL side of this).
+function describeControlledPuzzle(dictionaryKeys) {
+  if (dictionaryKeys.length === 0) {
+    return 'Controlled Puzzle';
+  }
+
+  if (dictionaryKeys.length > 2) {
+    return `Controlled Puzzle, ${dictionaryKeys.length} dictionaries`;
+  }
+
+  const labels = dictionaryKeys.map((key) => DICTIONARY_SHORT_LABEL_BY_KEY.get(key)).filter(Boolean);
+  return labels.length > 0 ? `Controlled Puzzle, ${labels.join(' + ')}` : 'Controlled Puzzle';
+}
+
 /**
  * Creates a puzzle service that loads catalog data and exposes previous/today/
  * next navigation helpers plus derived UI state.
@@ -77,14 +101,26 @@ export function createPuzzleFetcher(options = {}) {
     // getPuzzleStatusText's generic 'Custom Puzzle' down to something more
     // specific (currently 'letterboxed-import' -> "Today's Letter Boxed",
     // 'random-puzzle' -> 'Random Puzzle', 'simple-puzzle' -> 'Simple
-    // Puzzle') for a board whose canonicalWords came from somewhere other
-    // than the player's own typing, without
-    // touching puzzleSource itself (still 'custom' either way, so analytics
-    // indexing, share-link flattening, etc. -- everything keyed off
-    // puzzleSource === 'custom' -- stays exactly as it was). null for a
-    // plain custom board (pasted, generated from the player's own words, or
-    // hand-typed).
+    // Puzzle', 'controlled-puzzle' -> 'Controlled Puzzle', 'random-letters'
+    // -> 'Random board' -- the same label the pre-catalog-load
+    // placeholder/fallback uses via puzzleSource === 'random' below, since
+    // both are the identical buildBoard() generator with no canonical
+    // solution) without touching puzzleSource itself (still 'custom'
+    // either way, so analytics indexing, share-link flattening, etc. --
+    // everything keyed off puzzleSource === 'custom' -- stays exactly as
+    // it was). null for a plain, player-authored custom board (pasted,
+    // generated from the player's own words, or hand-typed) -- including
+    // one with no canonical solution either, which stays 'Custom Puzzle'
+    // rather than borrowing 'Random board', since the player chose those
+    // letters deliberately rather than getting a random arrangement.
     customBoardKind: null,
+    // Only meaningful alongside customBoardKind === 'controlled-puzzle' --
+    // the GENERATION_DICTIONARY_OPTIONS keys the player actually checked,
+    // so getPuzzleStatusText can build a specific title ("Controlled
+    // Puzzle, proper nouns") instead of just the generic kind name. Set
+    // via markCustomBoard's dictionaryKeys option, cleared the same time
+    // and for the same reason customBoardKind is.
+    customBoardDictionaryKeys: [],
     // Years already requested from the server (successfully or not), so the
     // year-boundary prefetch below never re-asks for the same year twice.
     fetchedYears: new Set(),
@@ -95,6 +131,7 @@ export function createPuzzleFetcher(options = {}) {
     state.activePuzzleIndex = puzzleIndex;
     if (source !== 'custom') {
       state.customBoardKind = null;
+      state.customBoardDictionaryKeys = [];
     }
   }
 
@@ -274,6 +311,16 @@ export function createPuzzleFetcher(options = {}) {
       }
       if (state.customBoardKind === 'simple-puzzle') {
         return 'Simple Puzzle';
+      }
+      if (state.customBoardKind === 'controlled-puzzle') {
+        return describeControlledPuzzle(state.customBoardDictionaryKeys);
+      }
+      // Same label as the puzzleSource === 'random' fallback below --
+      // Random Letters produces that exact board (buildBoard(), no
+      // canonical solution), just reached by an explicit click instead of
+      // the pre-catalog-load placeholder/fallback path.
+      if (state.customBoardKind === 'random-letters') {
+        return 'Random board';
       }
       return 'Custom Puzzle';
     }
@@ -488,8 +535,9 @@ export function createPuzzleFetcher(options = {}) {
     return { ok: true };
   }
 
-  function markCustomBoard({ kind = null } = {}) {
+  function markCustomBoard({ kind = null, dictionaryKeys = [] } = {}) {
     state.customBoardKind = kind;
+    state.customBoardDictionaryKeys = kind === 'controlled-puzzle' ? dictionaryKeys : [];
     setPuzzleContext('custom');
   }
 

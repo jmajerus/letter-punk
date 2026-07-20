@@ -2,7 +2,7 @@
  * Board renderer owns DOM + SVG rendering for tiles and steampunk pipe routes.
  * Gameplay state remains external and is provided via render calls.
  */
-import { SOURCE_DISPLAY_NAMES } from './dictionaryValidator.js';
+import { SOURCE_DISPLAY_NAMES, GENERATION_DICTIONARY_OPTIONS } from './dictionaryValidator.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HISTORY_ROUTE_LIMIT = 8;
@@ -10,51 +10,48 @@ const HISTORY_OPACITY_MAX = 0.68;
 const HISTORY_OPACITY_MIN = 0.22;
 const HISTORY_JOINT_OPACITY_BOOST = 0.08;
 
-// Maps a word's collapsed validation badge (see dictionaryValidator.js's
-// summarizeValidationSources) to the individual source(s) it represents.
-// "Both" only ever means Primary+Fallback -- API and Custom are each
-// mutually exclusive with everything else (see validateWord).
-const BADGE_SOURCE_LABELS = {
-  Primary: ['Primary'],
-  Fallback: ['Fallback'],
-  Both: ['Primary', 'Fallback'],
-  API: ['API'],
-  Custom: ['Custom'],
-};
-
-// Per-source square styling. Primary/Fallback get a fixed digit -- "1"/"2"
-// reserved for actual dictionary tiers, so a future third tier can take
-// "3" without colliding with anything. API/Custom aren't dictionary tiers
-// at all, so they keep a two-letter tag on a dashed border instead of a
-// digit, rather than implying they're part of the same numbered sequence.
+// One digit per real dictionary, in GENERATION_DICTIONARY_OPTIONS order --
+// this is exactly what "Option A" was designed to scale to from the start
+// ("a future third tier can take '3' without colliding with anything").
+// API and Custom aren't dictionary tiers at all, so they keep a two-letter
+// tag on a dashed border instead of a digit, rather than implying they're
+// part of the same numbered sequence. word.dictionaryTierKeys (see
+// gameLogic.js/dictionaryValidator.js's getDictionaryTierKeys) already
+// carries these exact keys directly -- no separate badge-to-labels
+// expansion step needed the way the old two-dictionary version required.
 const SOURCE_SQUARE_INFO = {
-  Primary: { code: '1', colorClass: 'provenance-source-primary' },
-  Fallback: { code: '2', colorClass: 'provenance-source-fallback' },
-  API: { code: 'AP', colorClass: 'provenance-source-api', tag: true },
-  Custom: { code: 'CU', colorClass: 'provenance-source-custom', tag: true },
+  ...Object.fromEntries(GENERATION_DICTIONARY_OPTIONS.map((option, index) => [
+    option.key,
+    { code: String(index + 1), colorClass: `provenance-source-${option.key}`, label: option.label },
+  ])),
+  api: {
+    code: 'AP', colorClass: 'provenance-source-api', tag: true, label: SOURCE_DISPLAY_NAMES.API,
+  },
+  custom: {
+    code: 'CU', colorClass: 'provenance-source-custom', tag: true, label: SOURCE_DISPLAY_NAMES.Custom,
+  },
 };
 
-// Shared display order for both the consolidated bar's segments and any
-// one word's own squares.
-const SOURCE_ORDER = ['Primary', 'Fallback', 'API', 'Custom'];
+// Shared display order for the consolidated bar's segments, any one word's
+// own squares, and the legend -- the six real dictionaries in
+// GENERATION_DICTIONARY_OPTIONS order, then the two non-dictionary
+// categories.
+const SOURCE_ORDER = [...GENERATION_DICTIONARY_OPTIONS.map((option) => option.key), 'api', 'custom'];
 
 // Legend copy for the breakdown modal -- self-contained per row (no "see
 // above"/"the dictionaries above" phrasing), since the legend only shows
 // rows for sources actually present in the current solve and so can't
-// assume any particular row appears alongside any other. Primary/Fallback
-// need no more than their name (see dictionaryValidator.js's
-// SOURCE_DISPLAY_NAMES, the single source of truth for this text -- the
-// live word-builder indicator uses the same names) -- API/Custom aren't
+// assume any particular row appears alongside any other. The six real
+// dictionaries need no more than their own name -- API/Custom aren't
 // dictionaries, so they get a phrase explaining their role instead.
 const SOURCE_LEGEND_DESCRIPTIONS = {
-  Primary: SOURCE_DISPLAY_NAMES.Primary,
-  Fallback: SOURCE_DISPLAY_NAMES.Fallback,
-  API: 'Fallback API, used only when local dictionaries are unreachable',
-  Custom: 'Allowed for this board specifically, not from a dictionary',
+  ...Object.fromEntries(GENERATION_DICTIONARY_OPTIONS.map((option) => [option.key, option.label])),
+  api: 'Fallback API, used only when local dictionaries are unreachable',
+  custom: 'Allowed for this board specifically, not from a dictionary',
 };
 
-function createProvenanceSquare(sourceLabel) {
-  const info = SOURCE_SQUARE_INFO[sourceLabel];
+function createProvenanceSquare(key) {
+  const info = SOURCE_SQUARE_INFO[key];
   const square = document.createElement('span');
   square.className = ['provenance-square', info.colorClass, info.tag ? 'provenance-square-tag' : '']
     .filter(Boolean)
@@ -64,24 +61,21 @@ function createProvenanceSquare(sourceLabel) {
   return square;
 }
 
-function describeSourceLabels(labels) {
-  const names = labels.map((label) => SOURCE_DISPLAY_NAMES[label]);
+function describeSourceLabels(keys) {
+  const names = keys.map((key) => SOURCE_SQUARE_INFO[key]?.label).filter(Boolean);
   return names.length > 1 ? names.join(' and ') : names[0];
 }
 
 // Shared by renderProvenanceBar and renderProvenanceLegend -- how many
-// found words matched each source. A word badged "Both" contributes to
-// both Primary's and Fallback's counts (see BADGE_SOURCE_LABELS), so the
-// total can exceed the word count.
+// found words matched each dictionary tier/category. A word matching
+// several tiers at once (e.g. both Common and Common-Simplistic, or
+// Primary and Fallback) contributes to each of their counts, so the total
+// can exceed the word count.
 function getSourceCounts(foundWords) {
   const counts = new Map();
   for (const word of foundWords) {
-    const labels = BADGE_SOURCE_LABELS[word.validationBadge];
-    if (!labels) {
-      continue;
-    }
-    for (const label of labels) {
-      counts.set(label, (counts.get(label) || 0) + 1);
+    for (const key of word.dictionaryTierKeys || []) {
+      counts.set(key, (counts.get(key) || 0) + 1);
     }
   }
   return counts;
@@ -862,7 +856,7 @@ export function createBoardRenderer(options) {
       // A trailing "(N words)" would stack awkwardly against names that
       // already end in a parenthetical (e.g. "...dictionary (general)"),
       // so the count is set off with a colon instead.
-      return `${SOURCE_DISPLAY_NAMES[label]}: ${count} word${count === 1 ? '' : 's'}`;
+      return `${SOURCE_SQUARE_INFO[label].label}: ${count} word${count === 1 ? '' : 's'}`;
     });
     const summary = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
     barButton.setAttribute('aria-label', `Dictionary sources: ${summary}. Open breakdown.`);
@@ -887,8 +881,8 @@ export function createBoardRenderer(options) {
     const ordered = [...foundWords].reverse();
 
     for (const word of ordered) {
-      const labels = BADGE_SOURCE_LABELS[word.validationBadge];
-      if (!labels) {
+      const keys = word.dictionaryTierKeys;
+      if (!keys || keys.length === 0) {
         continue;
       }
 
@@ -901,13 +895,16 @@ export function createBoardRenderer(options) {
 
       const squares = document.createElement('span');
       squares.className = 'provenance-modal-row-squares';
-      for (const sourceLabel of labels) {
-        squares.append(createProvenanceSquare(sourceLabel));
+      // Already in GENERATION_DICTIONARY_OPTIONS order (see
+      // getDictionaryTierKeys) except for api/custom, which are always a
+      // lone entry -- no separate sort needed.
+      for (const key of keys) {
+        squares.append(createProvenanceSquare(key));
       }
 
       const srLabel = document.createElement('span');
       srLabel.className = 'sr-only';
-      srLabel.textContent = describeSourceLabels(labels);
+      srLabel.textContent = describeSourceLabels(keys);
       squares.append(srLabel);
 
       row.append(squares);

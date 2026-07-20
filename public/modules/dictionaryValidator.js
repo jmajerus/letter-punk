@@ -27,9 +27,7 @@ export const PACKED_DICTIONARY_SOURCES = [
 // alone would otherwise happily surface as just another valid word).
 //
 // PROPER_NOUNS_SOURCE is the complement: primary words whose only origin
-// was a capitalized (proper noun) entry. Not currently read by any
-// function here -- kept available for whenever a proper-noun-inclusive
-// Random Puzzle variant is worth building, not before.
+// was a capitalized (proper noun) entry.
 //
 // COMMON_WORDS_SIMPLISTIC_SOURCE and PROPER_NOUNS_SIMPLISTIC_SOURCE are
 // each their own source's intersection with a frequency-ranked list of the
@@ -95,6 +93,52 @@ export const SOURCE_DISPLAY_NAMES = {
   Custom: 'Custom override',
 };
 
+// The full inventory of dictionaries a player can pick from for a
+// Controlled Puzzle (boardSetup.js's generateControlledPuzzle) -- unlike
+// Random/Simple Puzzle's own fixed single-tier defaults, here the player
+// explicitly chooses the mix, so nothing needs to be pre-curated away from
+// them (Primary/Fallback included, uncurated origin words and all -- the
+// same territory Generate From Words already lets a player reach for with
+// a self-chosen seed). Single source of truth for both the checkbox list
+// boardSetup.js renders and the actual sources searched, so the two can't
+// drift out of sync. Primary/Fallback reuse SOURCE_DISPLAY_NAMES directly
+// rather than restating the same label text a second time.
+//
+// shortLabel backs the compact puzzle-status title (puzzleFetcher.js's
+// getPuzzleStatusText, e.g. "Controlled Puzzle, proper nouns") -- deliberately
+// shorter than the checkbox list's own `label` above, which has room to be
+// fully descriptive since it sits next to a checkbox, not squeezed into a
+// one-line board status. Primary/Fallback use the same "general"/
+// "word-game" wording (minus the word "dictionary" itself, which
+// SOURCE_INDICATOR_NAMES needs for its own full-sentence context but a
+// telegraphic status title doesn't) for the same underlying reason that
+// wording exists: naming the exact dictionary is for the breakdown modal,
+// not an ambient status line.
+export const GENERATION_DICTIONARY_OPTIONS = [
+  { key: 'primary', source: PACKED_DICTIONARY_SOURCES[0], label: SOURCE_DISPLAY_NAMES.Primary, shortLabel: 'general' },
+  { key: 'fallback', source: PACKED_DICTIONARY_SOURCES[1], label: SOURCE_DISPLAY_NAMES.Fallback, shortLabel: 'word-game' },
+  { key: 'common', source: COMMON_WORDS_SOURCE, label: 'Common', shortLabel: 'common' },
+  { key: 'common-simplistic', source: COMMON_WORDS_SIMPLISTIC_SOURCE, label: 'Common (simplistic)', shortLabel: 'common (simplistic)' },
+  { key: 'proper-nouns', source: PROPER_NOUNS_SOURCE, label: 'Proper nouns', shortLabel: 'proper nouns' },
+  { key: 'proper-nouns-simplistic', source: PROPER_NOUNS_SIMPLISTIC_SOURCE, label: 'Proper nouns (simplistic)', shortLabel: 'proper nouns (simplistic)' },
+];
+
+// Short category names for the live word-builder indicator (detail below)
+// -- that text sits under the word-in-progress and updates on every
+// keystroke for anyone with provenance tracking on, so it stays glanceable
+// rather than naming the exact dictionary the way SOURCE_DISPLAY_NAMES
+// does. The full names are for the breakdown modal, a surface someone
+// deliberately opens to dig into detail; this one is ambient, present on
+// the main board for as long as provenance tracking is on. "General"/
+// "word-game" still says something real (unlike "Primary"/"Fallback"),
+// just without committing to *which* general or word-game dictionary.
+const SOURCE_INDICATOR_NAMES = {
+  Primary: 'general dictionary',
+  Fallback: 'word-game dictionary',
+  API: SOURCE_DISPLAY_NAMES.API,
+  Custom: SOURCE_DISPLAY_NAMES.Custom,
+};
+
 export function summarizeValidationSources(matchedSources) {
   const uniqueSources = [...new Set((matchedSources || []).filter(Boolean))];
 
@@ -106,18 +150,17 @@ export function summarizeValidationSources(matchedSources) {
   }
 
   const labels = uniqueSources.map(getValidationSourceLabel);
-  const names = labels.map((label) => SOURCE_DISPLAY_NAMES[label]);
 
   if (labels.length > 1) {
     return {
       badge: 'Both',
-      detail: `Accepted by the ${names.join(' and ')}.`,
+      detail: 'Accepted by the general and word-game dictionaries.',
     };
   }
 
   return {
     badge: labels[0],
-    detail: `Accepted by the ${names[0]}.`,
+    detail: `Accepted by the ${SOURCE_INDICATOR_NAMES[labels[0]]}.`,
   };
 }
 
@@ -150,9 +193,23 @@ export function createDictionaryValidator(options = {}) {
   // different curated tier than the validator's own default (e.g. Random
   // Puzzle's broader COMMON_WORDS_SOURCE vs. Simple Puzzle's default
   // COMMON_WORDS_SIMPLISTIC_SOURCE) without constructing a whole second
-  // validator just to change which one tier gets searched.
+  // validator just to change which one tier gets searched. Passing an
+  // array instead of a single source (Controlled Puzzle, one entry per
+  // checked dictionary) searches all of them and unions the results --
+  // both findCompanionWord and getRandomSeedWord already loop over
+  // whatever resolveSearchSources returns and merge matches into one Set,
+  // the exact same way the default (non-commonWordsOnly) path already
+  // unions Primary+Fallback, so nothing downstream needed to change.
   function resolveSearchSources(commonWordsOnly, sourceOverride) {
-    return commonWordsOnly ? [sourceOverride || commonWordsSource] : sources;
+    if (!commonWordsOnly) {
+      return sources;
+    }
+
+    if (Array.isArray(sourceOverride)) {
+      return sourceOverride;
+    }
+
+    return [sourceOverride || commonWordsSource];
   }
 
   // Words explicitly whitelisted for the currently-applied custom board
@@ -247,6 +304,51 @@ export function createDictionaryValidator(options = {}) {
     } catch {
       return { isValid: null, source: source.key };
     }
+  }
+
+  // Full dictionary-tier picture for an already-accepted word: which of
+  // the six GENERATION_DICTIONARY_OPTIONS entries it's actually found in,
+  // independent of and in addition to how it was validated for gameplay
+  // (validateWord's own Primary/Fallback/API/session-override result).
+  // Backs the provenance modal's full badge set (boardRenderer.js) and the
+  // Cataloger title (gameLogic.js) -- both now read the same data rather
+  // than needing their own separate check.
+  //
+  // Provenance tracking is unconditional -- this runs for every accepted
+  // word regardless of whether badges are currently displayed or the
+  // puzzle is a Controlled Puzzle, the same way Primary/Fallback are
+  // already always checked regardless of the display toggle.
+  //
+  // Common-Simplistic and Proper Nouns-Simplistic are each a strict subset
+  // of their own parent tier (built as the parent intersected with the
+  // frequency list) -- a word can't be in the simplistic tier without
+  // already being in the parent, so that lookup is skipped entirely
+  // whenever the parent didn't match, rather than performed and just
+  // trusted to come back false.
+  async function getDictionaryTierKeys(word) {
+    const sourceByKey = new Map(GENERATION_DICTIONARY_OPTIONS.map((option) => [option.key, option.source]));
+    const matched = [];
+
+    async function check(key) {
+      const result = await validateWordWithPackedDictionary(word, sourceByKey.get(key));
+      if (result.isValid) {
+        matched.push(key);
+      }
+      return result.isValid;
+    }
+
+    await check('primary');
+    await check('fallback');
+
+    if (await check('common')) {
+      await check('common-simplistic');
+    }
+
+    if (await check('proper-nouns')) {
+      await check('proper-nouns-simplistic');
+    }
+
+    return matched;
   }
 
   async function validateWordWithFallbackApi(word) {
@@ -369,9 +471,10 @@ export function createDictionaryValidator(options = {}) {
    * COMMON_WORDS_SIMPLISTIC_SOURCE above) -- off by default so a player
    * typing their own seed into Generate From Words still gets the full
    * dictionary's candidates, same as always. commonWordsSource lets a call
-   * reach for a specific tier instead (e.g. the broader COMMON_WORDS_SOURCE)
-   * without touching the validator's own configured default; ignored unless
-   * commonWordsOnly is also true.
+   * reach for a specific tier instead (e.g. the broader COMMON_WORDS_SOURCE),
+   * or an array of tiers to union together (Controlled Puzzle, one entry per
+   * checked dictionary) -- without touching the validator's own configured
+   * default; ignored unless commonWordsOnly is also true.
    *
    * Returned shortest to longest. This function has no way to know
    * whether a candidate's own internal letter sequence can actually fit
@@ -443,7 +546,8 @@ export function createDictionaryValidator(options = {}) {
    * the top 10k most frequent English words, e.g. "ELDERSBURG" (a proper
    * noun) and any oddity the broader common tier alone still carries. Pass
    * a commonWordsSource here to reach for a different tier for this one
-   * call (e.g. the broader COMMON_WORDS_SOURCE) instead.
+   * call (e.g. the broader COMMON_WORDS_SOURCE), or an array of tiers to
+   * union together (Controlled Puzzle), instead.
    */
   async function getRandomSeedWord({ commonWordsOnly = false, commonWordsSource: sourceOverride } = {}) {
     const blockedWords = await loadBlocklist();
@@ -486,6 +590,7 @@ export function createDictionaryValidator(options = {}) {
     isBlocked,
     findCompanionWord,
     getRandomSeedWord,
+    getDictionaryTierKeys,
     addSessionOverride,
     clearSessionOverrides,
     clearCache() {

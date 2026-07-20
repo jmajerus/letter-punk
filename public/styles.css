@@ -17,14 +17,26 @@
 
   /* Dictionary-provenance source colors, referenced by both the
      consolidated bar and its per-word breakdown modal (see
-     boardRenderer.js's SOURCE_SQUARE_INFO). Reused from the existing
-     decorative palette above rather than new hex values, and kept
-     separate from --success/--danger so a source color is never mistaken
-     for a pass/fail signal. */
+     boardRenderer.js's SOURCE_SQUARE_INFO). Kept separate from
+     --success/--danger so a source color is never mistaken for a pass/fail
+     signal -- provenance tracking is always on and has nothing to do with
+     whether a word was "good," just where it was found. Primary/Fallback/
+     API/Custom reuse the existing decorative palette above; the four
+     dictionary-classification tiers below get their own new values, since
+     there aren't enough spare hues left in the existing palette to cover
+     all eight without reusing something that already carries a different
+     meaning elsewhere. Digit/tag is still the real identifying signal on
+     each square (see boardRenderer.js) -- color is reinforcement only, so
+     two of these sitting close in hue is a cosmetic tradeoff, not a
+     legibility one. */
   --source-primary: var(--steam);
   --source-fallback: var(--brass);
   --source-api: var(--copper);
   --source-custom: var(--muted);
+  --source-common: var(--ember);
+  --source-common-simplistic: #c9982f;
+  --source-proper-nouns: #4f9e8f;
+  --source-proper-nouns-simplistic: #b06a8f;
 }
 
 * {
@@ -816,6 +828,35 @@ button:active {
   margin-top: 6px;
 }
 
+/* Groups every control that discards whatever's currently on the board --
+   navigating to a different puzzle (Previous/Today's Puzzle/Next/NYT) or
+   wiping it back to blank (Reset) -- behind one visual boundary, apart
+   from the Undo Word/Undo Letter/Enter loop a player uses constantly
+   while actually solving. The border is meant to slow down an accidental
+   tap on one of these five, not the frequent undo/submit actions next to
+   the box. Tinted with --danger's own rgb (234, 122, 116) -- the same red
+   already used for error messages and a word's own end-marker on the
+   board -- rather than the near-invisible --line, so the "these discard
+   your progress" signal is actually legible, not just structurally present.
+   var(--danger) itself can't be used directly in an rgba() (defined as a
+   full hex, not r,g,b components), hence the literal triplet here. */
+.discard-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  /* A low-opacity wash here blends toward the same dark, desaturated tone
+     as .secondary's own brown gradient (#2c2119-#413126) -- at ~15% alpha
+     over the page's near-black background they land within a few RGB
+     values of each other, indistinguishable at a glance. 0.4 actually
+     shifts the hue enough to read as red, not just "another shade of
+     brown". */
+  background: rgba(234, 122, 116, 0.4);
+  border: 2px solid rgba(234, 122, 116, 0.9);
+  border-radius: 18px;
+}
+
 .puzzle-nav {
   display: inline-flex;
   align-items: center;
@@ -837,9 +878,9 @@ button:active {
 }
 
 /* Deliberately smaller than the core word-entry controls (Undo Word/Undo
-   Letter/Enter) it sits next to -- a reset is a rarer, more deliberate
-   action than those, and shouldn't visually compete with them for
-   attention or accidental taps. */
+   Letter/Enter) -- a reset is a rarer, more deliberate action than those,
+   and shouldn't visually compete with them for attention or accidental
+   taps. Now also set apart structurally, inside .discard-controls above. */
 .reset-btn {
   padding: 12px 14px;
   font-size: 0.9rem;
@@ -1301,6 +1342,10 @@ body.arcade-mode .board-tools {
 .provenance-source-fallback { background: var(--source-fallback); }
 .provenance-source-api { background: var(--source-api); }
 .provenance-source-custom { background: var(--source-custom); }
+.provenance-source-common { background: var(--source-common); }
+.provenance-source-common-simplistic { background: var(--source-common-simplistic); }
+.provenance-source-proper-nouns { background: var(--source-proper-nouns); }
+.provenance-source-proper-nouns-simplistic { background: var(--source-proper-nouns-simplistic); }
 
 .provenance-modal-row {
   display: flex;
@@ -1526,6 +1571,13 @@ body.arcade-mode .board-tools {
 
 .board-advanced summary::marker {
   color: var(--muted);
+}
+
+.controlled-puzzle-dictionaries {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
 }
 
 @media (max-width: 1080px) {
@@ -1824,6 +1876,10 @@ body.arcade-mode .board-tools {
   .psa-banner-dismiss {
     align-self: flex-end;
     margin-top: -6px;
+  }
+
+  .controlled-puzzle-dictionaries {
+    grid-template-columns: 1fr;
   }
 }
 

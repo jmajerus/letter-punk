@@ -1,8 +1,9 @@
 /**
  * Encodes/decodes a shareable puzzle link payload into a compact URL
- * fragment: `p=<board>~<progressWords>~<canonicalWords>~<resultSummary>`.
+ * fragment:
+ * `p=<board>~<progressWords>~<canonicalWords>~<resultSummary>~<boardKind>`.
  *
- * The three optional payloads carry different information and are encoded
+ * The four optional payloads carry different information and are encoded
  * differently:
  *
  * - `progressWords`: words the sharer has actually played, in order. These
@@ -33,8 +34,20 @@
  *   one-time "here's what to beat" toast on open, rather than baking it
  *   into the shareable text as pixels the way the board's own green/red
  *   markers do.
+ *
+ * - `boardKind`/`dictionaryKeys`: which of Import Today's Letter Boxed /
+ *   Random Puzzle / Simple Puzzle / Controlled Puzzle / Random Letters (if
+ *   any) produced this board, plus which dictionaries a Controlled Puzzle
+ *   drew from -- otherwise a shared link's recipient has no way to see any
+ *   of that, and every kind collapses to the generic "Custom Puzzle" on
+ *   their end regardless of how the sender actually got the board (see
+ *   puzzleFetcher.js's getPuzzleStatusText). Only the raw dictionary *keys*
+ *   are encoded, not a rendered label -- the actual display text is built
+ *   fresh from them on decode, so changing that wording later never
+ *   requires changing what a link encodes or breaks an already-shared one.
  */
 import { SIDE_NAMES } from './buildLogic.js';
+import { GENERATION_DICTIONARY_OPTIONS } from './dictionaryValidator.js';
 
 const HASH_KEY = 'p';
 const SEGMENT_SEPARATOR = '~';
@@ -43,6 +56,63 @@ const RESULT_FIELD_SEPARATOR = ':';
 const BOARD_LETTER_COUNT = 12;
 const LETTERS_PER_SIDE = 3;
 const MAX_WORD_LENGTH_CODE = 35; // single base36 digit ceiling
+
+// Single-letter codes, not the kind strings themselves -- keeps this
+// segment as compact as the others. 'random-letters' gets 'X' rather than
+// a second 'R', since 'R' is already random-puzzle's.
+const BOARD_KIND_CODES = {
+  'letterboxed-import': 'L',
+  'random-puzzle': 'R',
+  'simple-puzzle': 'S',
+  'controlled-puzzle': 'C',
+  'random-letters': 'X',
+};
+const BOARD_KIND_FROM_CODE = Object.fromEntries(
+  Object.entries(BOARD_KIND_CODES).map(([kind, code]) => [code, kind]),
+);
+
+// One digit per dictionary (there are only six, so a single base10 digit
+// covers all of them with room to spare) -- index into
+// GENERATION_DICTIONARY_OPTIONS rather than anything about the key text
+// itself, since the whole point is staying compact.
+const DICTIONARY_KEY_TO_DIGIT = new Map(
+  GENERATION_DICTIONARY_OPTIONS.map((option, index) => [option.key, String(index)]),
+);
+const DICTIONARY_KEY_FROM_DIGIT = new Map(
+  GENERATION_DICTIONARY_OPTIONS.map((option, index) => [String(index), option.key]),
+);
+
+function encodeBoardKindSegment(boardKind, dictionaryKeys) {
+  const code = BOARD_KIND_CODES[boardKind];
+  if (!code) {
+    return '';
+  }
+
+  if (boardKind !== 'controlled-puzzle' || !Array.isArray(dictionaryKeys) || dictionaryKeys.length === 0) {
+    return code;
+  }
+
+  const digits = dictionaryKeys
+    .map((key) => DICTIONARY_KEY_TO_DIGIT.get(key))
+    .filter((digit) => digit !== undefined);
+  return code + digits.join('');
+}
+
+function decodeBoardKindSegment(segment) {
+  const boardKind = BOARD_KIND_FROM_CODE[segment[0]] || null;
+  if (!boardKind) {
+    return { boardKind: null, dictionaryKeys: [] };
+  }
+
+  if (boardKind !== 'controlled-puzzle') {
+    return { boardKind, dictionaryKeys: [] };
+  }
+
+  const dictionaryKeys = [...segment.slice(1)]
+    .map((digit) => DICTIONARY_KEY_FROM_DIGIT.get(digit))
+    .filter(Boolean);
+  return { boardKind, dictionaryKeys };
+}
 
 // Short codes keep the URL compact -- full title names would roughly
 // double the length of this segment for no benefit, since the recipient
@@ -53,6 +123,7 @@ const TITLE_CODES = {
   'Vocabulary Wrangler': 'VW',
   'Solo Plumber': 'SP',
   'Union Plumber': 'UP',
+  Cataloger: 'CG',
 };
 const TITLE_NAMES = Object.fromEntries(
   Object.entries(TITLE_CODES).map(([name, code]) => [code, name]),
@@ -214,9 +285,16 @@ function decodeResultSummary(segment) {
  *   A masked share's result data (see public/modules/shareText.js). Omit entirely for a normal
  *   share/progress link -- only present, the segment is appended and the format matches exactly
  *   what encodeShareHash has always produced.
+ * @param {string|null} [options.boardKind] One of 'letterboxed-import'/'random-puzzle'/
+ *   'simple-puzzle'/'controlled-puzzle'/'random-letters', or null/omitted for a plain
+ *   player-authored board (pasted, generated from solution words, or hand-typed).
+ * @param {string[]} [options.dictionaryKeys] For boardKind 'controlled-puzzle' only -- the
+ *   GENERATION_DICTIONARY_OPTIONS keys the player actually checked.
  * @returns {string} A URL fragment payload, without the leading '#'.
  */
-export function encodeShareHash({ board, progressWords = [], canonicalWords = [], resultSummary = null }) {
+export function encodeShareHash({
+  board, progressWords = [], canonicalWords = [], resultSummary = null, boardKind = null, dictionaryKeys = [],
+}) {
   const flatBoard = flattenBoard(board);
   if (flatBoard.length !== BOARD_LETTER_COUNT || new Set(flatBoard).size !== BOARD_LETTER_COUNT) {
     throw new Error('Board must have exactly 12 unique letters.');
@@ -234,10 +312,20 @@ export function encodeShareHash({ board, progressWords = [], canonicalWords = []
     throw new Error('Canonical words must only contain letters from the board.');
   }
 
-  const segments = [flatBoard, progressSegment, canonicalSegment];
   const resultSegment = encodeResultSummary(resultSummary);
-  if (resultSegment) {
-    segments.push(resultSegment);
+  const boardKindSegment = encodeBoardKindSegment(boardKind, dictionaryKeys);
+
+  // resultSegment/boardKindSegment are only trimmed from the *end* when
+  // empty, never below the three fixed segments -- resultSegment being
+  // absent while boardKindSegment is present is exactly the common case
+  // for a plain (non-masked) share of a generated puzzle, and needs its
+  // empty slot kept so boardKindSegment still lands in the right position
+  // on decode. This also means every link encoded without either (the
+  // vast majority, historically) comes out byte-identical to before these
+  // two segments existed.
+  const segments = [flatBoard, progressSegment, canonicalSegment, resultSegment, boardKindSegment];
+  while (segments.length > 3 && segments[segments.length - 1] === '') {
+    segments.pop();
   }
 
   return `${HASH_KEY}=${segments.join(SEGMENT_SEPARATOR)}`;
@@ -245,7 +333,7 @@ export function encodeShareHash({ board, progressWords = [], canonicalWords = []
 
 /**
  * @param {string} hash location.hash value, with or without the leading '#'.
- * @returns {{ board: Array<{side: number, name: string, letters: string[]}>, progressWords: string[], canonicalWords: string[], resultSummary: {wordLengths: number[], chainTransitions: boolean[], titles: string[], completedInFreeChain: boolean} | null } | null}
+ * @returns {{ board: Array<{side: number, name: string, letters: string[]}>, progressWords: string[], canonicalWords: string[], resultSummary: {wordLengths: number[], chainTransitions: boolean[], titles: string[], completedInFreeChain: boolean} | null, boardKind: string | null, dictionaryKeys: string[] } | null}
  */
 export function decodeShareHash(hash) {
   const raw = String(hash || '').replace(/^#/, '');
@@ -254,7 +342,7 @@ export function decodeShareHash(hash) {
   }
 
   const payload = raw.slice(HASH_KEY.length + 1);
-  const [flatBoard = '', progressSegment = '', canonicalSegment = '', resultSegment = ''] = payload.split(SEGMENT_SEPARATOR);
+  const [flatBoard = '', progressSegment = '', canonicalSegment = '', resultSegment = '', boardKindSegment = ''] = payload.split(SEGMENT_SEPARATOR);
 
   if (!/^[A-Z]{12}$/.test(flatBoard) || new Set(flatBoard).size !== BOARD_LETTER_COUNT) {
     return null;
@@ -271,6 +359,9 @@ export function decodeShareHash(hash) {
   const progressWords = decodeWordList(progressSegment, (part) => decodeWordPlain(part, boardLetters));
   const canonicalWords = decodeWordList(canonicalSegment, (part) => decodeWord(part, indexToLetter));
   const resultSummary = decodeResultSummary(resultSegment);
+  const { boardKind, dictionaryKeys } = decodeBoardKindSegment(boardKindSegment);
 
-  return { board, progressWords, canonicalWords, resultSummary };
+  return {
+    board, progressWords, canonicalWords, resultSummary, boardKind, dictionaryKeys,
+  };
 }

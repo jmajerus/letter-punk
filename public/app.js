@@ -107,6 +107,8 @@ const boardPasteInput = document.getElementById('boardPasteInput');
 const importLetterBoxedButton = document.getElementById('importLetterBoxedBtn');
 const randomPuzzleButton = document.getElementById('randomPuzzleBtn');
 const simplePuzzleButton = document.getElementById('simplePuzzleBtn');
+const controlledPuzzleDictionariesElement = document.getElementById('controlledPuzzleDictionaries');
+const generateControlledPuzzleButton = document.getElementById('generateControlledPuzzleBtn');
 const randomLettersButton = document.getElementById('randomLettersBtn');
 const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
@@ -610,6 +612,25 @@ function getActiveCanonicalWordCount() {
   return words.length > 0 ? words.length : null;
 }
 
+// Full dictionary-tier picture for an accepted word (see gameLogic.js and
+// dictionaryValidator.js's getDictionaryTierKeys) -- provenance tracking is
+// always on, so this runs unconditionally for every accepted word,
+// regardless of puzzle kind or whether badges are currently displayed.
+function getWordDictionaryTierKeys(word) {
+  return dictionaryValidator.getDictionaryTierKeys(word);
+}
+
+// gameLogic.js's Cataloger title: which dictionary keys count as "on
+// theme" for whatever puzzle is currently active -- only non-empty for a
+// Controlled Puzzle. Reuses getActiveBoardKindInfo, the same puzzleFetcher
+// read buildBlankPuzzleShareUrl/copyShareLink already do for the exact
+// same "is the active board a Controlled Puzzle, and with which
+// dictionaries" question.
+function getActiveThemeDictionaryKeys() {
+  const { boardKind, dictionaryKeys } = getActiveBoardKindInfo();
+  return boardKind === 'controlled-puzzle' ? dictionaryKeys : [];
+}
+
 // The single string Analytics Engine uses as its sampling/grouping index
 // (see src/worker.js's buildDataPoint) -- a catalog puzzle's date id, or a
 // custom board's own flattened 12-letter layout (the same identity a
@@ -780,6 +801,20 @@ function describeShareTeaser(resultSummary) {
 // at all -- falls through to the full encoded #p=... hash, since there's
 // no public date reference for the recipient's client to look anything up
 // by; that's the one case still worth the length.
+//
+// Shared by every encodeShareHash call site -- without this, a shared link
+// carries only the board/words, and the recipient's status always reads
+// the generic "Custom Puzzle" no matter how the sender actually got the
+// board (see shareLink.js's own doc comment on boardKind/dictionaryKeys).
+function getActiveBoardKindInfo() {
+  const pState = puzzleFetcher.getState();
+  if (pState.puzzleSource !== 'custom') {
+    return { boardKind: null, dictionaryKeys: [] };
+  }
+
+  return { boardKind: pState.customBoardKind, dictionaryKeys: pState.customBoardDictionaryKeys || [] };
+}
+
 function buildBlankPuzzleShareUrl() {
   if (puzzleFetcher.isActiveCatalogPuzzleToday()) {
     return `${window.location.origin}${window.location.pathname}`;
@@ -794,6 +829,7 @@ function buildBlankPuzzleShareUrl() {
     const hash = encodeShareHash({
       board: gameEngine.getBoard(),
       canonicalWords: getActiveCanonicalWords(),
+      ...getActiveBoardKindInfo(),
     });
     return `${window.location.origin}${window.location.pathname}#${hash}`;
   } catch {
@@ -934,7 +970,9 @@ async function copyShareLink({ includeProgress }) {
 
   let hash;
   try {
-    hash = encodeShareHash({ board, progressWords, canonicalWords: getActiveCanonicalWords() });
+    hash = encodeShareHash({
+      board, progressWords, canonicalWords: getActiveCanonicalWords(), ...getActiveBoardKindInfo(),
+    });
   } catch {
     setBoardLinkMessage('Could not build a share link for this board.', 'error');
     return;
@@ -1037,6 +1075,7 @@ function wireEvents() {
   importLetterBoxedButton?.addEventListener('click', boardSetup.importTodaysLetterBoxedBoard);
   randomPuzzleButton?.addEventListener('click', boardSetup.generateRandomPuzzle);
   simplePuzzleButton?.addEventListener('click', boardSetup.generateSimplePuzzle);
+  generateControlledPuzzleButton?.addEventListener('click', boardSetup.generateControlledPuzzle);
   randomLettersButton?.addEventListener('click', boardSetup.generateRandomLetters);
   pasteClipboardButton?.addEventListener('click', boardSetup.pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', boardSetup.parsePastedBoardText);
@@ -1321,7 +1360,7 @@ function tryLoadSharedPuzzleFromHash() {
   // onStateChange reads synchronously is already correct on the very first
   // render, not just by the time initializeGame's later renderUi() call
   // papers over it.
-  puzzleFetcher.markCustomBoard();
+  puzzleFetcher.markCustomBoard({ kind: decoded.boardKind, dictionaryKeys: decoded.dictionaryKeys });
   gameEngine.applyBoardDefinition(decoded.board);
   // Unlike trackWordSubmit/trackGameSolved (deliberately suppressed during
   // arcade's own attract-loop replays -- see the !arcadeMode.isActive()
@@ -1365,6 +1404,8 @@ function initializeGame() {
     summarizeValidationSources,
     getCanonicalCharacterCount: getActiveCanonicalCharacterCount,
     getCanonicalWordCount: getActiveCanonicalWordCount,
+    getDictionaryTierKeys: getWordDictionaryTierKeys,
+    getThemeDictionaryKeys: getActiveThemeDictionaryKeys,
     onStateChange(snapshot) {
       renderUi(snapshot);
       puzzleProgress.saveIfApplicable(snapshot);
@@ -1485,6 +1526,8 @@ function initializeGame() {
     boardPasteInput,
     solutionWordsInput,
     boardInputMessageElement,
+    controlledPuzzleDictionariesElement,
+    generateControlledPuzzleButton,
   });
 
   renderUi();

@@ -230,8 +230,50 @@ test('markCustomBoard with kind labels the status distinctly, and clears on the 
   assert.equal(fetcher.getState().puzzleSource, 'custom');
   assert.equal(fetcher.getPuzzleStatusText(), 'Simple Puzzle');
 
+  fetcher.markCustomBoard({ kind: 'controlled-puzzle' });
+  assert.equal(fetcher.getState().puzzleSource, 'custom');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Controlled Puzzle');
+
+  // Same status text as the puzzleSource === 'random' fallback (see
+  // 'markCustomBoard and markRandomBoard reset the puzzle source...' and
+  // 'loadDailyPuzzleCatalog falls back...' above) -- Random Letters
+  // produces the exact same buildBoard() output with no canonical
+  // solution, just reached by an explicit click rather than the
+  // pre-catalog-load placeholder/fallback path.
+  fetcher.markCustomBoard({ kind: 'random-letters' });
+  assert.equal(fetcher.getState().puzzleSource, 'custom');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Random board');
+
   fetcher.markCustomBoard();
   assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
+});
+
+// A friend opening a shared Controlled Puzzle link should see which
+// dictionaries produced it, not just the generic kind name -- this is what
+// that title actually looks like for 0/1/2/3+ selected dictionaries.
+test('a controlled-puzzle status names the dictionaries used, falling back to a count past two', async () => {
+  const catalog = [makeEntry(isoDate(0))];
+  const { fetcher } = createFetcher(catalog);
+  await fetcher.loadDailyPuzzleCatalog();
+
+  fetcher.markCustomBoard({ kind: 'controlled-puzzle', dictionaryKeys: ['proper-nouns'] });
+  assert.equal(fetcher.getPuzzleStatusText(), 'Controlled Puzzle, proper nouns');
+
+  fetcher.markCustomBoard({ kind: 'controlled-puzzle', dictionaryKeys: ['proper-nouns', 'common'] });
+  assert.equal(fetcher.getPuzzleStatusText(), 'Controlled Puzzle, proper nouns + common');
+
+  fetcher.markCustomBoard({ kind: 'controlled-puzzle', dictionaryKeys: ['proper-nouns', 'common', 'fallback'] });
+  assert.equal(fetcher.getPuzzleStatusText(), 'Controlled Puzzle, 3 dictionaries', 'falls back to a count once more than two are selected');
+
+  fetcher.markCustomBoard({ kind: 'controlled-puzzle', dictionaryKeys: [] });
+  assert.equal(fetcher.getPuzzleStatusText(), 'Controlled Puzzle', 'no dictionaries recorded falls back to the bare kind name');
+
+  // dictionaryKeys is meaningless for any other kind -- markCustomBoard
+  // itself drops it (see the dedicated puzzleFetcher-level guard), so this
+  // also exercises that guard, not just describeControlledPuzzle in isolation.
+  fetcher.markCustomBoard({ kind: 'random-puzzle', dictionaryKeys: ['common'] });
+  assert.equal(fetcher.getPuzzleStatusText(), 'Random Puzzle');
+  assert.deepEqual(fetcher.getState().customBoardDictionaryKeys, [], 'dictionaryKeys is dropped for a non-controlled-puzzle kind');
 });
 
 test('getYesterdayPuzzleData returns the previous entry\'s canonical words, uppercased', async () => {

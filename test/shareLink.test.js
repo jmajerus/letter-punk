@@ -185,3 +185,91 @@ test('completedInFreeChain defaults to false when omitted from resultSummary', (
   const decoded = decodeShareHash(hash);
   assert.equal(decoded.resultSummary.completedInFreeChain, false);
 });
+
+test('boardKind is absent (null) by default, and its omission does not change the encoded hash at all', () => {
+  const hash = encodeShareHash({ board: BOARD, canonicalWords: ['AARDVARK'] });
+  assert.equal(hash, 'p=RVIADEKLMOTS~~bb809b82', 'byte-identical to the hash before boardKind existed');
+  assert.equal(decodeShareHash(hash).boardKind, null);
+  assert.deepEqual(decodeShareHash(hash).dictionaryKeys, []);
+});
+
+test('each non-controlled boardKind round-trips, with an empty dictionaryKeys list', () => {
+  for (const kind of ['letterboxed-import', 'random-puzzle', 'simple-puzzle', 'random-letters']) {
+    const hash = encodeShareHash({ board: BOARD, boardKind: kind });
+    const decoded = decodeShareHash(hash);
+    assert.equal(decoded.boardKind, kind, `boardKind round-trips for ${kind}`);
+    assert.deepEqual(decoded.dictionaryKeys, [], `${kind} never carries dictionary keys`);
+  }
+});
+
+test('a controlled-puzzle boardKind round-trips its selected dictionary keys, in the order encoded', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    boardKind: 'controlled-puzzle',
+    dictionaryKeys: ['proper-nouns', 'common'],
+  });
+  const decoded = decodeShareHash(hash);
+  assert.equal(decoded.boardKind, 'controlled-puzzle');
+  assert.deepEqual(decoded.dictionaryKeys, ['proper-nouns', 'common']);
+});
+
+test('a controlled-puzzle boardKind with no dictionaryKeys still round-trips as controlled-puzzle', () => {
+  const hash = encodeShareHash({ board: BOARD, boardKind: 'controlled-puzzle', dictionaryKeys: [] });
+  const decoded = decodeShareHash(hash);
+  assert.equal(decoded.boardKind, 'controlled-puzzle');
+  assert.deepEqual(decoded.dictionaryKeys, []);
+});
+
+test('dictionaryKeys are ignored (encoded as absent) for every boardKind except controlled-puzzle', () => {
+  const hash = encodeShareHash({ board: BOARD, boardKind: 'random-puzzle', dictionaryKeys: ['common'] });
+  const decoded = decodeShareHash(hash);
+  assert.equal(decoded.boardKind, 'random-puzzle');
+  assert.deepEqual(decoded.dictionaryKeys, [], 'dictionaryKeys only mean anything for a controlled-puzzle boardKind');
+});
+
+test('boardKind and dictionaryKeys survive alongside progress/canonical words and a masked resultSummary together', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    progressWords: ['REDO'],
+    canonicalWords: ['AARDVARK'],
+    resultSummary: { wordLengths: [8], chainTransitions: [], titles: [] },
+    boardKind: 'controlled-puzzle',
+    dictionaryKeys: ['proper-nouns-simplistic'],
+  });
+  const decoded = decodeShareHash(hash);
+  assert.deepEqual(decoded.progressWords, ['REDO']);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK']);
+  assert.deepEqual(decoded.resultSummary.wordLengths, [8]);
+  assert.equal(decoded.boardKind, 'controlled-puzzle');
+  assert.deepEqual(decoded.dictionaryKeys, ['proper-nouns-simplistic']);
+});
+
+test('an unrecognized boardKind code in a hand-crafted hash decodes to null rather than throwing', () => {
+  // Simulates a malformed or from-the-future link -- degrade gracefully to
+  // "no known kind" (generic Custom Puzzle), same as a link with no
+  // boardKind segment at all.
+  const decoded = decodeShareHash('p=RVIADEKLMOTS~~~~Z9');
+  assert.equal(decoded.boardKind, null);
+  assert.deepEqual(decoded.dictionaryKeys, []);
+});
+
+test('a pre-boardKind hash (only 4 segments, from before this feature existed) still decodes cleanly', () => {
+  const decoded = decodeShareHash('p=RVIADEKLMOTS~REDO.OAK~bb809b82');
+  assert.deepEqual(decoded.progressWords, ['REDO', 'OAK']);
+  assert.deepEqual(decoded.canonicalWords, ['AARDVARK']);
+  assert.equal(decoded.boardKind, null);
+  assert.deepEqual(decoded.dictionaryKeys, []);
+});
+
+test('a Cataloger title round-trips through a masked resultSummary, alongside the other title codes', () => {
+  const hash = encodeShareHash({
+    board: BOARD,
+    resultSummary: {
+      wordLengths: [8],
+      chainTransitions: [],
+      titles: ['Cataloger', 'Solo Plumber'],
+    },
+  });
+  const decoded = decodeShareHash(hash);
+  assert.deepEqual(decoded.resultSummary.titles, ['Cataloger', 'Solo Plumber']);
+});

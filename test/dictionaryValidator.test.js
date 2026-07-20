@@ -4,6 +4,8 @@ import {
   createDictionaryValidator,
   getValidationSourceLabel,
   summarizeValidationSources,
+  SOURCE_DISPLAY_NAMES,
+  GENERATION_DICTIONARY_OPTIONS,
   DEFAULT_BLOCKLIST_URL,
 } from '../public/modules/dictionaryValidator.js';
 
@@ -443,6 +445,64 @@ test('a per-call commonWordsSource override reaches a different tier than the va
   assert.ok(calls.includes(COMMON_URL), 'the override source must actually be fetched');
 });
 
+// Reproduces Controlled Puzzle: a player checks several dictionaries, and
+// the puzzle's seed/companion should be able to come from any of them --
+// exactly the same union behavior the default (non-commonWordsOnly) path
+// already gives Primary+Fallback, just with an array override instead of
+// the validator's own fixed `sources`.
+test('a commonWordsSource array unions multiple sources together, in findCompanionWord', async () => {
+  const TIER_A_SOURCE = { key: 'tier-a-packed-dawg', url: 'util/compressed-dictionary-common.txt', optional: true };
+  const TIER_B_SOURCE = { key: 'tier-b-packed-dawg', url: 'util/compressed-dictionary-proper-nouns.txt', optional: true };
+
+  const { validator, calls } = createValidator({
+    [PRIMARY_URL]: [],
+    [FALLBACK_URL]: [],
+    [TIER_A_SOURCE.url]: [VALID_COMPANION_A],
+    [TIER_B_SOURCE.url]: [VALID_COMPANION_B],
+  });
+
+  const result = await validator.findCompanionWord(COMPANION_SEED, {
+    commonWordsOnly: true,
+    commonWordsSource: [TIER_A_SOURCE, TIER_B_SOURCE],
+  });
+
+  assert.deepEqual(
+    [...result.candidates].sort(),
+    [VALID_COMPANION_A, VALID_COMPANION_B].sort(),
+    'a word found in either selected source must surface -- the union, not just one of them',
+  );
+  assert.ok(
+    calls.includes(TIER_A_SOURCE.url) && calls.includes(TIER_B_SOURCE.url),
+    'both selected sources must actually be fetched, not just the first',
+  );
+});
+
+test('a commonWordsSource array unions multiple sources together, in getRandomSeedWord', async () => {
+  const TIER_A_SOURCE = { key: 'tier-a-packed-dawg', url: 'util/compressed-dictionary-common.txt', optional: true };
+  const TIER_B_SOURCE = { key: 'tier-b-packed-dawg', url: 'util/compressed-dictionary-proper-nouns.txt', optional: true };
+
+  const { validator, calls } = createValidator({
+    [PRIMARY_URL]: [],
+    [FALLBACK_URL]: [],
+    // Only tier B has any words at all -- if the array override collapsed
+    // back down to a single source (a regression to the old behavior),
+    // this would return null instead of a real word.
+    [TIER_A_SOURCE.url]: [],
+    [TIER_B_SOURCE.url]: ['known'],
+  });
+
+  const seed = await validator.getRandomSeedWord({
+    commonWordsOnly: true,
+    commonWordsSource: [TIER_A_SOURCE, TIER_B_SOURCE],
+  });
+
+  assert.equal(seed, 'KNOWN');
+  assert.ok(
+    calls.includes(TIER_A_SOURCE.url) && calls.includes(TIER_B_SOURCE.url),
+    'both selected sources must be checked, not just the one that happened to match',
+  );
+});
+
 test('getRandomSeedWord never returns a word shorter than 3 letters', async () => {
   // "ab" starts with 'a' and would otherwise be a candidate for that
   // letter -- only "known" survives the length filter, regardless of
@@ -510,24 +570,137 @@ test('summarizeValidationSources reflects none/one/many matches', () => {
 });
 
 // The live word-builder indicator (app.js's renderValidationSourceIndicator)
-// shows this detail text directly as a player types -- it must name the
-// actual dictionary, not its role/precedence. "Fallback" specifically used
-// to imply a contingency ("only checked if primary misses") that isn't what
-// validateWord does: it checks every source unconditionally, every time.
-test('summarizeValidationSources detail names the actual dictionary, not a vague role label', () => {
+// shows this detail text continuously as a player types, so it stays short
+// and generic ("general"/"word-game dictionary") rather than naming the
+// exact dictionary -- that full specificity belongs in the breakdown modal
+// instead (a surface someone deliberately opens), via boardRenderer.js's
+// direct use of SOURCE_DISPLAY_NAMES, which this text does NOT flow into.
+// "Fallback" is still avoided here since it implies a contingency ("only
+// checked if primary misses") that isn't what validateWord does: it checks
+// every source unconditionally, every time.
+test('summarizeValidationSources detail stays short and generic, for the live word-builder indicator', () => {
   const primaryOnly = summarizeValidationSources(['primary-packed-dawg']);
-  assert.equal(primaryOnly.detail, 'Accepted by the Hunspell-based dictionary (general).');
+  assert.equal(primaryOnly.detail, 'Accepted by the general dictionary.');
   assert.equal(primaryOnly.badge, 'Primary', 'the internal badge value stays "Primary" -- only the display text changed');
 
   const fallbackOnly = summarizeValidationSources(['fallback-packed-dawg']);
-  assert.equal(fallbackOnly.detail, 'Accepted by the 3of6game dictionary (word-game).');
+  assert.equal(fallbackOnly.detail, 'Accepted by the word-game dictionary.');
 
   const both = summarizeValidationSources(['primary-packed-dawg', 'fallback-packed-dawg']);
-  assert.equal(both.detail, 'Accepted by the Hunspell-based dictionary (general) and 3of6game dictionary (word-game).');
+  assert.equal(both.detail, 'Accepted by the general and word-game dictionaries.');
 
   const api = summarizeValidationSources(['fallback-api']);
   assert.equal(api.detail, 'Accepted by the Fallback API.');
 
   const custom = summarizeValidationSources(['session-override']);
   assert.equal(custom.detail, 'Accepted by the Custom override.');
+});
+
+// The breakdown modal's per-word/legend text is unaffected by the above --
+// it reads SOURCE_DISPLAY_NAMES directly (see boardRenderer.js), not
+// summarizeValidationSources' detail field, so it keeps naming the actual
+// dictionaries for players who deliberately opened the modal to see them.
+test('SOURCE_DISPLAY_NAMES (the breakdown modal source) still names the actual dictionaries', () => {
+  assert.equal(SOURCE_DISPLAY_NAMES.Primary, 'Hunspell-based dictionary (general)');
+  assert.equal(SOURCE_DISPLAY_NAMES.Fallback, '3of6game dictionary (word-game)');
+});
+
+// Single source of truth for Controlled Puzzle's checkbox list
+// (boardSetup.js renders one row per entry) and what actually gets
+// searched -- exercised structurally here since boardSetup.js's own DOM
+// rendering isn't unit-tested (see the dom-stub/real-DOM scripts used to
+// verify it manually instead).
+test('GENERATION_DICTIONARY_OPTIONS lists all six dictionaries, each with a unique key and a real source', () => {
+  assert.equal(GENERATION_DICTIONARY_OPTIONS.length, 6);
+
+  const keys = GENERATION_DICTIONARY_OPTIONS.map((option) => option.key);
+  assert.equal(new Set(keys).size, 6, 'every option needs a distinct key -- boardSetup.js keys checkboxes by this');
+
+  for (const option of GENERATION_DICTIONARY_OPTIONS) {
+    assert.ok(option.label.length > 0, `${option.key} needs a non-empty label`);
+    assert.ok(option.source && typeof option.source.url === 'string' && option.source.url.length > 0, `${option.key} needs a real source with a url`);
+  }
+
+  // Primary/Fallback reuse SOURCE_DISPLAY_NAMES rather than restating the
+  // same label text -- if that map's wording ever changes, this list
+  // shouldn't silently drift out of sync with it.
+  const primaryOption = GENERATION_DICTIONARY_OPTIONS.find((option) => option.key === 'primary');
+  const fallbackOption = GENERATION_DICTIONARY_OPTIONS.find((option) => option.key === 'fallback');
+  assert.equal(primaryOption.label, SOURCE_DISPLAY_NAMES.Primary);
+  assert.equal(fallbackOption.label, SOURCE_DISPLAY_NAMES.Fallback);
+});
+
+// getDictionaryTierKeys backs both the provenance modal's full badge set
+// (boardRenderer.js) and the Cataloger title (gameLogic.js) -- a
+// comprehensive, always-on membership check across all six dictionaries,
+// independent of validateWord's own Primary/Fallback/API/session-override
+// gameplay-acceptance decision.
+const PROPER_URL = 'util/compressed-dictionary-proper-nouns.txt';
+const COMMON_SIMPLISTIC_URL = 'util/compressed-dictionary-common-simplistic.txt';
+const PROPER_SIMPLISTIC_URL = 'util/compressed-dictionary-proper-nouns-simplistic.txt';
+
+test('getDictionaryTierKeys reports every tier a word is actually found in', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: ['cat'],
+    [FALLBACK_URL]: ['cat'],
+    [COMMON_URL]: ['cat'],
+    [COMMON_SIMPLISTIC_URL]: ['cat'],
+    [PROPER_URL]: [],
+    [PROPER_SIMPLISTIC_URL]: [],
+  });
+
+  assert.deepEqual(
+    await validator.getDictionaryTierKeys('cat'),
+    ['primary', 'fallback', 'common', 'common-simplistic'],
+    'an ordinary, frequent, dual-dictionary word matches all four of its real tiers',
+  );
+});
+
+test('getDictionaryTierKeys skips the simplistic lookup entirely when the parent tier does not match', async () => {
+  const { validator, calls } = createValidator({
+    [PRIMARY_URL]: ['obscura'],
+    [FALLBACK_URL]: [],
+    [COMMON_URL]: [], // not common -- too obscure
+    [PROPER_URL]: [],
+  });
+
+  const keys = await validator.getDictionaryTierKeys('obscura');
+  assert.deepEqual(keys, ['primary']);
+  assert.ok(!calls.includes(COMMON_SIMPLISTIC_URL), 'common-simplistic can\'t match if common already didn\'t -- no lookup should even happen');
+  assert.ok(!calls.includes(PROPER_SIMPLISTIC_URL), 'same reasoning for proper-nouns-simplistic');
+});
+
+test('getDictionaryTierKeys still checks the simplistic tier when its parent does match, and can come back false', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: ['obscura'],
+    [FALLBACK_URL]: ['obscura'],
+    [COMMON_URL]: ['obscura'], // common, but...
+    [COMMON_SIMPLISTIC_URL]: [], // ...not frequent enough for the simplistic tier
+    [PROPER_URL]: [],
+  });
+
+  assert.deepEqual(await validator.getDictionaryTierKeys('obscura'), ['primary', 'fallback', 'common']);
+});
+
+test('getDictionaryTierKeys reports a proper noun found only in the proper-nouns tiers, with no common-tier match', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: ['kennedy'],
+    [FALLBACK_URL]: [],
+    [COMMON_URL]: [],
+    [PROPER_URL]: ['kennedy'],
+    [PROPER_SIMPLISTIC_URL]: ['kennedy'],
+  });
+
+  assert.deepEqual(await validator.getDictionaryTierKeys('kennedy'), ['primary', 'proper-nouns', 'proper-nouns-simplistic']);
+});
+
+test('getDictionaryTierKeys returns an empty array for a word found nowhere', async () => {
+  const { validator } = createValidator({
+    [PRIMARY_URL]: [],
+    [FALLBACK_URL]: [],
+    [COMMON_URL]: [],
+    [PROPER_URL]: [],
+  });
+
+  assert.deepEqual(await validator.getDictionaryTierKeys('zzzqx'), []);
 });

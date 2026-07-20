@@ -14,6 +14,7 @@ const TEST_BOARD = [
 
 function createHarness({
   acceptedWords = [], getCanonicalCharacterCount, getCanonicalWordCount, freeChainMode,
+  getDictionaryTierKeys, getThemeDictionaryKeys,
 } = {}) {
   const accepted = new Set(acceptedWords);
   const events = { stateChanges: [], messages: [], invalidLetters: [], wordResults: [] };
@@ -32,6 +33,8 @@ function createHarness({
     }),
     getCanonicalCharacterCount,
     getCanonicalWordCount,
+    getDictionaryTierKeys,
+    getThemeDictionaryKeys,
     onStateChange: (snapshot) => events.stateChanges.push(snapshot),
     onMessage: (text, kind) => events.messages.push({ text, kind }),
     onInvalidLetter: (letter) => events.invalidLetters.push(letter),
@@ -585,6 +588,111 @@ test('Union Plumber requires at least two words -- a solo full-board solve earns
   assert.match(text, /Solo Plumber: every word stood on its own/);
 });
 
+test('Cataloger is earned when every accepted word\'s dictionaryTierKeys overlaps the puzzle\'s theme keys', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getDictionaryTierKeys: async () => ['common'],
+    getThemeDictionaryKeys: () => ['common'],
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    // eslint-disable-next-line no-await-in-loop
+    await engine.submitWord();
+  }
+
+  assert.match(lastMessage(events).text, /Cataloger: every word you found came from this puzzle's own dictionary selection/);
+});
+
+test('Cataloger is not earned if even one accepted word\'s dictionaryTierKeys does not overlap the theme', async () => {
+  const words = ['adgj', 'jbehk', 'kcfil'];
+  const { engine, events } = createHarness({
+    acceptedWords: words,
+    // Every word matches except the middle one -- not partial credit,
+    // same all-or-nothing character as Solo Plumber.
+    getDictionaryTierKeys: async (word) => (word === 'jbehk' ? [] : ['common']),
+    getThemeDictionaryKeys: () => ['common'],
+  });
+
+  for (const word of words) {
+    typeWord(engine, word);
+    // eslint-disable-next-line no-await-in-loop
+    await engine.submitWord();
+  }
+
+  assert.doesNotMatch(lastMessage(events).text, /Cataloger/);
+});
+
+test('Cataloger never fires when neither callback is provided at all', async () => {
+  const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    // eslint-disable-next-line no-await-in-loop
+    await engine.submitWord();
+  }
+
+  assert.doesNotMatch(lastMessage(events).text, /Cataloger/);
+  const summary = engine.getShareSummary();
+  assert.ok(!summary.titles.includes('Cataloger'));
+});
+
+test('Cataloger never fires when getThemeDictionaryKeys returns empty -- the realistic non-Controlled-Puzzle case, since provenance tracking (getDictionaryTierKeys) is always on regardless', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk', 'kcfil'],
+    getDictionaryTierKeys: async () => ['common'], // tracking still runs, and matches...
+    getThemeDictionaryKeys: () => [], // ...but this puzzle has no theme to match against
+  });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    // eslint-disable-next-line no-await-in-loop
+    await engine.submitWord();
+  }
+
+  assert.doesNotMatch(lastMessage(events).text, /Cataloger/);
+});
+
+test('Cataloger combines with a character-count title and a Plumber title in the same message, not instead of either', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'behkcfil'],
+    freeChainMode: true,
+    getCanonicalCharacterCount: () => 20,
+    getDictionaryTierKeys: async () => ['common'],
+    getThemeDictionaryKeys: () => ['common'],
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  typeWord(engine, 'behkcfil');
+  await engine.submitWord();
+
+  const { text } = lastMessage(events);
+  assert.match(text, /Efficiency Engineer: you came in 8 characters under the canonical 20-character solution!/);
+  assert.match(text, /Solo Plumber: every word stood on its own/);
+  assert.match(text, /Cataloger: every word you found came from this puzzle's own dictionary selection/);
+});
+
+test('a word matching several tiers at once still needs only one of them to overlap the theme for Cataloger', async () => {
+  const { engine, events } = createHarness({
+    acceptedWords: ['adgj', 'jbehk'],
+    getDictionaryTierKeys: async (word) => (word === 'adgj' ? ['primary', 'fallback', 'common'] : ['proper-nouns']),
+    getThemeDictionaryKeys: () => ['common'],
+  });
+
+  typeWord(engine, 'adgj');
+  await engine.submitWord();
+  assert.deepEqual(events.wordResults.at(-1).dictionaryTierKeys, ['primary', 'fallback', 'common']);
+
+  typeWord(engine, 'jbehk');
+  await engine.submitWord();
+  assert.deepEqual(events.wordResults.at(-1).dictionaryTierKeys, ['proper-nouns']);
+
+  // 'jbehk' matched proper-nouns, not common -- the puzzle's actual theme
+  // -- so the overlap fails even though both words matched *something*.
+  assert.doesNotMatch(lastMessage(events).text, /Cataloger/);
+});
+
 test('justCompleted is true only for the word that first completes the board, not for further words that keep it complete', async () => {
   const { engine, events } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil', 'lad'] });
 
@@ -836,6 +944,25 @@ test('lastValidationSummary clears as soon as the next word starts, not just onc
     '',
     'starting to build the next word must clear the previous word\'s summary immediately, before any submit',
   );
+});
+
+test('lastValidationSummary clears once the board is solved, not left describing a word no longer on screen', async () => {
+  const { engine } = createHarness({ acceptedWords: ['adgj', 'jbehk', 'kcfil'] });
+
+  for (const word of ['adgj', 'jbehk', 'kcfil']) {
+    typeWord(engine, word);
+    // eslint-disable-next-line no-await-in-loop
+    await engine.submitWord();
+  }
+
+  // The word builder goes genuinely empty once solved (no auto-reseed --
+  // see the solved branch's own comment in gameLogic.js), so there is no
+  // word left for "Accepted by ..." to describe. Left set, this is exactly
+  // the bug report: the message sits there indefinitely, including when
+  // navigating back through an already-solved daily puzzle, since progress
+  // restoration replays saved words through this same submitWord path.
+  assert.deepEqual(engine.getSnapshot().tokens, []);
+  assert.equal(engine.getSnapshot().lastValidationSummary, '');
 });
 
 test('freeChainMode defaults to false and is reflected on isFreeChainMode() and the snapshot', () => {
