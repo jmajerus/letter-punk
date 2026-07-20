@@ -630,6 +630,19 @@ test('GENERATION_DICTIONARY_OPTIONS lists all six dictionaries, each with a uniq
   assert.equal(fallbackOption.label, SOURCE_DISPLAY_NAMES.Fallback);
 });
 
+// boardSetup.js groups same-family entries into a mutually-exclusive radio
+// group (a tier and its own simplistic subset), relying on them actually
+// being adjacent in this list and on Primary/Fallback having no family at
+// all -- this locks in the shape that grouping depends on.
+test('GENERATION_DICTIONARY_OPTIONS groups each tier with its own simplistic subset, adjacently, and leaves Primary/Fallback ungrouped', () => {
+  const families = GENERATION_DICTIONARY_OPTIONS.map((option) => option.family);
+  assert.deepEqual(families, [null, null, 'common', 'common', 'proper-nouns', 'proper-nouns']);
+
+  const familyKeys = (family) => GENERATION_DICTIONARY_OPTIONS.filter((option) => option.family === family).map((option) => option.key);
+  assert.deepEqual(familyKeys('common'), ['common', 'common-simplistic']);
+  assert.deepEqual(familyKeys('proper-nouns'), ['proper-nouns', 'proper-nouns-simplistic']);
+});
+
 // getDictionaryTierKeys backs both the provenance modal's full badge set
 // (boardRenderer.js) and the Cataloger title (gameLogic.js) -- a
 // comprehensive, always-on membership check across all six dictionaries,
@@ -703,4 +716,36 @@ test('getDictionaryTierKeys returns an empty array for a word found nowhere', as
   });
 
   assert.deepEqual(await validator.getDictionaryTierKeys('zzzqx'), []);
+});
+
+test('getDictionaryTierKeys dispatches its independent lookups concurrently, not one after another', async () => {
+  // A fake fetch with real (if tiny) latency, tracking how many fetches
+  // are simultaneously in flight -- proves genuine overlap, not just that
+  // every dictionary eventually gets checked.
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const dictionaries = {
+    [PRIMARY_URL]: ['cat'],
+    [FALLBACK_URL]: ['cat'],
+    [COMMON_URL]: ['cat'],
+    [COMMON_SIMPLISTIC_URL]: ['cat'],
+    [PROPER_URL]: [],
+  };
+  const fetchImpl = async (url) => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight -= 1;
+    const words = dictionaries[url];
+    if (words === undefined) {
+      return { ok: false, status: 404 };
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify(words) };
+  };
+
+  const validator = createDictionaryValidator({ sources: SOURCES, fetchImpl, ptrieFactory: fakePTrieFactory });
+  const keys = await validator.getDictionaryTierKeys('cat');
+
+  assert.ok(maxInFlight >= 4, `round 1 (primary/fallback/common/proper-nouns) dispatches together -- got a max of ${maxInFlight} concurrent fetches, expected at least 4`);
+  assert.deepEqual(keys, ['primary', 'fallback', 'common', 'common-simplistic'], 'correctness is unaffected by the concurrency change');
 });

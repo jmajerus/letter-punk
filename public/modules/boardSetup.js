@@ -55,6 +55,26 @@ function pickBalancedCompanion(seedUpper, candidates) {
   return null;
 }
 
+// Groups adjacent GENERATION_DICTIONARY_OPTIONS entries sharing a non-null
+// family into one radio group (a tier and its own simplistic subset --
+// see the option list's own doc comment for why they're mutually
+// exclusive rather than independent checkboxes); entries with no family
+// (Primary/Fallback) each get their own singleton group, rendered as a
+// plain checkbox. Relies on same-family entries actually being adjacent in
+// the source list, which they are by construction.
+function groupDictionaryOptionsByFamily(options) {
+  const groups = [];
+  for (const option of options) {
+    const lastGroup = groups[groups.length - 1];
+    if (option.family && lastGroup?.family === option.family) {
+      lastGroup.options.push(option);
+    } else {
+      groups.push({ family: option.family, options: [option] });
+    }
+  }
+  return groups;
+}
+
 /**
  * Owns the Set Board modal's input side (paste/parse, generate-from-words,
  * import, manual grid, Apply) -- everything upstream of a board actually
@@ -113,42 +133,107 @@ export function createBoardSetup({
   // something other than 'controlled-puzzle'.
   let boardDictionaryKeys = [];
 
-  // Populated once, not per modal-open -- the six checkboxes are static
+  // Populated once, not per modal-open -- the option list is static
   // (GENERATION_DICTIONARY_OPTIONS never changes at runtime), and unlike
-  // boardKind above, which tier(s) a player last checked is left sticky
+  // boardKind above, which tier(s) a player last selected is left sticky
   // across modal opens rather than reset, so re-opening Set Board to tweak
-  // one box doesn't lose the rest of a selection.
+  // one selection doesn't lose the rest.
+  //
+  // Every rendered input carries data-dictionaryKey when (and only when)
+  // choosing it means something -- a checked Primary/Fallback checkbox, or
+  // a family's non-None radio -- so "what's actually selected" is always
+  // just querySelectorAll('input:checked[data-dictionary-key]'), the same
+  // selector regardless of whether it's hitting a checkbox or a radio.
+  // Each family's "None" radio deliberately has no data-dictionaryKey at
+  // all, so it's naturally excluded without needing to special-case it.
   if (controlledPuzzleDictionariesElement) {
     controlledPuzzleDictionariesElement.innerHTML = '';
-    for (const option of GENERATION_DICTIONARY_OPTIONS) {
-      const row = document.createElement('div');
-      row.className = 'settings-toggle-row';
+    for (const group of groupDictionaryOptionsByFamily(GENERATION_DICTIONARY_OPTIONS)) {
+      if (!group.family) {
+        const [option] = group.options;
+        const row = document.createElement('div');
+        row.className = 'settings-toggle-row';
 
-      const checkboxId = `controlledDict-${option.key}`;
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.id = checkboxId;
-      checkbox.className = 'settings-checkbox';
-      checkbox.dataset.dictionaryKey = option.key;
+        const checkboxId = `controlledDict-${option.key}`;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = checkboxId;
+        checkbox.className = 'settings-checkbox';
+        checkbox.dataset.dictionaryKey = option.key;
 
-      const label = document.createElement('label');
-      label.setAttribute('for', checkboxId);
-      label.textContent = option.label;
+        const label = document.createElement('label');
+        label.setAttribute('for', checkboxId);
+        label.textContent = option.label;
 
-      row.append(checkbox, label);
-      controlledPuzzleDictionariesElement.append(row);
+        row.append(checkbox, label);
+        controlledPuzzleDictionariesElement.append(row);
+        continue;
+      }
+
+      // A tier and its own simplistic subset -- radio buttons, not
+      // checkboxes, since checking both is never meaningfully different
+      // from checking just the broader tier alone (see
+      // GENERATION_DICTIONARY_OPTIONS' own doc comment). "None" is an
+      // explicit option rather than just "nothing picked yet," so a
+      // screen reader announces it as a real, deliberate choice in the
+      // group, not an absence.
+      const fieldset = document.createElement('fieldset');
+      fieldset.className = 'controlled-puzzle-radio-group';
+
+      const legend = document.createElement('legend');
+      legend.textContent = group.options[0].label;
+      fieldset.append(legend);
+
+      const groupName = `controlledDict-${group.family}`;
+
+      const noneRow = document.createElement('div');
+      noneRow.className = 'settings-toggle-row';
+      const noneId = `${groupName}-none`;
+      const noneRadio = document.createElement('input');
+      noneRadio.type = 'radio';
+      noneRadio.name = groupName;
+      noneRadio.id = noneId;
+      noneRadio.className = 'settings-checkbox';
+      noneRadio.checked = true;
+      const noneLabel = document.createElement('label');
+      noneLabel.setAttribute('for', noneId);
+      noneLabel.textContent = 'None';
+      noneRow.append(noneRadio, noneLabel);
+      fieldset.append(noneRow);
+
+      for (const option of group.options) {
+        const row = document.createElement('div');
+        row.className = 'settings-toggle-row';
+
+        const radioId = `controlledDict-${option.key}`;
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = groupName;
+        radio.id = radioId;
+        radio.className = 'settings-checkbox';
+        radio.dataset.dictionaryKey = option.key;
+
+        const label = document.createElement('label');
+        label.setAttribute('for', radioId);
+        label.textContent = option.label;
+
+        row.append(radio, label);
+        fieldset.append(row);
+      }
+
+      controlledPuzzleDictionariesElement.append(fieldset);
     }
 
-    // Delegated on the container rather than one listener per checkbox --
-    // the Generate button only makes sense once at least one dictionary is
-    // checked, same reasoning as any other form with a meaningless empty
-    // submission.
+    // Delegated on the container rather than one listener per input -- the
+    // Generate button only makes sense once at least one dictionary is
+    // actually selected, same reasoning as any other form with a
+    // meaningless empty submission.
     controlledPuzzleDictionariesElement.addEventListener('change', () => {
       if (!generateControlledPuzzleButton) {
         return;
       }
-      const anyChecked = controlledPuzzleDictionariesElement.querySelector('input[type="checkbox"]:checked') !== null;
-      generateControlledPuzzleButton.disabled = !anyChecked;
+      const anySelected = controlledPuzzleDictionariesElement.querySelector('input:checked[data-dictionary-key]') !== null;
+      generateControlledPuzzleButton.disabled = !anySelected;
     });
   }
 
@@ -342,14 +427,14 @@ export function createBoardSetup({
       return undefined;
     }
 
-    const checkedBoxes = controlledPuzzleDictionariesElement.querySelectorAll('input[type="checkbox"]:checked');
-    const selectedKeys = new Set([...checkedBoxes].map((box) => box.dataset.dictionaryKey));
+    const selectedInputs = controlledPuzzleDictionariesElement.querySelectorAll('input:checked[data-dictionary-key]');
+    const selectedKeys = new Set([...selectedInputs].map((input) => input.dataset.dictionaryKey));
     const selectedOptions = GENERATION_DICTIONARY_OPTIONS.filter((option) => selectedKeys.has(option.key));
     const selectedSources = selectedOptions.map((option) => option.source);
 
     // Defensive only -- generateControlledPuzzleButton is disabled
-    // whenever nothing is checked (see the change listener above), so this
-    // shouldn't be reachable in normal use.
+    // whenever nothing is selected (see the change listener above), so
+    // this shouldn't be reachable in normal use.
     if (selectedSources.length === 0) {
       setBoardInputMessage('Pick at least one dictionary first.', 'error');
       return undefined;

@@ -1578,6 +1578,40 @@ body.arcade-mode .board-tools {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 16px;
+  align-items: start;
+}
+
+/* Primary/Fallback's checkboxes render visibly smaller than the radio
+   buttons alongside them even at the same .settings-checkbox box size --
+   bumped to match the radios' apparent diameter. */
+.controlled-puzzle-dictionaries input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+
+/* A tier and its own simplistic subset, grouped as mutually-exclusive
+   radio buttons (see GENERATION_DICTIONARY_OPTIONS' own doc comment in
+   dictionaryValidator.js) -- reset to plain, borderless stacking rather
+   than the browser's default fieldset box, matching the unboxed look of
+   the plain checkbox rows (Primary/Fallback) it sits alongside in the
+   same grid. */
+.controlled-puzzle-radio-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controlled-puzzle-radio-group legend {
+  padding: 0;
+  margin-bottom: 2px;
+  font-size: max(0.78rem, 14px);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 @media (max-width: 1080px) {

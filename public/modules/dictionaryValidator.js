@@ -114,13 +114,34 @@ export const SOURCE_DISPLAY_NAMES = {
 // telegraphic status title doesn't) for the same underlying reason that
 // wording exists: naming the exact dictionary is for the breakdown modal,
 // not an ambient status line.
+//
+// family groups a tier with its own simplistic subset (null for
+// Primary/Fallback, which have no such relationship to anything) --
+// boardSetup.js renders same-family entries as a mutually-exclusive radio
+// group rather than independent checkboxes, since checking both a tier and
+// its own simplistic child is never meaningfully different from checking
+// just the broader tier alone (the simplistic one is always already a
+// subset of it), a redundant choice a flat checkbox list let a player make
+// without any indication it did nothing.
 export const GENERATION_DICTIONARY_OPTIONS = [
-  { key: 'primary', source: PACKED_DICTIONARY_SOURCES[0], label: SOURCE_DISPLAY_NAMES.Primary, shortLabel: 'general' },
-  { key: 'fallback', source: PACKED_DICTIONARY_SOURCES[1], label: SOURCE_DISPLAY_NAMES.Fallback, shortLabel: 'word-game' },
-  { key: 'common', source: COMMON_WORDS_SOURCE, label: 'Common', shortLabel: 'common' },
-  { key: 'common-simplistic', source: COMMON_WORDS_SIMPLISTIC_SOURCE, label: 'Common (simplistic)', shortLabel: 'common (simplistic)' },
-  { key: 'proper-nouns', source: PROPER_NOUNS_SOURCE, label: 'Proper nouns', shortLabel: 'proper nouns' },
-  { key: 'proper-nouns-simplistic', source: PROPER_NOUNS_SIMPLISTIC_SOURCE, label: 'Proper nouns (simplistic)', shortLabel: 'proper nouns (simplistic)' },
+  {
+    key: 'primary', source: PACKED_DICTIONARY_SOURCES[0], label: SOURCE_DISPLAY_NAMES.Primary, shortLabel: 'general', family: null,
+  },
+  {
+    key: 'fallback', source: PACKED_DICTIONARY_SOURCES[1], label: SOURCE_DISPLAY_NAMES.Fallback, shortLabel: 'word-game', family: null,
+  },
+  {
+    key: 'common', source: COMMON_WORDS_SOURCE, label: 'Common', shortLabel: 'common', family: 'common',
+  },
+  {
+    key: 'common-simplistic', source: COMMON_WORDS_SIMPLISTIC_SOURCE, label: 'Common (simplistic)', shortLabel: 'common (simplistic)', family: 'common',
+  },
+  {
+    key: 'proper-nouns', source: PROPER_NOUNS_SOURCE, label: 'Proper nouns', shortLabel: 'proper nouns', family: 'proper-nouns',
+  },
+  {
+    key: 'proper-nouns-simplistic', source: PROPER_NOUNS_SIMPLISTIC_SOURCE, label: 'Proper nouns (simplistic)', shortLabel: 'proper nouns (simplistic)', family: 'proper-nouns',
+  },
 ];
 
 // Short category names for the live word-builder indicator (detail below)
@@ -325,28 +346,47 @@ export function createDictionaryValidator(options = {}) {
   // already being in the parent, so that lookup is skipped entirely
   // whenever the parent didn't match, rather than performed and just
   // trusted to come back false.
+  //
+  // Two rounds, not six sequential awaits: primary/fallback/common/proper-
+  // nouns don't depend on each other at all, so they're dispatched
+  // together first (primary/fallback are typically already cached by
+  // validateWord's own check earlier in the same submitWord() call, but
+  // common/proper-nouns are usually this word's first real network
+  // activity, and there's no reason to make them wait on one another).
+  // The two simplistic checks only depend on their own parent, not each
+  // other, so the second round runs them together too -- worst case, two
+  // sequential round-trips instead of up to four.
   async function getDictionaryTierKeys(word) {
     const sourceByKey = new Map(GENERATION_DICTIONARY_OPTIONS.map((option) => [option.key, option.source]));
-    const matched = [];
 
-    async function check(key) {
+    async function isMatch(key) {
       const result = await validateWordWithPackedDictionary(word, sourceByKey.get(key));
-      if (result.isValid) {
-        matched.push(key);
-      }
       return result.isValid;
     }
 
-    await check('primary');
-    await check('fallback');
+    const [primary, fallback, common, properNouns] = await Promise.all([
+      isMatch('primary'),
+      isMatch('fallback'),
+      isMatch('common'),
+      isMatch('proper-nouns'),
+    ]);
 
-    if (await check('common')) {
-      await check('common-simplistic');
-    }
+    const [commonSimplistic, properNounsSimplistic] = await Promise.all([
+      common ? isMatch('common-simplistic') : false,
+      properNouns ? isMatch('proper-nouns-simplistic') : false,
+    ]);
 
-    if (await check('proper-nouns')) {
-      await check('proper-nouns-simplistic');
-    }
+    // Built in a fixed order (GENERATION_DICTIONARY_OPTIONS' own order)
+    // regardless of which lookup above actually resolved first --
+    // boardRenderer.js relies on this order to render a word's squares
+    // without a separate sort.
+    const matched = [];
+    if (primary) matched.push('primary');
+    if (fallback) matched.push('fallback');
+    if (common) matched.push('common');
+    if (commonSimplistic) matched.push('common-simplistic');
+    if (properNouns) matched.push('proper-nouns');
+    if (properNounsSimplistic) matched.push('proper-nouns-simplistic');
 
     return matched;
   }
