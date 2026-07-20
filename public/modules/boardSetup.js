@@ -7,6 +7,7 @@ import {
   generateBoardFromSolutionWords,
   findChainBreaks,
 } from './buildLogic.js';
+import { COMMON_WORDS_SOURCE } from './dictionaryValidator.js';
 
 // A candidate list sorted shortest-to-longest gives us any percentile for
 // free by index. The raw dictionary's length distribution is dominated by
@@ -85,14 +86,15 @@ export function createBoardSetup({
   // Tracks where the board sitting in the side inputs right now actually
   // came from -- null (plain: pasted, generated from the player's own
   // words, hand-typed, or Random Letters), 'letterboxed-import' (Import
-  // Today's Letter Boxed), or 'random-puzzle' (Random Puzzle). Passed
-  // straight through to puzzleFetcher's markCustomBoard on Apply, which
-  // uses it to label the status something more specific than the generic
-  // 'Custom Puzzle'. Synced from the puzzle actually in play whenever the
-  // modal opens (prepareBoardModal), then cleared by anything that replaces
-  // the inputs with something else -- Parse Pasted Text, Generate From
-  // Words, Random Letters, or hand-editing a side directly (see the input
-  // listeners below).
+  // Today's Letter Boxed), 'random-puzzle' (Random Puzzle), or
+  // 'simple-puzzle' (Simple Puzzle). Passed straight through to
+  // puzzleFetcher's markCustomBoard on Apply, which uses it to label the
+  // status something more specific than the generic 'Custom Puzzle'.
+  // Synced from the puzzle actually in play whenever the modal opens
+  // (prepareBoardModal), then cleared by anything that replaces the inputs
+  // with something else -- Parse Pasted Text, Generate From Words, Random
+  // Letters, or hand-editing a side directly (see the input listeners
+  // below).
   let boardKind = null;
 
   function setBoardInputMessage(text, kind = '') {
@@ -193,28 +195,27 @@ export function createBoardSetup({
   // applyBoardFromInputs' generic override message below) -- the player
   // hasn't seen these words either.
   //
-  // Both dictionary calls pass commonWordsOnly: true -- the primary
-  // dictionary carries ~10k proper nouns (place/personal names like
-  // "ELDERSBURG") that a player typing their own Generate From Words seed
-  // would notice and could choose to avoid, but nobody reviews these words
-  // before they become the hidden answer here, so the search is restricted
-  // to a dedicated, frequency-filtered common-words dictionary (see
-  // dictionaryValidator.js's COMMON_WORDS_SIMPLISTIC_SOURCE) to keep the
-  // result recognizable.
-  const MAX_RANDOM_PUZZLE_SEED_ATTEMPTS = 8;
+  // Shared by Random Puzzle and Simple Puzzle below, which differ only in
+  // which curated dictionary tier they draw from -- both dictionary calls
+  // pass commonWordsOnly: true regardless, since the primary dictionary
+  // carries ~10k proper nouns (place/personal names like "ELDERSBURG") that
+  // a player typing their own Generate From Words seed would notice and
+  // could choose to avoid, but nobody reviews these words before they
+  // become the hidden answer here.
+  const MAX_AUTOMATIC_PUZZLE_SEED_ATTEMPTS = 8;
 
-  async function generateRandomPuzzle() {
-    setBoardInputMessage('Generating a random puzzle…');
+  async function generateAutomaticPuzzle({ label, kind, source }) {
+    setBoardInputMessage(`Generating a ${label} puzzle…`);
 
-    for (let attempt = 0; attempt < MAX_RANDOM_PUZZLE_SEED_ATTEMPTS; attempt += 1) {
+    for (let attempt = 0; attempt < MAX_AUTOMATIC_PUZZLE_SEED_ATTEMPTS; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
-      const seed = await dictionaryValidator.getRandomSeedWord({ commonWordsOnly: true });
+      const seed = await dictionaryValidator.getRandomSeedWord({ commonWordsOnly: true, commonWordsSource: source });
       if (!seed) {
         break;
       }
 
       // eslint-disable-next-line no-await-in-loop
-      const companionResult = await dictionaryValidator.findCompanionWord(seed, { commonWordsOnly: true });
+      const companionResult = await dictionaryValidator.findCompanionWord(seed, { commonWordsOnly: true, commonWordsSource: source });
       if (companionResult.error) {
         continue;
       }
@@ -236,24 +237,41 @@ export function createBoardSetup({
         bottom: generated.board[2].letters.join(''),
         left: generated.board[3].letters.join(''),
       });
-      boardKind = 'random-puzzle';
+      boardKind = kind;
       setCanonicalWords(words);
-      setBoardInputMessage('Generated a random puzzle. Click Apply Board to play it.', 'success');
+      setBoardInputMessage(`Generated a ${label} puzzle. Click Apply Board to play it.`, 'success');
       return;
     }
 
-    setBoardInputMessage("Couldn't generate a random puzzle right now. Try again, or use Random Letters below.", 'error');
+    setBoardInputMessage(`Couldn't generate a ${label} puzzle right now. Try again, or use Random Letters below.`, 'error');
+  }
+
+  // Draws from the broader "common words" tier -- recognized by both the
+  // primary and fallback dictionaries and never a proper noun, but not
+  // filtered down to only the most frequent English words. More variety
+  // than Simple Puzzle below, at the cost of occasionally landing on a
+  // less common word.
+  function generateRandomPuzzle() {
+    return generateAutomaticPuzzle({ label: 'random', kind: 'random-puzzle', source: COMMON_WORDS_SOURCE });
+  }
+
+  // Draws from the tighter, frequency-filtered tier -- dictionaryValidator's
+  // own default commonWordsSource, so no override needed here. The easiest,
+  // most recognizable words available, at the cost of a smaller pool (fewer
+  // distinct seeds/companions to draw from) than Random Puzzle above.
+  function generateSimplePuzzle() {
+    return generateAutomaticPuzzle({ label: 'simple', kind: 'simple-puzzle', source: undefined });
   }
 
   // buildBoard() is the same generator used for the placeholder board before
   // the daily catalog (or a shared link) loads at boot -- this just exposes
   // it as something a player can deliberately ask for again, same
   // fill-then-Apply flow as every other way of getting letters into these
-  // fields. Unlike Random Puzzle above, there's no known reference solution
-  // for these letters at all (not even a hidden one) -- just a random
-  // arrangement, not guaranteed easy or even to admit a short solve -- so
-  // this lives in Advanced alongside the other build-it-yourself tools,
-  // not next to Random Puzzle.
+  // fields. Unlike Random Puzzle/Simple Puzzle above, there's no known
+  // reference solution for these letters at all (not even a hidden one) --
+  // just a random arrangement, not guaranteed easy or even to admit a short
+  // solve -- so this lives in Advanced alongside the other
+  // build-it-yourself tools, not next to Random Puzzle/Simple Puzzle.
   function generateRandomLetters() {
     const board = buildBoard();
     fillBoardInputs({
@@ -433,6 +451,8 @@ export function createBoardSetup({
       boardLabel = "today's Letter Boxed board";
     } else if (boardKind === 'random-puzzle') {
       boardLabel = 'random puzzle';
+    } else if (boardKind === 'simple-puzzle') {
+      boardLabel = 'simple puzzle';
     }
     let message = `Applied ${boardLabel}. Route away.`;
     if (overrideWords.length > 0) {
@@ -506,6 +526,7 @@ export function createBoardSetup({
     prepareBoardModal,
     importTodaysLetterBoxedBoard,
     generateRandomPuzzle,
+    generateSimplePuzzle,
     generateRandomLetters,
     pasteBoardFromClipboard,
     parsePastedBoardText,

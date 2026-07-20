@@ -14,6 +14,17 @@
   --success: #78d39b;
   --danger: #ea7a74;
   --shadow: rgba(0, 0, 0, 0.45);
+
+  /* Dictionary-provenance source colors, referenced by both the
+     consolidated bar and its per-word breakdown modal (see
+     boardRenderer.js's SOURCE_SQUARE_INFO). Reused from the existing
+     decorative palette above rather than new hex values, and kept
+     separate from --success/--danger so a source color is never mistaken
+     for a pass/fail signal. */
+  --source-primary: var(--steam);
+  --source-fallback: var(--brass);
+  --source-api: var(--copper);
+  --source-custom: var(--muted);
 }
 
 * {
@@ -94,8 +105,8 @@ body {
    scaling intact above the floor, while guaranteeing the floor at 100%
    zoom -- rather than just hardcoding 14px and losing the original
    relative scale entirely. A few fixed-size circular badges (tile usage
-   count, doubled-letter multiplier, the dictionary-source glyph) needed
-   their container dimensions enlarged to fit, not just the text. */
+   count, doubled-letter multiplier, the dictionary-provenance square)
+   needed their container dimensions enlarged to fit, not just the text. */
 .eyebrow,
 .section-label {
   margin: 0;
@@ -1207,37 +1218,136 @@ body.arcade-mode .board-tools {
   font-size: 1.15em;
 }
 
-.word-pill-source {
-  display: inline-flex;
+.found-words-header {
+  display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 4px;
-  border-radius: 999px;
-  background: rgba(30, 42, 53, 0.16);
-  border: 1px solid rgba(43, 63, 80, 0.16);
-  color: #2b3f50;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.word-pill-source-glyph {
+/* One consolidated bar per solve rather than a badge on every word pill --
+   segments are sized in renderProvenanceBar (boardRenderer.js) by how many
+   words matched each source. Clicking/activating opens the per-word
+   breakdown modal (.provenance-modal-row below). */
+.provenance-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px 5px 5px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+
+.provenance-bar:hover {
+  border-color: var(--brass);
+}
+
+.provenance-bar:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.provenance-bar[hidden] {
+  display: none;
+}
+
+.provenance-bar-track {
+  display: flex;
+  width: 84px;
+  height: max(9px, 0.56rem);
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.provenance-bar-seg {
   flex-shrink: 0;
 }
 
-.word-pill-source-glyph-cover {
-  fill: rgba(255, 255, 255, 0.6);
-  stroke: currentColor;
-  stroke-width: 1.1;
-}
-
-.word-pill-source-glyph-spine {
-  fill: currentColor;
-  opacity: 0.6;
-}
-
-.word-pill-source-glyph-text {
-  fill: currentColor;
-  font-family: inherit;
-  font-size: 14px;
+/* Per-word squares, shown inside the breakdown modal. Primary/Fallback
+   carry a digit reserved for actual dictionary tiers; API/Custom aren't
+   tiers, so they get a two-letter tag on a dashed border instead of a
+   digit, rather than implying they share that numbered sequence. Color is
+   reinforcement only -- the code/digit is the real signal, so
+   identification doesn't collapse for a player who can't rely on hue. */
+.provenance-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: max(20px, 1.3rem);
+  height: max(20px, 1.3rem);
+  border-radius: 5px;
+  font-size: max(0.68rem, 12px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #14171a;
+  flex-shrink: 0;
+}
+
+.provenance-square-tag {
+  border: 1px dashed rgba(20, 23, 26, 0.45);
+  font-size: max(0.58rem, 10px);
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+.provenance-source-primary { background: var(--source-primary); }
+.provenance-source-fallback { background: var(--source-fallback); }
+.provenance-source-api { background: var(--source-api); }
+.provenance-source-custom { background: var(--source-custom); }
+
+.provenance-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+}
+
+.provenance-modal-row:first-of-type {
+  border-top: none;
+}
+
+.provenance-modal-row-squares {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.provenance-legend {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.provenance-legend[hidden] {
+  display: none;
+}
+
+.provenance-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: max(0.82rem, 14px);
+}
+
+.provenance-legend-row .provenance-square {
+  flex-shrink: 0;
 }
 
 .help-modal {

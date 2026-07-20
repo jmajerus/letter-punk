@@ -226,6 +226,10 @@ test('markCustomBoard with kind labels the status distinctly, and clears on the 
   assert.equal(fetcher.getState().puzzleSource, 'custom');
   assert.equal(fetcher.getPuzzleStatusText(), 'Random Puzzle');
 
+  fetcher.markCustomBoard({ kind: 'simple-puzzle' });
+  assert.equal(fetcher.getState().puzzleSource, 'custom');
+  assert.equal(fetcher.getPuzzleStatusText(), 'Simple Puzzle');
+
   fetcher.markCustomBoard();
   assert.equal(fetcher.getPuzzleStatusText(), 'Custom Puzzle');
 });

@@ -423,6 +423,26 @@ test('commonWordsOnly defaults to the simplistic common-words source when common
   assert.ok(calls.includes(SIMPLISTIC_URL), 'must fetch the default simplistic source when no override is given');
 });
 
+test('a per-call commonWordsSource override reaches a different tier than the validator default, for both functions', async () => {
+  // Reproduces Random Puzzle vs Simple Puzzle: same validator instance
+  // (default commonWordsSource is the simplistic tier), one call
+  // explicitly overrides to the broader COMMON_SOURCE tier instead.
+  const SIMPLISTIC_URL = 'util/compressed-dictionary-common-simplistic.txt';
+  const { validator, calls } = createValidator({
+    [PRIMARY_URL]: [],
+    [FALLBACK_URL]: [],
+    [SIMPLISTIC_URL]: ['known'],
+    [COMMON_URL]: [VALID_COMPANION_A],
+  });
+
+  const defaultSeed = await validator.getRandomSeedWord({ commonWordsOnly: true });
+  assert.equal(defaultSeed, 'KNOWN', 'without an override, the validator falls back to its own default (the simplistic tier)');
+
+  const overriddenResult = await validator.findCompanionWord(COMPANION_SEED, { commonWordsOnly: true, commonWordsSource: COMMON_SOURCE });
+  assert.deepEqual(overriddenResult.candidates, [VALID_COMPANION_A]);
+  assert.ok(calls.includes(COMMON_URL), 'the override source must actually be fetched');
+});
+
 test('getRandomSeedWord never returns a word shorter than 3 letters', async () => {
   // "ab" starts with 'a' and would otherwise be a candidate for that
   // letter -- only "known" survives the length filter, regardless of
@@ -487,4 +507,27 @@ test('summarizeValidationSources reflects none/one/many matches', () => {
 
   const both = summarizeValidationSources(['primary-packed-dawg', 'fallback-packed-dawg']);
   assert.equal(both.badge, 'Both');
+});
+
+// The live word-builder indicator (app.js's renderValidationSourceIndicator)
+// shows this detail text directly as a player types -- it must name the
+// actual dictionary, not its role/precedence. "Fallback" specifically used
+// to imply a contingency ("only checked if primary misses") that isn't what
+// validateWord does: it checks every source unconditionally, every time.
+test('summarizeValidationSources detail names the actual dictionary, not a vague role label', () => {
+  const primaryOnly = summarizeValidationSources(['primary-packed-dawg']);
+  assert.equal(primaryOnly.detail, 'Accepted by the Hunspell-based dictionary (general).');
+  assert.equal(primaryOnly.badge, 'Primary', 'the internal badge value stays "Primary" -- only the display text changed');
+
+  const fallbackOnly = summarizeValidationSources(['fallback-packed-dawg']);
+  assert.equal(fallbackOnly.detail, 'Accepted by the 3of6game dictionary (word-game).');
+
+  const both = summarizeValidationSources(['primary-packed-dawg', 'fallback-packed-dawg']);
+  assert.equal(both.detail, 'Accepted by the Hunspell-based dictionary (general) and 3of6game dictionary (word-game).');
+
+  const api = summarizeValidationSources(['fallback-api']);
+  assert.equal(api.detail, 'Accepted by the Fallback API.');
+
+  const custom = summarizeValidationSources(['session-override']);
+  assert.equal(custom.detail, 'Accepted by the Custom override.');
 });

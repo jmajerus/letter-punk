@@ -37,7 +37,12 @@
           </section>
 
           <section class="panel-card">
-            <p class="section-label">Accepted words</p>
+            <div class="found-words-header">
+              <p class="section-label">Accepted words</p>
+              <button id="provenanceBarBtn" class="provenance-bar" type="button" aria-haspopup="dialog" aria-controls="provenanceModal" hidden>
+                <span class="provenance-bar-track" aria-hidden="true"></span>
+              </button>
+            </div>
             <div id="foundWords" class="found-words" aria-label="Accepted words list" aria-live="polite" aria-relevant="additions text"></div>
             <div class="share-actions">
               <button id="hintBtn" class="secondary" type="button" hidden>Hint</button>
@@ -114,9 +119,9 @@
         <div class="settings-option">
           <div class="settings-toggle-row">
             <input id="provenanceBadgesToggle" class="settings-checkbox" type="checkbox" />
-            <label for="provenanceBadgesToggle">Show dictionary provenance badges</label>
+            <label for="provenanceBadgesToggle">Show dictionary provenance bar</label>
           </div>
-          <p class="help-copy">Shows which dictionary accepted each word (Primary, Fallback, or Both). Default is off for a cleaner board.</p>
+          <p class="help-copy">Shows a bar next to Accepted Words summarizing which dictionary source(s) accepted your words; click it for a per-word breakdown. Default is off for a cleaner board.</p>
         </div>
         <div class="settings-option">
           <div class="settings-toggle-row">
@@ -208,6 +213,18 @@
       </div>
     </div>
 
+    <div id="provenanceModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="provenanceTitle" hidden>
+      <div class="help-dialog">
+        <div class="help-header">
+          <h2 id="provenanceTitle">Dictionary sources</h2>
+          <button id="closeProvenanceBtn" class="help-close" type="button" aria-label="Close dictionary sources">Close</button>
+        </div>
+        <p class="help-copy">Where each accepted word was found.</p>
+        <div id="provenanceModalList"></div>
+        <div id="provenanceModalLegend" class="provenance-legend" hidden></div>
+      </div>
+    </div>
+
     <div id="revealSolutionModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="revealSolutionTitle" hidden>
       <div class="help-dialog">
         <div class="help-header">
@@ -233,10 +250,11 @@
           <h2 id="boardTitle">Set Board</h2>
           <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close board setup">Close</button>
         </div>
-        <p class="help-copy">Import today's board, generate a random puzzle, or open Advanced to paste board text, generate one from solution words, or type the letters in yourself.</p>
+        <p class="help-copy">Import today's board, generate a random or simple puzzle, or open Advanced to paste board text, generate one from solution words, or type the letters in yourself.</p>
         <div class="board-paste-actions">
           <button id="importLetterBoxedBtn" class="secondary" type="button">Import Today's Letter Boxed</button>
           <button id="randomPuzzleBtn" class="secondary" type="button">Random Puzzle</button>
+          <button id="simplePuzzleBtn" class="secondary" type="button">Simple Puzzle</button>
         </div>
         <details class="board-advanced">
           <summary>Advanced: paste, generate, or type letters in by hand</summary>

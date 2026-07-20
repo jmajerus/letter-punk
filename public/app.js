@@ -89,6 +89,11 @@ const hintLettersButton = document.getElementById('hintLettersBtn');
 const hintLettersText = document.getElementById('hintLettersText');
 const hintWordsButton = document.getElementById('hintWordsBtn');
 const hintWordsText = document.getElementById('hintWordsText');
+const provenanceBarButton = document.getElementById('provenanceBarBtn');
+const provenanceModal = document.getElementById('provenanceModal');
+const closeProvenanceButton = document.getElementById('closeProvenanceBtn');
+const provenanceModalListElement = document.getElementById('provenanceModalList');
+const provenanceModalLegendElement = document.getElementById('provenanceModalLegend');
 const closeHelpButton = document.getElementById('closeHelpBtn');
 const gotItButton = document.getElementById('gotItBtn');
 const boardModal = document.getElementById('boardModal');
@@ -101,6 +106,7 @@ const boardLeftInput = document.getElementById('boardLeftInput');
 const boardPasteInput = document.getElementById('boardPasteInput');
 const importLetterBoxedButton = document.getElementById('importLetterBoxedBtn');
 const randomPuzzleButton = document.getElementById('randomPuzzleBtn');
+const simplePuzzleButton = document.getElementById('simplePuzzleBtn');
 const randomLettersButton = document.getElementById('randomLettersBtn');
 const pasteClipboardButton = document.getElementById('pasteClipboardBtn');
 const parseBoardPasteButton = document.getElementById('parseBoardPasteBtn');
@@ -322,6 +328,9 @@ const modalManager = createModalManager({
   hintModal,
   closeHintButton,
   hintButton,
+  provenanceModal,
+  closeProvenanceButton,
+  provenanceBarButton,
 });
 
 const hintPanel = createHintPanel({
@@ -672,7 +681,10 @@ function renderUi(snapshot = gameEngine.getSnapshot()) {
   }
 
   renderer.renderCurrentWord(currentWordElement, snapshot.tokens);
-  renderer.renderFoundWords(foundWordsElement, snapshot.foundWords, settings.isProvenanceBadgesEnabled());
+  renderer.renderFoundWords(foundWordsElement, snapshot.foundWords);
+  renderer.renderProvenanceBar(provenanceBarButton, snapshot.foundWords, settings.isProvenanceBadgesEnabled());
+  renderer.renderProvenanceBreakdown(provenanceModalListElement, snapshot.foundWords, settings.isProvenanceBadgesEnabled());
+  renderer.renderProvenanceLegend(provenanceModalLegendElement, snapshot.foundWords, settings.isProvenanceBadgesEnabled());
   renderValidationSourceIndicator(snapshot);
   renderLetterCountStat(snapshot);
   renderFreeChainBadge(snapshot);
@@ -1011,6 +1023,8 @@ function wireEvents() {
   revealSolutionCopyButton?.addEventListener('click', revealSolution);
   hintButton?.addEventListener('click', modalManager.openHintModal);
   closeHintButton?.addEventListener('click', modalManager.closeHintModal);
+  provenanceBarButton?.addEventListener('click', modalManager.openProvenanceModal);
+  closeProvenanceButton?.addEventListener('click', modalManager.closeProvenanceModal);
   closeSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   saveSettingsButton?.addEventListener('click', modalManager.closeSettingsModal);
   closeYesterdayButton?.addEventListener('click', modalManager.closeYesterdayModal);
@@ -1022,6 +1036,7 @@ function wireEvents() {
   applyBoardButton?.addEventListener('click', boardSetup.applyBoardFromInputs);
   importLetterBoxedButton?.addEventListener('click', boardSetup.importTodaysLetterBoxedBoard);
   randomPuzzleButton?.addEventListener('click', boardSetup.generateRandomPuzzle);
+  simplePuzzleButton?.addEventListener('click', boardSetup.generateSimplePuzzle);
   randomLettersButton?.addEventListener('click', boardSetup.generateRandomLetters);
   pasteClipboardButton?.addEventListener('click', boardSetup.pasteBoardFromClipboard);
   parseBoardPasteButton?.addEventListener('click', boardSetup.parsePastedBoardText);
@@ -1059,6 +1074,11 @@ function wireEvents() {
       modalManager.closeHintModal();
     }
   });
+  provenanceModal?.addEventListener('click', (event) => {
+    if (event.target === provenanceModal) {
+      modalManager.closeProvenanceModal();
+    }
+  });
 
   reducedMotionToggle?.addEventListener('change', () => {
     settings.setReducedMotionPreference(Boolean(reducedMotionToggle.checked));
@@ -1070,7 +1090,7 @@ function wireEvents() {
     const enabled = Boolean(provenanceBadgesToggle.checked);
     settings.setProvenanceBadgesPreference(enabled);
     renderUi();
-    setMessage(`Dictionary provenance badges ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+    setMessage(`Dictionary provenance bar ${enabled ? 'enabled' : 'disabled'}.`, 'success');
   });
 
   freeChainToggle?.addEventListener('change', () => {
@@ -1163,6 +1183,11 @@ function wireEvents() {
 
       if (activeModal === hintModal) {
         modalManager.closeHintModal();
+        return;
+      }
+
+      if (activeModal === provenanceModal) {
+        modalManager.closeProvenanceModal();
         return;
       }
 

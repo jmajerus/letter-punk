@@ -73,6 +73,28 @@ export function getValidationSourceLabel(sourceKey) {
   return 'Unavailable';
 }
 
+// Player-facing name for each source, named after the actual dictionary
+// rather than its role/precedence in the lookup. "Primary"/"Fallback" say
+// nothing about what a word was actually found in, stop being accurate the
+// moment either dictionary is swapped for a different one, and "Fallback"
+// specifically implies a contingency ("only checked if the first one
+// misses") that isn't what happens -- validateWord checks every source in
+// PACKED_DICTIONARY_SOURCES unconditionally, every time, for provenance,
+// even though gameplay only needs one match. Naming the real thing sidesteps
+// that entirely. The parenthetical marks what kind of dictionary each one
+// is (general-purpose vs. word-game-specific), which is what actually
+// explains why two are stacked in the first place -- see
+// docs/dual-dictionary-validation.md. API/Custom aren't dictionaries, so
+// they keep describing their role instead; API's own contingency (only
+// used when local dictionaries are unreachable) is a genuine fallback, just
+// not the one "Fallback" used to name here.
+export const SOURCE_DISPLAY_NAMES = {
+  Primary: 'Hunspell-based dictionary (general)',
+  Fallback: '3of6game dictionary (word-game)',
+  API: 'Fallback API',
+  Custom: 'Custom override',
+};
+
 export function summarizeValidationSources(matchedSources) {
   const uniqueSources = [...new Set((matchedSources || []).filter(Boolean))];
 
@@ -83,17 +105,19 @@ export function summarizeValidationSources(matchedSources) {
     };
   }
 
-  if (uniqueSources.length > 1) {
+  const labels = uniqueSources.map(getValidationSourceLabel);
+  const names = labels.map((label) => SOURCE_DISPLAY_NAMES[label]);
+
+  if (labels.length > 1) {
     return {
       badge: 'Both',
-      detail: 'Accepted by multiple dictionary sources.',
+      detail: `Accepted by the ${names.join(' and ')}.`,
     };
   }
 
-  const label = getValidationSourceLabel(uniqueSources[0]);
   return {
-    badge: label,
-    detail: `Accepted by the ${label.toLowerCase()} dictionary.`,
+    badge: labels[0],
+    detail: `Accepted by the ${names[0]}.`,
   };
 }
 
@@ -122,9 +146,13 @@ export function createDictionaryValidator(options = {}) {
   // Shared by findCompanionWord and getRandomSeedWord's commonWordsOnly
   // option -- both need exactly this same "which source(s) to search"
   // resolution, nothing else about the two functions overlaps enough to
-  // merge further.
-  function resolveSearchSources(commonWordsOnly) {
-    return commonWordsOnly ? [commonWordsSource] : sources;
+  // merge further. sourceOverride lets a specific call reach for a
+  // different curated tier than the validator's own default (e.g. Random
+  // Puzzle's broader COMMON_WORDS_SOURCE vs. Simple Puzzle's default
+  // COMMON_WORDS_SIMPLISTIC_SOURCE) without constructing a whole second
+  // validator just to change which one tier gets searched.
+  function resolveSearchSources(commonWordsOnly, sourceOverride) {
+    return commonWordsOnly ? [sourceOverride || commonWordsSource] : sources;
   }
 
   // Words explicitly whitelisted for the currently-applied custom board
@@ -340,7 +368,10 @@ export function createDictionaryValidator(options = {}) {
    * simplistic common-words tier by default -- see
    * COMMON_WORDS_SIMPLISTIC_SOURCE above) -- off by default so a player
    * typing their own seed into Generate From Words still gets the full
-   * dictionary's candidates, same as always.
+   * dictionary's candidates, same as always. commonWordsSource lets a call
+   * reach for a specific tier instead (e.g. the broader COMMON_WORDS_SOURCE)
+   * without touching the validator's own configured default; ignored unless
+   * commonWordsOnly is also true.
    *
    * Returned shortest to longest. This function has no way to know
    * whether a candidate's own internal letter sequence can actually fit
@@ -348,7 +379,7 @@ export function createDictionaryValidator(options = {}) {
    * job, and it can fail for a given pair) — callers should be prepared to
    * try more than one candidate, not just the first.
    */
-  async function findCompanionWord(seedWord, { commonWordsOnly = false } = {}) {
+  async function findCompanionWord(seedWord, { commonWordsOnly = false, commonWordsSource: sourceOverride } = {}) {
     const seed = String(seedWord || '').trim().toLowerCase();
     if (seed.length < 3) {
       return { error: 'Seed word must be at least 3 letters.' };
@@ -361,7 +392,7 @@ export function createDictionaryValidator(options = {}) {
     const seedLast = seed[seed.length - 1];
     const blockedWords = await loadBlocklist();
     const candidateWords = new Set();
-    const searchSources = resolveSearchSources(commonWordsOnly);
+    const searchSources = resolveSearchSources(commonWordsOnly, sourceOverride);
 
     for (const source of searchSources) {
       // eslint-disable-next-line no-await-in-loop
@@ -410,16 +441,18 @@ export function createDictionaryValidator(options = {}) {
    * COMMON_WORDS_SIMPLISTIC_SOURCE above) -- excludes proper nouns,
    * anything not shared with the fallback dictionary, and anything outside
    * the top 10k most frequent English words, e.g. "ELDERSBURG" (a proper
-   * noun) and any oddity the broader common tier alone still carries.
+   * noun) and any oddity the broader common tier alone still carries. Pass
+   * a commonWordsSource here to reach for a different tier for this one
+   * call (e.g. the broader COMMON_WORDS_SOURCE) instead.
    */
-  async function getRandomSeedWord({ commonWordsOnly = false } = {}) {
+  async function getRandomSeedWord({ commonWordsOnly = false, commonWordsSource: sourceOverride } = {}) {
     const blockedWords = await loadBlocklist();
     const letters = [...ALPHABET];
     for (let index = letters.length - 1; index > 0; index -= 1) {
       const swapIndex = Math.floor(Math.random() * (index + 1));
       [letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]];
     }
-    const searchSources = resolveSearchSources(commonWordsOnly);
+    const searchSources = resolveSearchSources(commonWordsOnly, sourceOverride);
 
     for (const letter of letters) {
       const candidateWords = new Set();

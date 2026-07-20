@@ -76,8 +76,9 @@ export function createPuzzleFetcher(options = {}) {
     // Set only via markCustomBoard's kind option -- narrows
     // getPuzzleStatusText's generic 'Custom Puzzle' down to something more
     // specific (currently 'letterboxed-import' -> "Today's Letter Boxed",
-    // 'random-puzzle' -> 'Random Puzzle') for a board whose canonicalWords
-    // came from somewhere other than the player's own typing, without
+    // 'random-puzzle' -> 'Random Puzzle', 'simple-puzzle' -> 'Simple
+    // Puzzle') for a board whose canonicalWords came from somewhere other
+    // than the player's own typing, without
     // touching puzzleSource itself (still 'custom' either way, so analytics
     // indexing, share-link flattening, etc. -- everything keyed off
     // puzzleSource === 'custom' -- stays exactly as it was). null for a
@@ -270,6 +271,9 @@ export function createPuzzleFetcher(options = {}) {
       }
       if (state.customBoardKind === 'random-puzzle') {
         return 'Random Puzzle';
+      }
+      if (state.customBoardKind === 'simple-puzzle') {
+        return 'Simple Puzzle';
       }
       return 'Custom Puzzle';
     }

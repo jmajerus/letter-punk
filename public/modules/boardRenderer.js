@@ -2,64 +2,89 @@
  * Board renderer owns DOM + SVG rendering for tiles and steampunk pipe routes.
  * Gameplay state remains external and is provided via render calls.
  */
+import { SOURCE_DISPLAY_NAMES } from './dictionaryValidator.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HISTORY_ROUTE_LIMIT = 8;
 const HISTORY_OPACITY_MAX = 0.68;
 const HISTORY_OPACITY_MIN = 0.22;
 const HISTORY_JOINT_OPACITY_BOOST = 0.08;
 
-// Which labeled book-cover glyph(s) render for each dictionary-source badge.
-// A pictogram alone reads ambiguously at badge scale (could be a book,
-// could be a butterfly) — the short code on the cover does the actual
-// identifying work, the book shape is just supporting context. "Both"
-// renders as two covers side by side, one per source, rather than one
-// glyph trying to represent two things at once.
-const SOURCE_GLYPH_CODES = {
-  Primary: ['D1'],
-  Fallback: ['D2'],
-  Both: ['D1', 'D2'],
-  API: ['AP'],
-  Custom: ['CU'],
+// Maps a word's collapsed validation badge (see dictionaryValidator.js's
+// summarizeValidationSources) to the individual source(s) it represents.
+// "Both" only ever means Primary+Fallback -- API and Custom are each
+// mutually exclusive with everything else (see validateWord).
+const BADGE_SOURCE_LABELS = {
+  Primary: ['Primary'],
+  Fallback: ['Fallback'],
+  Both: ['Primary', 'Fallback'],
+  API: ['API'],
+  Custom: ['Custom'],
 };
 
-/**
- * A small book-cover glyph with a short code (e.g. "D1") as its cover
- * title. Drawn with currentColor so it always matches the badge's own
- * text color, rather than a platform emoji that wouldn't.
- */
-// Geometry is scaled up ~1.35x from its original 20x24 viewBox so the
-// 2-character code can render at the site's 14px accessibility floor
-// (see the font-size floor note in styles.css) without the text crowding
-// the book-cover shape.
-function createDictionaryGlyph(code) {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 27 32');
-  svg.setAttribute('width', '28');
-  svg.setAttribute('height', '34');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('class', 'word-pill-source-glyph');
+// Per-source square styling. Primary/Fallback get a fixed digit -- "1"/"2"
+// reserved for actual dictionary tiers, so a future third tier can take
+// "3" without colliding with anything. API/Custom aren't dictionary tiers
+// at all, so they keep a two-letter tag on a dashed border instead of a
+// digit, rather than implying they're part of the same numbered sequence.
+const SOURCE_SQUARE_INFO = {
+  Primary: { code: '1', colorClass: 'provenance-source-primary' },
+  Fallback: { code: '2', colorClass: 'provenance-source-fallback' },
+  API: { code: 'AP', colorClass: 'provenance-source-api', tag: true },
+  Custom: { code: 'CU', colorClass: 'provenance-source-custom', tag: true },
+};
 
-  const cover = document.createElementNS(SVG_NS, 'rect');
-  cover.setAttribute('x', '1.3');
-  cover.setAttribute('y', '1.3');
-  cover.setAttribute('width', '24');
-  cover.setAttribute('height', '30');
-  cover.setAttribute('rx', '3.4');
-  cover.setAttribute('class', 'word-pill-source-glyph-cover');
+// Shared display order for both the consolidated bar's segments and any
+// one word's own squares.
+const SOURCE_ORDER = ['Primary', 'Fallback', 'API', 'Custom'];
 
-  const spine = document.createElementNS(SVG_NS, 'path');
-  spine.setAttribute('d', 'M4.7 1.3h-0.7a2.7 2.7 0 0 0-2.7 2.7v24.3a2.7 2.7 0 0 0 2.7 2.7h0.7z');
-  spine.setAttribute('class', 'word-pill-source-glyph-spine');
+// Legend copy for the breakdown modal -- self-contained per row (no "see
+// above"/"the dictionaries above" phrasing), since the legend only shows
+// rows for sources actually present in the current solve and so can't
+// assume any particular row appears alongside any other. Primary/Fallback
+// need no more than their name (see dictionaryValidator.js's
+// SOURCE_DISPLAY_NAMES, the single source of truth for this text -- the
+// live word-builder indicator uses the same names) -- API/Custom aren't
+// dictionaries, so they get a phrase explaining their role instead.
+const SOURCE_LEGEND_DESCRIPTIONS = {
+  Primary: SOURCE_DISPLAY_NAMES.Primary,
+  Fallback: SOURCE_DISPLAY_NAMES.Fallback,
+  API: 'Fallback API, used only when local dictionaries are unreachable',
+  Custom: 'Allowed for this board specifically, not from a dictionary',
+};
 
-  const text = document.createElementNS(SVG_NS, 'text');
-  text.setAttribute('x', '16');
-  text.setAttribute('y', '21.5');
-  text.setAttribute('text-anchor', 'middle');
-  text.setAttribute('class', 'word-pill-source-glyph-text');
-  text.textContent = code;
+function createProvenanceSquare(sourceLabel) {
+  const info = SOURCE_SQUARE_INFO[sourceLabel];
+  const square = document.createElement('span');
+  square.className = ['provenance-square', info.colorClass, info.tag ? 'provenance-square-tag' : '']
+    .filter(Boolean)
+    .join(' ');
+  square.textContent = info.code;
+  square.setAttribute('aria-hidden', 'true');
+  return square;
+}
 
-  svg.append(cover, spine, text);
-  return svg;
+function describeSourceLabels(labels) {
+  const names = labels.map((label) => SOURCE_DISPLAY_NAMES[label]);
+  return names.length > 1 ? names.join(' and ') : names[0];
+}
+
+// Shared by renderProvenanceBar and renderProvenanceLegend -- how many
+// found words matched each source. A word badged "Both" contributes to
+// both Primary's and Fallback's counts (see BADGE_SOURCE_LABELS), so the
+// total can exceed the word count.
+function getSourceCounts(foundWords) {
+  const counts = new Map();
+  for (const word of foundWords) {
+    const labels = BADGE_SOURCE_LABELS[word.validationBadge];
+    if (!labels) {
+      continue;
+    }
+    for (const label of labels) {
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+  }
+  return counts;
 }
 
 function clamp(value, min, max) {
@@ -761,7 +786,7 @@ export function createBoardRenderer(options) {
     }
   }
 
-  function renderFoundWords(foundWordsElement, foundWords, badgesEnabled) {
+  function renderFoundWords(foundWordsElement, foundWords) {
     foundWordsElement.innerHTML = '';
 
     if (foundWords.length === 0) {
@@ -781,33 +806,154 @@ export function createBoardRenderer(options) {
       label.textContent = word.word;
       pill.append(label);
 
-      if (badgesEnabled && word.validationBadge) {
-        const sourceBadge = document.createElement('span');
-        sourceBadge.className = 'word-pill-source';
-        sourceBadge.title = word.validationDetail || '';
-
-        // The visible badge is glyphs only now — "Both" renders as two
-        // book covers (D1, D2) side by side rather than a single glyph
-        // trying to represent two sources at once. The full word
-        // ("Primary"/"Both"/...) still exists as screen-reader-only text,
-        // since a sighted user gets it from the glyph codes but that
-        // information would otherwise disappear entirely for anyone using
-        // assistive tech (the SVGs themselves are aria-hidden).
-        const codes = SOURCE_GLYPH_CODES[word.validationBadge] || [];
-        for (const code of codes) {
-          sourceBadge.append(createDictionaryGlyph(code));
-        }
-
-        const srLabel = document.createElement('span');
-        srLabel.className = 'sr-only';
-        srLabel.textContent = word.validationBadge;
-        sourceBadge.append(srLabel);
-
-        pill.append(sourceBadge);
-      }
-
       foundWordsElement.append(pill);
     }
+  }
+
+  // Consolidated dictionary-provenance bar: one segmented bar for the whole
+  // solve instead of a badge per word (see renderProvenanceBreakdown for
+  // the per-word detail this summarizes). Segment width is proportional to
+  // how many words matched each source, so a multi-source word like one
+  // badged "Both" contributes to both Primary's and Fallback's segments --
+  // the total can add up to more than the word count, which is the honest
+  // read once a single word can match more than one source.
+  function renderProvenanceBar(barButton, foundWords, badgesEnabled) {
+    if (!barButton) {
+      return;
+    }
+
+    const track = barButton.querySelector('.provenance-bar-track');
+
+    if (!badgesEnabled) {
+      barButton.hidden = true;
+      if (track) {
+        track.innerHTML = '';
+      }
+      return;
+    }
+
+    const counts = getSourceCounts(foundWords);
+
+    if (counts.size === 0) {
+      barButton.hidden = true;
+      if (track) {
+        track.innerHTML = '';
+      }
+      return;
+    }
+
+    if (track) {
+      track.innerHTML = '';
+      for (const label of SOURCE_ORDER) {
+        const count = counts.get(label);
+        if (!count) {
+          continue;
+        }
+        const info = SOURCE_SQUARE_INFO[label];
+        const segment = document.createElement('span');
+        segment.className = `provenance-bar-seg ${info.colorClass}`;
+        segment.style.flexGrow = String(count);
+        track.append(segment);
+      }
+    }
+
+    const parts = SOURCE_ORDER.filter((label) => counts.get(label)).map((label) => {
+      const count = counts.get(label);
+      // A trailing "(N words)" would stack awkwardly against names that
+      // already end in a parenthetical (e.g. "...dictionary (general)"),
+      // so the count is set off with a colon instead.
+      return `${SOURCE_DISPLAY_NAMES[label]}: ${count} word${count === 1 ? '' : 's'}`;
+    });
+    const summary = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+    barButton.setAttribute('aria-label', `Dictionary sources: ${summary}. Open breakdown.`);
+    barButton.hidden = false;
+  }
+
+  // Per-word detail behind the bar above -- reuses the same squares Option
+  // A settled on, just relocated from every pill onto one modal list.
+  function renderProvenanceBreakdown(listElement, foundWords, badgesEnabled) {
+    if (!listElement) {
+      return;
+    }
+
+    listElement.innerHTML = '';
+
+    if (!badgesEnabled) {
+      return;
+    }
+
+    // foundWords is newest-first; reverse to the order the words were
+    // actually played, matching how share text / Reveal Solution read.
+    const ordered = [...foundWords].reverse();
+
+    for (const word of ordered) {
+      const labels = BADGE_SOURCE_LABELS[word.validationBadge];
+      if (!labels) {
+        continue;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'provenance-modal-row';
+
+      const label = document.createElement('span');
+      label.textContent = word.word;
+      row.append(label);
+
+      const squares = document.createElement('span');
+      squares.className = 'provenance-modal-row-squares';
+      for (const sourceLabel of labels) {
+        squares.append(createProvenanceSquare(sourceLabel));
+      }
+
+      const srLabel = document.createElement('span');
+      srLabel.className = 'sr-only';
+      srLabel.textContent = describeSourceLabels(labels);
+      squares.append(srLabel);
+
+      row.append(squares);
+      listElement.append(row);
+    }
+  }
+
+  // Legend for the breakdown above -- only rows for sources actually
+  // present in this solve, so a board with only Primary/Fallback words
+  // never explains API/Custom it never used.
+  function renderProvenanceLegend(legendElement, foundWords, badgesEnabled) {
+    if (!legendElement) {
+      return;
+    }
+
+    legendElement.innerHTML = '';
+
+    if (!badgesEnabled) {
+      legendElement.hidden = true;
+      return;
+    }
+
+    const counts = getSourceCounts(foundWords);
+
+    if (counts.size === 0) {
+      legendElement.hidden = true;
+      return;
+    }
+
+    for (const label of SOURCE_ORDER) {
+      if (!counts.get(label)) {
+        continue;
+      }
+
+      const row = document.createElement('p');
+      row.className = 'provenance-legend-row';
+      row.append(createProvenanceSquare(label));
+
+      const description = document.createElement('span');
+      description.textContent = SOURCE_LEGEND_DESCRIPTIONS[label];
+      row.append(description);
+
+      legendElement.append(row);
+    }
+
+    legendElement.hidden = false;
   }
 
   function renderLetterUsage(prospectiveUsedLetters, currentTokenLetters, letterUsageCounts = new Map()) {
@@ -936,6 +1082,9 @@ export function createBoardRenderer(options) {
     renderBoard,
     renderCurrentWord,
     renderFoundWords,
+    renderProvenanceBar,
+    renderProvenanceBreakdown,
+    renderProvenanceLegend,
     renderLetterUsage,
     renderBoardLinks,
     flashInvalidTile,

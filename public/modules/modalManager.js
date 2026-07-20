@@ -1,5 +1,6 @@
-// Owns open/close/focus for the six modals (Help, Yesterday's Puzzle,
-// Solution, Settings, Set Board, Hints) plus the two cross-modal helpers
+// Owns open/close/focus for the seven modals (Help, Yesterday's Puzzle,
+// Solution, Settings, Set Board, Hints, Dictionary Sources) plus the two
+// cross-modal helpers
 // that don't belong to any one of them: getActiveModal (which one, if any,
 // is currently open) and trapFocusInModal (keeps Tab cycling inside
 // whichever modal is open, rather than escaping to the page behind it).
@@ -38,6 +39,9 @@ export function createModalManager({
   hintModal,
   closeHintButton,
   hintButton,
+  provenanceModal,
+  closeProvenanceButton,
+  provenanceBarButton,
 }) {
   function openHelpModal() {
     if (!helpModal) {
@@ -183,6 +187,29 @@ export function createModalManager({
     hintButton?.focus();
   }
 
+  // Unlike the other modals above, there's no data to fetch or populate
+  // here -- the breakdown list is kept current on every render alongside
+  // the bar that opens this (see boardRenderer.js's renderProvenanceBar/
+  // renderProvenanceBreakdown, called together in app.js), so opening is
+  // just show-and-focus like openHelpModal.
+  function openProvenanceModal() {
+    if (!provenanceModal) {
+      return;
+    }
+
+    provenanceModal.hidden = false;
+    closeProvenanceButton?.focus();
+  }
+
+  function closeProvenanceModal() {
+    if (!provenanceModal) {
+      return;
+    }
+
+    provenanceModal.hidden = true;
+    provenanceBarButton?.focus();
+  }
+
   function getActiveModal() {
     if (boardModal && !boardModal.hidden) {
       return boardModal;
@@ -202,6 +229,10 @@ export function createModalManager({
 
     if (hintModal && !hintModal.hidden) {
       return hintModal;
+    }
+
+    if (provenanceModal && !provenanceModal.hidden) {
+      return provenanceModal;
     }
 
     if (helpModal && !helpModal.hidden) {
@@ -229,6 +260,8 @@ export function createModalManager({
       closeRevealSolutionModal();
     } else if (activeModal === hintModal) {
       closeHintModal();
+    } else if (activeModal === provenanceModal) {
+      closeProvenanceModal();
     } else if (activeModal === helpModal) {
       closeHelpModal();
     }
@@ -277,6 +310,8 @@ export function createModalManager({
     closeBoardModal,
     openHintModal,
     closeHintModal,
+    openProvenanceModal,
+    closeProvenanceModal,
     getActiveModal,
     closeActiveModalIfAny,
     trapFocusInModal,
