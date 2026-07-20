@@ -132,7 +132,7 @@ export function createPuzzleReplay({
 
     // Adopt the link's canonical words as this session's own — this keeps
     // the character-count comparison working, and means re-sharing this same
-    // puzzle later (or reopening Set Board) carries the reference solution
+    // puzzle later (or reopening New Game) carries the reference solution
     // forward too.
     setCanonicalWords(canonicalWordsFromLink);
 

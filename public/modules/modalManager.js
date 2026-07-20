@@ -1,5 +1,5 @@
 // Owns open/close/focus for the seven modals (Help, Yesterday's Puzzle,
-// Solution, Settings, Set Board, Hints, Dictionary Sources) plus the two
+// Solution, Settings, New Game, Hints, Dictionary Sources) plus the two
 // cross-modal helpers
 // that don't belong to any one of them: getActiveModal (which one, if any,
 // is currently open) and trapFocusInModal (keeps Tab cycling inside
@@ -8,7 +8,7 @@
 // getYesterdayPuzzleData/loadPlayerSolutions/getRevealSolutionData/
 // loadRevealPlayerSolutions/syncSettingsToUi/prepareBoardModal are
 // callbacks rather than direct references to puzzleFetcher/the
-// /api/solutions fetch/gameEngine's share summary/settings/the Set Board
+// /api/solutions fetch/gameEngine's share summary/settings/the New Game
 // input-filling helpers, since those are each one specific thing this
 // module needs from a neighboring concern, not a reason to depend on the
 // whole of it.
@@ -32,6 +32,7 @@ export function createModalManager({
   settingsButton,
   provenanceBadgesToggle,
   boardModal,
+  boardButton,
   boardTopInput,
   getYesterdayPuzzleData,
   syncSettingsToUi,
@@ -161,12 +162,7 @@ export function createModalManager({
     }
 
     boardModal.hidden = true;
-    // setBoardButton now lives inside the Settings modal (see its click
-    // listener in app.js's wireEvents), which is always closed by the time
-    // this runs -- focusing it directly would land focus on an element
-    // inside a hidden container. The Settings button is the closest stable
-    // return point now.
-    settingsButton?.focus();
+    boardButton?.focus();
   }
 
   function openHintModal() {

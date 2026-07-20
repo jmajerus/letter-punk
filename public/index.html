@@ -94,7 +94,7 @@
                 <button id="todayPuzzleBtn" class="secondary today-puzzle-btn" type="button" aria-label="Return to today's puzzle">Today's Puzzle</button>
                 <button id="nextPuzzleBtn" class="secondary puzzle-nav-arrow" type="button" aria-label="Play next puzzle">&gt;</button>
               </div>
-              <button id="playLetterBoxedBtn" class="secondary today-puzzle-btn" type="button" aria-label="Play today's real Letter Boxed board">NYT</button>
+              <button id="setBoardBtn" class="secondary today-puzzle-btn" type="button" aria-label="Start a new game" aria-haspopup="dialog" aria-controls="boardModal">New</button>
               <button id="resetBtn" class="secondary reset-btn" type="button" aria-label="Reset this puzzle">Reset</button>
             </div>
             <button id="clearBtn" class="secondary" aria-label="Delete current word">Undo Word</button>
@@ -138,10 +138,6 @@
             <label for="shareIncludeLinkToggle">Include link when sharing</label>
           </div>
           <p class="help-copy">Turn this on to also include a link to a blank copy of the puzzle, so someone who doesn't already have Letter Punk bookmarked can jump straight in and play it themselves.</p>
-        </div>
-        <div class="settings-option">
-          <button id="setBoardBtn" class="help-btn" type="button" aria-label="Open board setup" aria-haspopup="dialog" aria-controls="boardModal">Set Board…</button>
-          <p class="help-copy">Paste a board from classic Letter Boxed, or generate one from your own solution word(s). An advanced option most players won't need day to day.</p>
         </div>
         <div class="help-actions">
           <button id="saveSettingsBtn" class="primary" type="button">Done</button>
@@ -249,17 +245,21 @@
     <div id="boardModal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="boardTitle" hidden>
       <div class="help-dialog">
         <div class="help-header">
-          <h2 id="boardTitle">Set Board</h2>
-          <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close board setup">Close</button>
+          <h2 id="boardTitle">New Game</h2>
+          <button id="closeBoardBtn" class="help-close" type="button" aria-label="Close new game">Close</button>
         </div>
-        <p class="help-copy">Import today's board, generate a random or simple puzzle, pick your own dictionary mix, or open Advanced to paste board text, generate one from solution words, or type the letters in yourself.</p>
+        <div class="board-nyt-link">
+          <a id="playRealNytLink" href="https://www.nytimes.com/puzzles/letter-boxed" target="_blank" rel="noopener noreferrer">Play today's NYT Letter Boxed</a>
+          <p class="help-copy">Or play the same puzzle here using Letter Punk's theme:</p>
+          <button id="importLetterBoxedBtn" class="secondary" type="button">Letter (Punk) Boxed</button>
+        </div>
+        <p class="help-copy">Generate a random or simple puzzle, pick your own dictionary mix with Controlled Puzzle, or open Advanced to paste board text, generate one from solution words, or type the letters in yourself.</p>
         <div class="board-paste-actions">
-          <button id="importLetterBoxedBtn" class="secondary" type="button">Import Today's Letter Boxed</button>
           <button id="randomPuzzleBtn" class="secondary" type="button">Random Puzzle</button>
           <button id="simplePuzzleBtn" class="secondary" type="button">Simple Puzzle</button>
         </div>
         <details class="board-advanced">
-          <summary>Advanced: random controlled-vocabulary puzzle</summary>
+          <summary>Controlled Puzzle</summary>
           <p class="help-copy">Pick one or more dictionaries -- the puzzle's seed and companion word can come from any of them.</p>
           <div id="controlledPuzzleDictionaries" class="controlled-puzzle-dictionaries" role="group" aria-label="Dictionaries to draw from"></div>
           <div class="board-paste-actions">
@@ -301,7 +301,7 @@
           <button id="applyBoardBtn" class="primary" type="button">Apply Board</button>
         </div>
         <div class="settings-option">
-          <p class="help-copy"><strong>Share this board</strong> — copy a link to the board you're currently playing, blank or with your current progress included. Unlike Share on the main screen, these always include the link and never mask the words.</p>
+          <p class="help-copy"><strong>Share this board</strong> — copy a link to the board you're currently playing, blank or with your current progress. Unlike Share on the main screen, this is nothing but the URL itself.</p>
           <div class="board-paste-actions">
             <button id="copyBlankLinkBtn" class="secondary" type="button">Copy Blank Link</button>
             <button id="copyProgressLinkBtn" class="secondary" type="button">Copy Progress Link</button>

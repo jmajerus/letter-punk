@@ -1,6 +1,6 @@
 /**
  * Fetches today's real NYT Letter Boxed board layout from third-party hints
- * pages, for the "Set Board" modal's board-import button. Deliberately
+ * pages, for the "New Game" modal's board-import button. Deliberately
  * imports only the bare 4-side letter layout -- never NYT's own visual
  * design, branding, or copy -- the same category of thing a player can
  * already do by hand-typing a board they saw somewhere else (see the

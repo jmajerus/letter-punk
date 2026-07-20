@@ -307,7 +307,7 @@ export function createArcadeMode({
     sourceProgressWords = progressWords;
     sourceCanonicalWords = canonicalWordsFromLink;
     document.body.classList.add('arcade-mode');
-    // A modal left open (Settings, Set Board, etc.) from before the idle
+    // A modal left open (Settings, New Game, etc.) from before the idle
     // timer fired would otherwise sit on top of the loop, fully interactive
     // and blocking the very "station is free" signal the loop exists to
     // send. Harmless no-op on the very first, URL-triggered call, since

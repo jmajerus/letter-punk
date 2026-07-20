@@ -56,7 +56,7 @@ export function createSettings({
   // Settings default). Only a shared link whose progress words don't
   // actually chain sets this — see puzzleReplay.js's hydrateSharedPuzzle —
   // and only the three board-application paths (catalog navigation, manual
-  // Set Board, a new shared link) clear it. Toggling the Settings checkbox
+  // New Game, a new shared link) clear it. Toggling the Settings checkbox
   // itself is the one and only way to make a change stick beyond the
   // current puzzle.
   let freeChainSessionOverride = null;
@@ -161,7 +161,7 @@ export function createSettings({
 
   // Scopes a session override to the puzzle that produced it: called at the
   // start of every path that loads a genuinely different board (catalog
-  // navigation, manual Set Board, a new shared link) so a Free Chain
+  // navigation, manual New Game, a new shared link) so a Free Chain
   // override from a previous shared link never leaks into an unrelated
   // puzzle.
   function clearFreeChainSessionOverride() {

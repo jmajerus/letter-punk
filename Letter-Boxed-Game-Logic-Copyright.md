@@ -9,14 +9,16 @@ Letter Punk is inspired by NYT's Letter Boxed but is an original project: its ow
 
 ## How Letter Punk stays clear of that
 
-- **Different name, different branding** — no use of "Letter Boxed," "NYT," or anything implying affiliation.
+- **Different name, different branding** — no use of "Letter Boxed," "NYT," or anything implying affiliation, anywhere Letter Punk is describing or naming itself. The one exception is a plain outbound link to NYT's own site (see "Importing today's real board" below) — naming NYT there is a factual reference to whose puzzle it links to, not a description of Letter Punk.
 - **Original code, written from scratch** — nothing copied from NYT's implementation.
 - **Original visual design** — a steampunk aesthetic (brass, copper, pipes, gauges) rather than NYT's presentation.
 - **Original wording** — help text, instructions, and UI copy written independently.
 
 ## Importing today's real board
 
-The "Letter Boxed" button and Set Board's "Import Today's Letter Boxed" option fetch the day's real board layout (12 letters, 4 sides) from third-party hints pages. This pulls in only the bare letter arrangement — a fact, not a creative expression — never NYT's actual source code, visual design, or written copy; it's the same category of thing a player could already do by hand-typing a board they saw somewhere else via Set Board's paste/manual-entry tools. Same reasoning as above, just automated.
+New Game's **Letter (Punk) Boxed** option fetches the day's real board layout (12 letters, 4 sides) from third-party hints pages. This pulls in only the bare letter arrangement — a fact, not a creative expression — never NYT's actual source code, visual design, or written copy; it's the same category of thing a player could already do by hand-typing a board they saw somewhere else via New Game's paste/manual-entry tools. Same reasoning as above, just automated. The button's own name deliberately avoids reproducing "Letter Boxed" as a phrase, instead punning on it with the app's own name.
+
+Right above that button, a plain link reading "Play today's NYT Letter Boxed" sends a player straight to the real puzzle at nytimes.com — this is the one place in the app that names "NYT" directly, and it's the safest possible way to do it: a factual, nominative reference used only to point a player at NYT's own site, not to describe or brand anything of Letter Punk's own.
 
 ## What's actually new here
 

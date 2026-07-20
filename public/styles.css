@@ -1472,6 +1472,7 @@ body.arcade-mode .board-tools {
 
 .help-actions {
   margin-top: 14px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: end;
 }
@@ -1543,6 +1544,33 @@ body.arcade-mode .board-tools {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Sets the real-NYT link and its in-theme alternative apart as their own
+   category, above the generated/custom board options below -- one links
+   straight out to nytimes.com (today's puzzle only, no in-app apply step
+   at all), the other applies the same board locally in one click. */
+.board-nyt-link {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(205, 216, 226, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(36, 44, 51, 0.9), rgba(24, 29, 34, 0.9));
+}
+
+.board-nyt-link > a {
+  font-weight: 700;
+  color: var(--brass);
+  text-decoration: underline;
+}
+
+.board-nyt-link > a:hover,
+.board-nyt-link > a:focus-visible {
+  color: var(--ember);
+}
+
+.board-nyt-link .help-copy {
+  margin: 6px 0 10px;
 }
 
 .board-input:focus-visible {

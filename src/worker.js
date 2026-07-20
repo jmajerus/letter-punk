@@ -280,7 +280,7 @@ export default {
       });
     }
 
-    // Today's real NYT Letter Boxed board layout, for the Set Board modal's
+    // Today's real NYT Letter Boxed board layout, for the New Game modal's
     // import button (see src/letterboxedImport.js for where this data comes
     // from and why). Returns 502 -- never a board -- when the upstream
     // source is unavailable or its markup no longer matches; the client

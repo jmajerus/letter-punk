@@ -33,7 +33,7 @@ const revealSolutionButton = document.getElementById('revealSolutionBtn');
 const hintButton = document.getElementById('hintBtn');
 // Shared by Share and Reveal Solution -- both live together in the
 // Accepted Words card now, so one status area (matching the existing
-// Copy Blank Link/Copy Progress Link precedent in Set Board) is clearer
+// Copy Blank Link/Copy Progress Link precedent in New Game) is clearer
 // than two separate ones a reader would have to check individually.
 const shareStatusMessageElement = document.getElementById('shareStatusMessage');
 const letterCountStatElement = document.getElementById('letterCountStat');
@@ -45,7 +45,6 @@ const clearButton = document.getElementById('clearBtn');
 const previousPuzzleButton = document.getElementById('previousPuzzleBtn');
 const todayPuzzleButton = document.getElementById('todayPuzzleBtn');
 const nextPuzzleButton = document.getElementById('nextPuzzleBtn');
-const playLetterBoxedButton = document.getElementById('playLetterBoxedBtn');
 const resetButton = document.getElementById('resetBtn');
 const setBoardButton = document.getElementById('setBoardBtn');
 const settingsButton = document.getElementById('settingsBtn');
@@ -262,7 +261,7 @@ const campaignCard = createCampaignCard({
 });
 
 // The known reference solution for the currently-applied board, if any.
-// Persists across "Set Board" modal opens/closes as long as the same puzzle
+// Persists across "New Game" modal opens/closes as long as the same puzzle
 // stays loaded — cleared only when puzzleFetcher actually loads a different
 // board (see the applyBoard callback below), not on every modal open. Feeds
 // three things: the solution-words input field, session dictionary
@@ -317,6 +316,7 @@ const modalManager = createModalManager({
   settingsButton,
   provenanceBadgesToggle,
   boardModal,
+  boardButton: setBoardButton,
   boardTopInput,
   getYesterdayPuzzleData: () => puzzleFetcher.getNavigationState().yesterdayData,
   loadPlayerSolutions: loadYesterdayPlayerSolutions,
@@ -1040,16 +1040,8 @@ function wireEvents() {
   previousPuzzleButton?.addEventListener('click', playPreviousPuzzle);
   todayPuzzleButton?.addEventListener('click', playTodayPuzzle);
   nextPuzzleButton?.addEventListener('click', playNextPuzzle);
-  playLetterBoxedButton?.addEventListener('click', boardSetup.playTodaysLetterBoxed);
   resetButton?.addEventListener('click', puzzleProgress.resetCurrent);
-  // setBoardButton lives inside the Settings modal now -- close Settings
-  // first so the two modals never end up visibly stacked on top of each
-  // other, since openBoardModal itself doesn't know or care what else
-  // might currently be open.
-  setBoardButton?.addEventListener('click', () => {
-    modalManager.closeSettingsModal();
-    modalManager.openBoardModal();
-  });
+  setBoardButton?.addEventListener('click', modalManager.openBoardModal);
   settingsButton?.addEventListener('click', modalManager.openSettingsModal);
   yesterdayButton?.addEventListener('click', modalManager.openYesterdayModal);
   helpButton?.addEventListener('click', modalManager.openHelpModal);
@@ -1072,7 +1064,7 @@ function wireEvents() {
   gotItButton?.addEventListener('click', modalManager.closeHelpModal);
   closeBoardButton?.addEventListener('click', modalManager.closeBoardModal);
   applyBoardButton?.addEventListener('click', boardSetup.applyBoardFromInputs);
-  importLetterBoxedButton?.addEventListener('click', boardSetup.importTodaysLetterBoxedBoard);
+  importLetterBoxedButton?.addEventListener('click', boardSetup.playTodaysLetterBoxed);
   randomPuzzleButton?.addEventListener('click', boardSetup.generateRandomPuzzle);
   simplePuzzleButton?.addEventListener('click', boardSetup.generateSimplePuzzle);
   generateControlledPuzzleButton?.addEventListener('click', boardSetup.generateControlledPuzzle);

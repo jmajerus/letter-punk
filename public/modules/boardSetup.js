@@ -76,7 +76,7 @@ function groupDictionaryOptionsByFamily(options) {
 }
 
 /**
- * Owns the Set Board modal's input side (paste/parse, generate-from-words,
+ * Owns the New Game modal's input side (paste/parse, generate-from-words,
  * import, manual grid, Apply) -- everything upstream of a board actually
  * getting applied to gameEngine. The modal's "Share this board" section
  * (Copy Blank/Progress Link) stays in app.js: it's a share concern that
@@ -136,7 +136,7 @@ export function createBoardSetup({
   // Populated once, not per modal-open -- the option list is static
   // (GENERATION_DICTIONARY_OPTIONS never changes at runtime), and unlike
   // boardKind above, which tier(s) a player last selected is left sticky
-  // across modal opens rather than reset, so re-opening Set Board to tweak
+  // across modal opens rather than reset, so re-opening New Game to tweak
   // one selection doesn't lose the rest.
   //
   // Every rendered input carries data-dictionaryKey when (and only when)
@@ -285,42 +285,6 @@ export function createBoardSetup({
     }
 
     setBoardInputMessage('');
-  }
-
-  // Fetches today's real NYT Letter Boxed board (via the server-side
-  // /api/import/letterboxed route -- see src/letterboxedImport.js) and
-  // fills it into the side inputs, exactly like Parse Pasted Text does.
-  // Deliberately doesn't auto-apply: the player still reviews and clicks
-  // Apply Board themselves, same as every other way of getting letters
-  // into these fields.
-  //
-  // When the source provides it (xfire only, not the gameletterboxed
-  // fallback), the real solution words come along too and are set as
-  // canonicalWords -- quietly, the same way Generate From Words does, so
-  // Reveal Solution/Share/word-count comparisons can use the actual NYT
-  // answer without ever displaying it up front (see prepareBoardModal).
-  async function importTodaysLetterBoxedBoard() {
-    setBoardInputMessage("Fetching today's board…");
-
-    let payload = null;
-    try {
-      const response = await fetch('/api/import/letterboxed');
-      payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.board) {
-        setBoardInputMessage(payload?.error || "Couldn't fetch today's board. Enter it manually below.", 'error');
-        return;
-      }
-    } catch {
-      setBoardInputMessage("Couldn't fetch today's board. Enter it manually below.", 'error');
-      return;
-    }
-
-    fillBoardInputs(payload.board);
-    boardKind = 'letterboxed-import';
-    boardDictionaryKeys = [];
-    setCanonicalWords(payload.solutionWords || []);
-    const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed board";
-    setBoardInputMessage(`Imported ${puzzleLabel} (${payload.date}). Click Apply Board to play it.`, 'success');
   }
 
   // Fully automated: picks a random seed word (dictionaryValidator's
@@ -676,44 +640,46 @@ export function createBoardSetup({
     setMessage(message);
   }
 
-  // One-click main-screen counterpart to Import Today's Letter Boxed: fetches
-  // and applies today's board immediately, no modal or separate Apply step --
-  // matching how Previous/Today's Puzzle/Next already work. Still runs the
-  // fetched board through boardFromInputValues for the same validation Apply
-  // Board gets, since it's still untrusted external data underneath.
+  // The New Game modal's one-click Letter Boxed action: fetches and applies
+  // today's real board immediately, no separate Apply Board step -- unlike
+  // every other option in this modal, which just fills the side inputs and
+  // waits for the player to review and apply. Closes the modal itself on
+  // success, same as applyBoardFromInputs; errors surface in the modal
+  // (it's still open at that point) rather than the main-screen message.
   async function playTodaysLetterBoxed() {
-    setMessage("Fetching today's Letter Boxed board…");
+    setBoardInputMessage("Fetching today's Letter Boxed board…");
 
     let payload = null;
     try {
       const response = await fetch('/api/import/letterboxed');
       payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.board) {
-        setMessage(payload?.error || "Couldn't fetch today's Letter Boxed board. Try again later.", 'error');
+        setBoardInputMessage(payload?.error || "Couldn't fetch today's Letter Boxed board. Try again later.", 'error');
         return;
       }
     } catch {
-      setMessage("Couldn't fetch today's Letter Boxed board. Try again later.", 'error');
+      setBoardInputMessage("Couldn't fetch today's Letter Boxed board. Try again later.", 'error');
       return;
     }
 
     const parsed = boardFromInputValues(payload.board);
     if (parsed.error) {
-      setMessage(`Fetched today's board, but ${parsed.error.toLowerCase()}`, 'error');
+      setBoardInputMessage(`Fetched today's board, but ${parsed.error.toLowerCase()}`, 'error');
       return;
     }
 
     settings.clearFreeChainSessionOverride();
-    // Set quietly, same as importTodaysLetterBoxedBoard -- never displayed
-    // up front, only used for Reveal Solution/Share/word-count comparisons
-    // against the real NYT answer (see prepareBoardModal's spoiler guard
-    // and applyBoardFromInputs' generic override message).
+    // Set quietly -- never displayed up front, only used for Reveal
+    // Solution/Share/word-count comparisons against the real NYT answer
+    // (see prepareBoardModal's spoiler guard and applyBoardFromInputs'
+    // generic override message).
     setCanonicalWords(payload.solutionWords || []);
     puzzleFetcher.markCustomBoard({ kind: 'letterboxed-import' });
     gameEngine.applyBoardDefinition(parsed.board);
     await applySolutionWordOverrides(getCanonicalWords());
 
     trackPuzzleLoad('custom', getAnalyticsPuzzleId(puzzleFetcher.getState()));
+    modalManager.closeBoardModal();
     const puzzleLabel = payload.puzzleNumber ? `Letter Boxed #${payload.puzzleNumber}` : "today's Letter Boxed";
     setMessage(`Loaded ${puzzleLabel}. Route away.`, 'success');
   }
@@ -732,7 +698,6 @@ export function createBoardSetup({
 
   return {
     prepareBoardModal,
-    importTodaysLetterBoxedBoard,
     generateRandomPuzzle,
     generateSimplePuzzle,
     generateControlledPuzzle,
